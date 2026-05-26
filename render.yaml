@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: solicitud-informe-tecnico
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: flet run --web --port $PORT main.py
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
