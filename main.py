@@ -1362,8 +1362,8 @@ def main(page: ft.Page):
     def tab_btn(label, subtitulo, key):
         is_active = plantilla["actual"] == key
 
-        def on_click(e):
-            plantilla["actual"] = key
+        def on_click(e, k=key):
+            plantilla["actual"] = k
             rebuild_form()
             rebuild_tabs()
             page.update()
@@ -1384,16 +1384,25 @@ def main(page: ft.Page):
             border_radius=ft.border_radius.only(top_left=4, top_right=4),
         )
 
-    tabs_row = ft.Row(controls=[], spacing=4)
+    tabs_row = ft.Row(controls=[], spacing=4, scroll=ft.ScrollMode.AUTO)
+
+    scroll_hint = ft.Container(
+        content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=RULE, size=22),
+        padding=ft.padding.symmetric(horizontal=4, vertical=10),
+        tooltip="Desliza para ver más plantillas",
+    )
 
     def rebuild_tabs():
+        keys = ["informe", "archivo", "reporte", "cobros", "inspeccion"]
         tabs_row.controls = [
-            tab_btn("Informe Técnico",       "Catastro · Investigación Parcelaria", "informe"),
-            tab_btn("Solicitud de Archivo",  "Archivo · Expediente",                "archivo"),
-            tab_btn("Reporte de Audiencia",  "Audiencia · Fallo y próxima fecha",   "reporte"),
-            tab_btn("Solicitud de Cobros",   "Cobros · Verificación de pago",       "cobros"),
-            tab_btn("Solicitud de Inspección","Inspección · Cuerpo libre",          "inspeccion"),
+            tab_btn("Informe Técnico",        "Catastro · Investigación Parcelaria", "informe"),
+            tab_btn("Solicitud de Archivo",   "Archivo · Expediente",                "archivo"),
+            tab_btn("Reporte de Audiencia",   "Audiencia · Fallo y próxima fecha",   "reporte"),
+            tab_btn("Solicitud de Cobros",    "Cobros · Verificación de pago",       "cobros"),
+            tab_btn("Solicitud de Inspección","Inspección · Cuerpo libre",           "inspeccion"),
         ]
+        # Ocultar la flecha si la plantilla activa es la última
+        scroll_hint.visible = plantilla["actual"] != keys[-1]
 
     rebuild_tabs()
 
@@ -1449,10 +1458,17 @@ def main(page: ft.Page):
                             font_family=FONT_DISPLAY),
                 ], spacing=2, tight=True),
             ], alignment=ft.MainAxisAlignment.START),
-            tabs_row,
+            ft.Row(
+                controls=[
+                    ft.Container(content=tabs_row, expand=True),
+                    scroll_hint,
+                ],
+                spacing=0,
+                vertical_alignment=ft.CrossAxisAlignment.END,
+            ),
         ], spacing=0),
         bgcolor=PANEL_INK,
-        padding=ft.padding.only(top=18, bottom=0, left=36, right=36),
+        padding=ft.padding.only(top=18, bottom=0, left=36, right=8),
         border=ft.border.only(bottom=ft.BorderSide(3, ACCENT)),
     )
 
