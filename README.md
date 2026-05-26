@@ -18,7 +18,7 @@ Sistema web desarrollado en **Python + Flet** para automatizar la generación de
 - Generación de documentos `.docx` con **formato exacto** al original
 - Fuente **Century Gothic** en todos los documentos
 - Campos dinámicos: anexos, demandados y partes configurables
-- Vista previa en tiempo real
+- Tabs deslizables con navegación por flecha en móvil
 - El documento se guarda automáticamente en la carpeta **Descargas** y se abre en Word
 
 ## Tecnologías
@@ -45,12 +45,30 @@ Luego abrir el navegador en: **http://localhost:8080**
 ## Estructura del proyecto
 
 ```
-├── main.py            # App principal (UI + generadores de documentos)
-├── requirements.txt   # Dependencias
-├── Procfile           # Configuración para deploy en Render.com
-├── render.yaml        # Configuración de Render.com
+├── main.py                        # UI principal (Flet)
+├── generators/
+│   ├── __init__.py                # Exporta los 5 generadores
+│   ├── base.py                    # Helpers y constantes compartidos (python-docx)
+│   ├── informe.py                 # Generador: Informe Técnico
+│   ├── archivo.py                 # Generador: Copia Certificada
+│   ├── reporte.py                 # Generador: Reporte de Audiencia
+│   ├── cobros.py                  # Generador: Solicitud de Cobros
+│   └── inspeccion.py              # Generador: Solicitud de Inspección
+├── assets/
+│   ├── favicon.png                # Ícono de pestaña (escudo RDL)
+│   └── icons/
+│       └── loading-animation.png  # Reemplazado por PNG transparente
+├── requirements.txt               # Dependencias
+├── Procfile                       # Comando de arranque para Render.com
+├── render.yaml                    # Configuración de Render.com
 └── README.md
 ```
+
+## Agregar una nueva plantilla
+
+1. Crear `generators/nueva.py` con una función `generar(d: dict) -> bytes` usando los helpers de `base.py`
+2. Registrarla en `generators/__init__.py`
+3. Agregar el formulario en `main.py` siguiendo el patrón `build_*` existente
 
 ## Deploy
 
