@@ -512,6 +512,13 @@ def generar_solicitud_inspeccion(d: dict) -> bytes:
 #  HELPER DESCARGA (Windows local / Web Linux)
 # ══════════════════════════════════════════════
 
+def _nombre_archivo(tipo: str, identificador: str) -> str:
+    """Genera un nombre de archivo limpio: 'Tipo - Nombre Completo.docx'"""
+    import re
+    limpio = re.sub(r'[\\/*?:"<>|]', '', identificador).strip()
+    limpio = re.sub(r'\s+', ' ', limpio)
+    return f"{tipo} - {limpio}.docx"
+
 def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
     if platform.system() == "Windows":
         # Local: guarda en Descargas y abre con Word
@@ -858,9 +865,7 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_informe_tecnico(form)
-                slug = form["cliente"].split()[0] if form["cliente"] else "solicitud"
-                fecha_slug = form["fecha_carta"].replace("/","_")
-                nombre = f"InformeTecnico_{slug}_{fecha_slug}.docx"
+                nombre = _nombre_archivo("Informe Tecnico", form.get("cliente","Solicitud"))
                 _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
@@ -956,9 +961,7 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_copia_certificada(form)
-                slug = form["nombre_cliente"].split()[0] if form["nombre_cliente"] else "solicitud"
-                fecha_slug = form["fecha_carta"].replace("/","_")
-                nombre = f"CopiaCertificada_{slug}_{fecha_slug}.docx"
+                nombre = _nombre_archivo("Solicitud de Archivo", form.get("nombre_cliente","Solicitud"))
                 _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
@@ -1111,8 +1114,10 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_reporte_audiencia(form)
-                slug = form["expediente"].replace("/","_").replace("-","_") or "reporte"
-                nombre = f"ReporteAudiencia_{slug}.docx"
+                # Reporte: usa el primer demandado o expediente como identificador
+                dem = next((x.strip() for x in form.get("demandados",[]) if x.strip()), "")
+                ident = dem or form.get("expediente","Reporte")
+                nombre = _nombre_archivo("Reporte de Audiencia", ident)
                 _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
@@ -1228,9 +1233,7 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_solicitud_cobros(form)
-                slug = form["nombre_cliente"].split()[0] if form["nombre_cliente"] else "cobros"
-                fecha_slug = form["fecha_carta"].replace("/","_")
-                nombre = f"SolicitudCobros_{slug}_{fecha_slug}.docx"
+                nombre = _nombre_archivo("Solicitud de Cobros", form.get("nombre_cliente","Solicitud"))
                 _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
@@ -1321,9 +1324,7 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_solicitud_inspeccion(form)
-                dest_slug = form["destinatario"].split()[0] if form["destinatario"] else "inspeccion"
-                fecha_slug = form["fecha_carta"].replace("/","_")
-                nombre = f"SolicitudInspeccion_{dest_slug}_{fecha_slug}.docx"
+                nombre = _nombre_archivo("Solicitud de Inspeccion", form.get("destinatario","Solicitud"))
                 _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
