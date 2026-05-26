@@ -1384,16 +1384,28 @@ def main(page: ft.Page):
             border_radius=ft.border_radius.only(top_left=4, top_right=4),
         )
 
+    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion"]
+
     tabs_row = ft.Row(controls=[], spacing=4, scroll=ft.ScrollMode.AUTO)
 
+    def on_arrow_click(e):
+        idx = KEYS.index(plantilla["actual"])
+        siguiente = KEYS[idx + 1] if idx < len(KEYS) - 1 else KEYS[0]
+        plantilla["actual"] = siguiente
+        rebuild_form()
+        rebuild_tabs()
+        page.update()
+
     scroll_hint = ft.Container(
-        content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=RULE, size=22),
-        padding=ft.padding.symmetric(horizontal=4, vertical=10),
-        tooltip="Desliza para ver más plantillas",
+        content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ACCENT, size=26),
+        padding=ft.padding.symmetric(horizontal=6, vertical=10),
+        tooltip="Siguiente plantilla",
+        on_click=on_arrow_click,
+        ink=True,
+        border_radius=4,
     )
 
     def rebuild_tabs():
-        keys = ["informe", "archivo", "reporte", "cobros", "inspeccion"]
         tabs_row.controls = [
             tab_btn("Informe Técnico",        "Catastro · Investigación Parcelaria", "informe"),
             tab_btn("Solicitud de Archivo",   "Archivo · Expediente",                "archivo"),
@@ -1401,8 +1413,7 @@ def main(page: ft.Page):
             tab_btn("Solicitud de Cobros",    "Cobros · Verificación de pago",       "cobros"),
             tab_btn("Solicitud de Inspección","Inspección · Cuerpo libre",           "inspeccion"),
         ]
-        # Ocultar la flecha si la plantilla activa es la última
-        scroll_hint.visible = plantilla["actual"] != keys[-1]
+        scroll_hint.visible = plantilla["actual"] != KEYS[-1]
 
     rebuild_tabs()
 
