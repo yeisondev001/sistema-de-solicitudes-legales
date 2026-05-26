@@ -14,7 +14,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from datetime import date
-import io
+import io, os, platform, base64, pathlib
 
 # ──────────────────────────────────────────────
 # PALETA  Navy & Oro
@@ -509,6 +509,27 @@ def generar_solicitud_inspeccion(d: dict) -> bytes:
 
 
 # ══════════════════════════════════════════════
+#  HELPER DESCARGA (Windows local / Web Linux)
+# ══════════════════════════════════════════════
+
+def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
+    if platform.system() == "Windows":
+        # Local: guarda en Descargas y abre con Word
+        descargas = pathlib.Path.home() / "Downloads"
+        descargas.mkdir(exist_ok=True)
+        ruta = descargas / nombre
+        ruta.write_bytes(contenido)
+        os.startfile(str(ruta))
+        snack_fn(f"✓ Guardado en Descargas: {nombre}")
+    else:
+        # Web (Render / Linux): descarga via data URL en el navegador
+        b64 = base64.b64encode(contenido).decode()
+        mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        page.launch_url(f"data:{mime};base64,{b64}")
+        snack_fn(f"✓ Descargando: {nombre}")
+
+
+# ══════════════════════════════════════════════
 #  HELPERS UI
 # ══════════════════════════════════════════════
 
@@ -837,16 +858,10 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_informe_tecnico(form)
-                import os, pathlib
-                descargas = pathlib.Path.home() / "Downloads"
-                descargas.mkdir(exist_ok=True)
                 slug = form["cliente"].split()[0] if form["cliente"] else "solicitud"
                 fecha_slug = form["fecha_carta"].replace("/","_")
                 nombre = f"InformeTecnico_{slug}_{fecha_slug}.docx"
-                ruta = descargas / nombre
-                ruta.write_bytes(contenido)
-                os.startfile(str(ruta))
-                snack(f"✓ Guardado: {nombre}")
+                _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -941,16 +956,10 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_copia_certificada(form)
-                import os, pathlib
-                descargas = pathlib.Path.home() / "Downloads"
-                descargas.mkdir(exist_ok=True)
                 slug = form["nombre_cliente"].split()[0] if form["nombre_cliente"] else "solicitud"
                 fecha_slug = form["fecha_carta"].replace("/","_")
                 nombre = f"CopiaCertificada_{slug}_{fecha_slug}.docx"
-                ruta = descargas / nombre
-                ruta.write_bytes(contenido)
-                os.startfile(str(ruta))
-                snack(f"✓ Guardado: {nombre}")
+                _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -1102,15 +1111,9 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_reporte_audiencia(form)
-                import os, pathlib
-                descargas = pathlib.Path.home() / "Downloads"
-                descargas.mkdir(exist_ok=True)
                 slug = form["expediente"].replace("/","_").replace("-","_") or "reporte"
                 nombre = f"ReporteAudiencia_{slug}.docx"
-                ruta = descargas / nombre
-                ruta.write_bytes(contenido)
-                os.startfile(str(ruta))
-                snack(f"✓ Guardado: {nombre}")
+                _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -1225,16 +1228,10 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_solicitud_cobros(form)
-                import os, pathlib
-                descargas = pathlib.Path.home() / "Downloads"
-                descargas.mkdir(exist_ok=True)
                 slug = form["nombre_cliente"].split()[0] if form["nombre_cliente"] else "cobros"
                 fecha_slug = form["fecha_carta"].replace("/","_")
                 nombre = f"SolicitudCobros_{slug}_{fecha_slug}.docx"
-                ruta = descargas / nombre
-                ruta.write_bytes(contenido)
-                os.startfile(str(ruta))
-                snack(f"✓ Guardado: {nombre}")
+                _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -1324,16 +1321,10 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_solicitud_inspeccion(form)
-                import os, pathlib
-                descargas = pathlib.Path.home() / "Downloads"
-                descargas.mkdir(exist_ok=True)
                 dest_slug = form["destinatario"].split()[0] if form["destinatario"] else "inspeccion"
                 fecha_slug = form["fecha_carta"].replace("/","_")
                 nombre = f"SolicitudInspeccion_{dest_slug}_{fecha_slug}.docx"
-                ruta = descargas / nombre
-                ruta.write_bytes(contenido)
-                os.startfile(str(ruta))
-                snack(f"✓ Guardado: {nombre}")
+                _guardar_y_abrir(page, contenido, nombre, snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
