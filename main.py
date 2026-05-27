@@ -714,4 +714,13 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    import start
+    import shutil, pathlib, flet_web
+    try:
+        _web = pathlib.Path(flet_web.__file__).parent / "web"
+        shutil.copy("assets/favicon.png", _web / "favicon.png")
+        shutil.copy("assets/icons/loading-animation.png", _web / "icons" / "loading-animation.png")
+    except Exception as e:
+        print(f"Aviso assets: {e}")
+
+    port = int(os.environ.get("PORT", 8080))
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, assets_dir="assets")
