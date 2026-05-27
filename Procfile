@@ -1,1 +1,1 @@
-web: flet run --web --port $PORT main.py
+web: python start.py
