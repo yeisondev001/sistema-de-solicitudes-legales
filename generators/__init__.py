@@ -4,3 +4,10 @@ from .reporte    import generar as generar_reporte_audiencia
 from .cobros     import generar as generar_solicitud_cobros
 from .inspeccion import generar as generar_solicitud_inspeccion
 from .base       import nombre_archivo
+from .pdf_gen    import (
+    pdf_informe_tecnico,
+    pdf_copia_certificada,
+    pdf_reporte_audiencia,
+    pdf_solicitud_cobros,
+    pdf_solicitud_inspeccion,
+)

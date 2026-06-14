@@ -16,6 +16,11 @@ from generators import (
     generar_solicitud_cobros,
     generar_solicitud_inspeccion,
     nombre_archivo,
+    pdf_informe_tecnico,
+    pdf_copia_certificada,
+    pdf_reporte_audiencia,
+    pdf_solicitud_cobros,
+    pdf_solicitud_inspeccion,
 )
 
 # ── PALETA ───────────────────────────────────────
@@ -30,6 +35,7 @@ PANEL_INK  = "#0F2A3F"
 
 FONT_DISPLAY = "Cormorant Garamond"
 FONT_BODY    = "Source Serif 4"
+PDF_COLOR    = "#6B1A1A"   # rojo vino — clásico PDF, armoniza con navy+gold
 
 # Teclado numérico + filtros para fechas y cédulas
 KT_NUM      = ft.KeyboardType.NUMBER
@@ -38,7 +44,7 @@ FLT_CEDULA  = ft.InputFilter(regex_string=r"[0-9\-]")
 
 
 # ── DESCARGA ─────────────────────────────────────
-def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
+def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
     if platform.system() == "Windows":
         descargas = pathlib.Path.home() / "Downloads"
         descargas.mkdir(exist_ok=True)
@@ -48,15 +54,13 @@ def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
         snack_fn(f"✓ Guardado en Descargas: {nombre}")
     else:
         b64  = base64.b64encode(contenido).decode()
-        mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        # Usamos Blob + <a download> en lugar de data: URI porque iOS Safari
-        # no admite descargas desde data: URIs (.docx nunca aparece en Archivos).
         nombre_js = nombre.replace("\\", "\\\\").replace("'", "\\'")
+        mime_js   = mime.replace("'", "\\'")
         js = f"""(function(){{
   var b = atob('{b64}');
   var arr = new Uint8Array(b.length);
   for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
-  var blob = new Blob([arr],{{type:'{mime}'}});
+  var blob = new Blob([arr],{{type:'{mime_js}'}});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url; a.download = '{nombre_js}';
@@ -66,6 +70,15 @@ def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
 }})();"""
         page.eval_js(js)
         snack_fn(f"✓ Descargando: {nombre}")
+
+
+def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
+    mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    _descargar(page, contenido, nombre, mime, snack_fn)
+
+
+def _guardar_pdf(page, contenido: bytes, nombre: str, snack_fn):
+    _descargar(page, contenido, nombre, "application/pdf", snack_fn)
 
 
 # ── HELPERS UI ───────────────────────────────────
@@ -150,6 +163,21 @@ def boton_generar(on_click):
             ft.Text("·", size=22, color=ACCENT),
         ], spacing=14, alignment=ft.MainAxisAlignment.CENTER),
         bgcolor=PANEL_INK,
+        padding=ft.padding.symmetric(vertical=16, horizontal=34),
+        border=ft.border.all(1, ACCENT),
+        on_click=on_click, ink=True, border_radius=2,
+    )
+
+
+def boton_pdf(on_click):
+    return ft.Container(
+        content=ft.Row(controls=[
+            ft.Icon(ft.Icons.PICTURE_AS_PDF, color=PAPER, size=18),
+            ft.Text("GENERAR DOCUMENTO PDF", size=14,
+                    weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY),
+            ft.Text("·", size=22, color=ACCENT),
+        ], spacing=14, alignment=ft.MainAxisAlignment.CENTER),
+        bgcolor=PDF_COLOR,
         padding=ft.padding.symmetric(vertical=16, horizontal=34),
         border=ft.border.all(1, ACCENT),
         on_click=on_click, ink=True, border_radius=2,
@@ -325,17 +353,31 @@ def main(page: ft.Page):
 
         build_anexos()
 
-        def on_generar(e):
+        def _validar_informe():
             reqs = [("inscripcion_no","No. Inscripción Catastral"),("propietario","Propietario"),
                     ("fecha_audiencia","Fecha de audiencia"),("expediente","No. Expediente"),("cliente","Cliente")]
             faltantes = [n for k, n in reqs if not form.get(k,"").strip()]
             if not any(a.strip() for a in form.get("anexos",[])):
                 faltantes.append("al menos un Anexo")
+            return faltantes
+
+        def on_generar(e):
+            faltantes = _validar_informe()
             if faltantes:
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_informe_tecnico(form)
                 _guardar_y_abrir(page, contenido, nombre_archivo("Informe Tecnico", form.get("cliente","Solicitud")), snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        def on_pdf_informe(e):
+            faltantes = _validar_informe()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = pdf_informe_tecnico(form)
+                _guardar_pdf(page, contenido, nombre_archivo("Informe Tecnico", form.get("cliente","Solicitud")).replace(".docx",".pdf"), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -377,6 +419,8 @@ def main(page: ft.Page):
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(on_pdf_informe), alignment=ft.alignment.center),
             nota_descarga(),
         ]
 
@@ -385,15 +429,28 @@ def main(page: ft.Page):
         form = form_archivo
         def rf(): page.update()
 
-        def on_generar(e):
+        def _validar_archivo():
             reqs = [("nombre_cliente","Nombre del cliente"),("cedula","Cédula"),
                     ("descripcion_inmueble","Descripción del inmueble"),("tipo_proceso","Tipo de proceso"),("tribunal","Tribunal")]
-            faltantes = [n for k, n in reqs if not form.get(k,"").strip()]
+            return [n for k, n in reqs if not form.get(k,"").strip()]
+
+        def on_generar(e):
+            faltantes = _validar_archivo()
             if faltantes:
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_copia_certificada(form)
                 _guardar_y_abrir(page, contenido, nombre_archivo("Solicitud de Archivo", form.get("nombre_cliente","Solicitud")), snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        def on_pdf_archivo(e):
+            faltantes = _validar_archivo()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = pdf_copia_certificada(form)
+                _guardar_pdf(page, contenido, nombre_archivo("Solicitud de Archivo", form.get("nombre_cliente","Solicitud")).replace(".docx",".pdf"), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -423,6 +480,8 @@ def main(page: ft.Page):
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(on_pdf_archivo), alignment=ft.alignment.center),
             nota_descarga(),
         ]
 
@@ -467,13 +526,17 @@ def main(page: ft.Page):
 
         build_demandados()
 
-        def on_generar(e):
+        def _validar_reporte():
             reqs = [("tribunal","Tribunal"),("expediente","No. Expediente"),("demandantes","Demandante(s)"),
                     ("parcela","Parcela"),("fecha_audiencia","Fecha de audiencia"),("fallo","Fallo"),
                     ("fecha_proxima","Fecha próxima audiencia"),("abogados","Abogado(s)")]
             faltantes = [n for k, n in reqs if not form.get(k,"").strip()]
             if not any(x.strip() for x in form.get("demandados",[])):
                 faltantes.append("Demandado(s)")
+            return faltantes
+
+        def on_generar(e):
+            faltantes = _validar_reporte()
             if faltantes:
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
@@ -481,6 +544,18 @@ def main(page: ft.Page):
                 dem   = next((x.strip() for x in form.get("demandados",[]) if x.strip()), "")
                 ident = dem or form.get("expediente","Reporte")
                 _guardar_y_abrir(page, contenido, nombre_archivo("Reporte de Audiencia", ident), snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        def on_pdf_reporte(e):
+            faltantes = _validar_reporte()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = pdf_reporte_audiencia(form)
+                dem   = next((x.strip() for x in form.get("demandados",[]) if x.strip()), "")
+                ident = dem or form.get("expediente","Reporte")
+                _guardar_pdf(page, contenido, nombre_archivo("Reporte de Audiencia", ident).replace(".docx",".pdf"), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -513,6 +588,8 @@ def main(page: ft.Page):
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(on_pdf_reporte), alignment=ft.alignment.center),
             nota_descarga(),
         ]
 
@@ -521,18 +598,31 @@ def main(page: ft.Page):
         form = form_cobros
         def rf(): page.update()
 
-        def on_generar(e):
+        def _validar_cobros():
             reqs = [("nombre_cliente","Nombre del cliente"),("tipo_proceso","Tipo de proceso"),
                     ("parcela","Parcela"),("municipio","Municipio"),("provincia","Provincia"),
                     ("expediente","No. Expediente"),("cedula","Cédula"),("tribunal","Tribunal"),
                     ("sentencia","No. Sentencia"),("fecha_sentencia","Fecha sentencia"),
                     ("tribunal_original","Tribunal que dictó la sentencia")]
-            faltantes = [n for k, n in reqs if not form.get(k,"").strip()]
+            return [n for k, n in reqs if not form.get(k,"").strip()]
+
+        def on_generar(e):
+            faltantes = _validar_cobros()
             if faltantes:
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_solicitud_cobros(form)
                 _guardar_y_abrir(page, contenido, nombre_archivo("Solicitud de Cobros", form.get("nombre_cliente","Solicitud")), snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        def on_pdf_cobros(e):
+            faltantes = _validar_cobros()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = pdf_solicitud_cobros(form)
+                _guardar_pdf(page, contenido, nombre_archivo("Solicitud de Cobros", form.get("nombre_cliente","Solicitud")).replace(".docx",".pdf"), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -573,6 +663,8 @@ def main(page: ft.Page):
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(on_pdf_cobros), alignment=ft.alignment.center),
             nota_descarga(),
         ]
 
@@ -581,14 +673,27 @@ def main(page: ft.Page):
         form = form_inspeccion
         def rf(): page.update()
 
-        def on_generar(e):
+        def _validar_inspeccion():
             reqs = [("destinatario","Destinatario"),("asunto","Asunto"),("cuerpo_1","Párrafo principal")]
-            faltantes = [n for k, n in reqs if not form.get(k,"").strip()]
+            return [n for k, n in reqs if not form.get(k,"").strip()]
+
+        def on_generar(e):
+            faltantes = _validar_inspeccion()
             if faltantes:
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_solicitud_inspeccion(form)
                 _guardar_y_abrir(page, contenido, nombre_archivo("Solicitud de Inspeccion", form.get("destinatario","Solicitud")), snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        def on_pdf_inspeccion(e):
+            faltantes = _validar_inspeccion()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = pdf_solicitud_inspeccion(form)
+                _guardar_pdf(page, contenido, nombre_archivo("Solicitud de Inspeccion", form.get("destinatario","Solicitud")).replace(".docx",".pdf"), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -619,6 +724,8 @@ def main(page: ft.Page):
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(on_pdf_inspeccion), alignment=ft.alignment.center),
             nota_descarga(),
         ]
 
