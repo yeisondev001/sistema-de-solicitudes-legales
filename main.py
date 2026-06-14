@@ -68,20 +68,33 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         fname = f"{uid}_{safe}"
         (dl_dir / fname).write_bytes(contenido)
         # Página HTML que fuerza la descarga directa con <a download>
-        # y se cierra sola — el cliente solo ve "Descargando..." un segundo
+        # y le indica al usuario dónde encontrar el archivo (útil en iPhone)
         label = nombre.replace("'", "\\'").replace('"', '\\"')
         html = (
             '<!DOCTYPE html><html><head><meta charset="utf-8">'
             '<title>Descargando...</title>'
-            '<style>body{margin:0;display:flex;align-items:center;justify-content:center;'
-            'height:100vh;font-family:sans-serif;background:#0F2A3F;color:#FBF7EE;}</style>'
-            '</head><body><p>&#8495; Descargando archivo&hellip;</p>'
+            '<style>'
+            'body{margin:0;display:flex;flex-direction:column;align-items:center;'
+            'justify-content:center;height:100vh;font-family:sans-serif;'
+            'background:#0F2A3F;color:#FBF7EE;text-align:center;padding:1rem;box-sizing:border-box;}'
+            'h2{color:#B8860B;margin-bottom:.5rem;}'
+            'p{margin:.4rem 0;font-size:1rem;}'
+            '.hint{margin-top:1.2rem;font-size:.85rem;opacity:.75;border-top:1px solid #2C4A63;padding-top:1rem;}'
+            '</style>'
+            '</head><body>'
+            '<h2>&#8495; Descargando...</h2>'
+            f'<p>{nombre}</p>'
+            '<div class="hint">'
+            '<p><strong>iPhone / iPad:</strong> abre la app <strong>Archivos</strong> &rarr; <strong>Descargas</strong></p>'
+            '<p><strong>Android:</strong> revisa el panel de notificaciones o la app <strong>Descargas</strong></p>'
+            '<p><strong>Computadora:</strong> revisa la carpeta <strong>Descargas</strong></p>'
+            '</div>'
             '<script>(function(){'
             'var a=document.createElement("a");'
             f'a.href="/dl/{fname}";'
             f'a.download="{label}";'
             'document.body.appendChild(a);a.click();document.body.removeChild(a);'
-            'setTimeout(function(){try{window.close();}catch(e){}},1500);'
+            'setTimeout(function(){try{window.close();}catch(e){}},4000);'
             '})();</script></body></html>'
         )
         html_fname = f"get_{uid}.html"
@@ -113,11 +126,24 @@ def ornamento(color=ACCENT):
 
 
 def campo(label, form, key, on_change, hint=None, multiline=False, required=False, expand=True,
-          keyboard_type=None, char_filter=None):
+          keyboard_type=None, char_filter=None, date_format=False):
 
     def _on_change(e, k=key):
         val = e.control.value
-        if char_filter:
+        if date_format:
+            # Extraer solo dígitos y reformatear como DD/MM/YYYY automáticamente
+            digits = re.sub(r"[^0-9]", "", val)[:8]
+            if len(digits) <= 2:
+                fmt = digits
+            elif len(digits) <= 4:
+                fmt = digits[:2] + "/" + digits[2:]
+            else:
+                fmt = digits[:2] + "/" + digits[2:4] + "/" + digits[4:]
+            if fmt != val:
+                e.control.value = fmt
+                e.control.update()
+                val = fmt
+        elif char_filter:
             clean = char_filter.sub("", val)
             if clean != val:
                 e.control.value = clean
@@ -412,7 +438,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta", form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                ft.Row(controls=[campo("Fecha de la carta", form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario",form,"destinatario",rf,required=True),
@@ -431,7 +457,7 @@ def main(page: ft.Page):
             ])),
             tarjeta("III", "Audiencia", "Fecha, lugar y expediente", ft.Column(controls=[
                 ft.Row(controls=[
-                    campo("Fecha de audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                    campo("Fecha de audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                     ft.Row(controls=[campo("Salón",form,"salon",rf), campo("Piso",form,"piso",rf)], spacing=16, expand=True),
                 ], spacing=24),
                 ft.Container(height=14),
@@ -485,7 +511,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
@@ -606,13 +632,13 @@ def main(page: ft.Page):
                 dem_col,
             ])),
             tarjeta("III", "Audiencia", "Fecha, fallo y próxima audiencia", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                ft.Row(controls=[campo("Fecha de la audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                                  campo("Caja No.",form,"caja_no",rf),
                                  campo("Rol",form,"rol",rf)], spacing=24),
                 ft.Container(height=14),
                 campo("Fallo",form,"fallo",rf,multiline=True,required=True,hint="Ej: Aplazada a los fines de que…"),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Fecha próxima audiencia",form,"fecha_proxima",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                ft.Row(controls=[campo("Fecha próxima audiencia",form,"fecha_proxima",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                                  campo("Abogado(s) que compareció",form,"abogados",rf,multiline=True,required=True)], spacing=24),
             ])),
             ft.Container(height=6),
@@ -657,7 +683,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A LA)",form,"destinatario",rf,required=True),
@@ -728,7 +754,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario, atención y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,char_filter=RE_FECHA),
+                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,date_format=True),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
