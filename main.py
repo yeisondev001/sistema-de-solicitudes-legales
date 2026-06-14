@@ -4,7 +4,7 @@ Automatización de Solicitudes Legales
 UI principal — generación de documentos en generators/
 """
 
-import os, base64, platform, pathlib, re
+import os, base64, platform, pathlib, re, uuid, time
 from datetime import date
 
 import flet as ft
@@ -53,8 +53,21 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         os.startfile(str(ruta))
         snack_fn(f"✓ Guardado en Descargas: {nombre}")
     else:
-        b64 = base64.b64encode(contenido).decode()
-        page.launch_url(f"data:{mime};base64,{b64}")
+        # Guardar en assets/dl/ y servir como URL real (funciona en todos los navegadores e iPhone)
+        dl_dir = pathlib.Path("assets") / "dl"
+        dl_dir.mkdir(parents=True, exist_ok=True)
+        # Limpiar archivos con más de 1 hora
+        try:
+            now = time.time()
+            for f in dl_dir.iterdir():
+                if f.is_file() and (now - f.stat().st_mtime) > 3600:
+                    f.unlink(missing_ok=True)
+        except Exception:
+            pass
+        safe = re.sub(r"[^\w._-]", "_", nombre)
+        fname = f"{uuid.uuid4().hex[:8]}_{safe}"
+        (dl_dir / fname).write_bytes(contenido)
+        page.launch_url(f"/dl/{fname}")
         snack_fn(f"✓ Descargando: {nombre}")
 
 
