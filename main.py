@@ -53,22 +53,8 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         os.startfile(str(ruta))
         snack_fn(f"✓ Guardado en Descargas: {nombre}")
     else:
-        b64  = base64.b64encode(contenido).decode()
-        nombre_js = nombre.replace("\\", "\\\\").replace("'", "\\'")
-        mime_js   = mime.replace("'", "\\'")
-        js = f"""(function(){{
-  var b = atob('{b64}');
-  var arr = new Uint8Array(b.length);
-  for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
-  var blob = new Blob([arr],{{type:'{mime_js}'}});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url; a.download = '{nombre_js}';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  setTimeout(function(){{URL.revokeObjectURL(url);}},2000);
-}})();"""
-        page.eval_js(js)
+        b64 = base64.b64encode(contenido).decode()
+        page.launch_url(f"data:{mime};base64,{b64}")
         snack_fn(f"✓ Descargando: {nombre}")
 
 
