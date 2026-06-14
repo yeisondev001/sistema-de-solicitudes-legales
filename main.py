@@ -44,7 +44,22 @@ def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
     else:
         b64  = base64.b64encode(contenido).decode()
         mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        page.launch_url(f"data:{mime};base64,{b64}")
+        # Usamos Blob + <a download> en lugar de data: URI porque iOS Safari
+        # no admite descargas desde data: URIs (.docx nunca aparece en Archivos).
+        nombre_js = nombre.replace("\\", "\\\\").replace("'", "\\'")
+        js = f"""(function(){{
+  var b = atob('{b64}');
+  var arr = new Uint8Array(b.length);
+  for(var i=0;i<b.length;i++) arr[i]=b.charCodeAt(i);
+  var blob = new Blob([arr],{{type:'{mime}'}});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = '{nombre_js}';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){{URL.revokeObjectURL(url);}},2000);
+}})();"""
+        page.eval_js(js)
         snack_fn(f"✓ Descargando: {nombre}")
 
 
