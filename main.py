@@ -67,7 +67,7 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         safe = re.sub(r"[^\w._-]", "_", nombre)
         fname = f"{uuid.uuid4().hex[:8]}_{safe}"
         (dl_dir / fname).write_bytes(contenido)
-        page.launch_url(f"/dl/{fname}")
+        page.launch_url(f"/dl/{fname}", web_window_name="_blank")
         snack_fn(f"✓ Descargando: {nombre}")
 
 
