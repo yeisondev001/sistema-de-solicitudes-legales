@@ -53,7 +53,6 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         os.startfile(str(ruta))
         snack_fn(f"✓ Guardado en Descargas: {nombre}")
     else:
-        # Guardar en assets/dl/ y servir como URL real (funciona en todos los navegadores e iPhone)
         dl_dir = pathlib.Path("assets") / "dl"
         dl_dir.mkdir(parents=True, exist_ok=True)
         # Limpiar archivos con más de 1 hora
@@ -64,10 +63,30 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
                     f.unlink(missing_ok=True)
         except Exception:
             pass
+        uid  = uuid.uuid4().hex[:8]
         safe = re.sub(r"[^\w._-]", "_", nombre)
-        fname = f"{uuid.uuid4().hex[:8]}_{safe}"
+        fname = f"{uid}_{safe}"
         (dl_dir / fname).write_bytes(contenido)
-        page.launch_url(f"/dl/{fname}", web_window_name="_blank")
+        # Página HTML que fuerza la descarga directa con <a download>
+        # y se cierra sola — el cliente solo ve "Descargando..." un segundo
+        label = nombre.replace("'", "\\'").replace('"', '\\"')
+        html = (
+            '<!DOCTYPE html><html><head><meta charset="utf-8">'
+            '<title>Descargando...</title>'
+            '<style>body{margin:0;display:flex;align-items:center;justify-content:center;'
+            'height:100vh;font-family:sans-serif;background:#0F2A3F;color:#FBF7EE;}</style>'
+            '</head><body><p>&#8495; Descargando archivo&hellip;</p>'
+            '<script>(function(){'
+            'var a=document.createElement("a");'
+            f'a.href="/dl/{fname}";'
+            f'a.download="{label}";'
+            'document.body.appendChild(a);a.click();document.body.removeChild(a);'
+            'setTimeout(function(){try{window.close();}catch(e){}},1500);'
+            '})();</script></body></html>'
+        )
+        html_fname = f"get_{uid}.html"
+        (dl_dir / html_fname).write_bytes(html.encode())
+        page.launch_url(f"/dl/{html_fname}", web_window_name="_blank")
         snack_fn(f"✓ Descargando: {nombre}")
 
 
