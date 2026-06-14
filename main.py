@@ -31,6 +31,11 @@ PANEL_INK  = "#0F2A3F"
 FONT_DISPLAY = "Cormorant Garamond"
 FONT_BODY    = "Source Serif 4"
 
+# Teclado numérico + filtros para fechas y cédulas
+KT_NUM      = ft.KeyboardType.NUMBER
+FLT_FECHA   = ft.InputFilter(regex_string=r"[0-9/]")
+FLT_CEDULA  = ft.InputFilter(regex_string=r"[0-9\-]")
+
 
 # ── DESCARGA ─────────────────────────────────────
 def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
@@ -76,7 +81,8 @@ def ornamento(color=ACCENT):
     )
 
 
-def campo(label, form, key, on_change, hint=None, multiline=False, required=False, expand=True):
+def campo(label, form, key, on_change, hint=None, multiline=False, required=False, expand=True,
+          keyboard_type=None, input_filter=None):
     tf = ft.TextField(
         value=form.get(key, ""),
         hint_text=hint,
@@ -91,6 +97,8 @@ def campo(label, form, key, on_change, hint=None, multiline=False, required=Fals
         text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, italic=True),
         hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
         content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
+        keyboard_type=keyboard_type,
+        input_filter=input_filter,
         on_change=lambda e, k=key: (form.__setitem__(k, e.control.value), on_change()),
     )
     req_star = ft.Text(" *", color=ACCENT, size=10) if required else ft.Text("")
@@ -333,7 +341,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta", form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True),
+                ft.Row(controls=[campo("Fecha de la carta", form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario",form,"destinatario",rf,required=True),
@@ -352,7 +360,7 @@ def main(page: ft.Page):
             ])),
             tarjeta("III", "Audiencia", "Fecha, lugar y expediente", ft.Column(controls=[
                 ft.Row(controls=[
-                    campo("Fecha de audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True),
+                    campo("Fecha de audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                     ft.Row(controls=[campo("Salón",form,"salon",rf), campo("Piso",form,"piso",rf)], spacing=16, expand=True),
                 ], spacing=24),
                 ft.Container(height=14),
@@ -391,7 +399,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True),
+                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
@@ -399,7 +407,7 @@ def main(page: ft.Page):
             ])),
             tarjeta("II",  "Expediente", "Cliente, inmueble y tribunal", ft.Column(controls=[
                 ft.Row(controls=[campo("Nombre del cliente",form,"nombre_cliente",rf,required=True,multiline=True),
-                                 campo("Cédula de identidad",form,"cedula",rf,hint="000-0000000-0",required=True)], spacing=24),
+                                 campo("Cédula de identidad",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,input_filter=FLT_CEDULA)], spacing=24),
                 ft.Container(height=14),
                 campo("Descripción del inmueble",form,"descripcion_inmueble",rf,
                       hint="Parcela No. X, del Distrito Catastral No. X…",multiline=True,required=True),
@@ -494,13 +502,13 @@ def main(page: ft.Page):
                 dem_col,
             ])),
             tarjeta("III", "Audiencia", "Fecha, fallo y próxima audiencia", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True),
+                ft.Row(controls=[campo("Fecha de la audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                                  campo("Caja No.",form,"caja_no",rf),
                                  campo("Rol",form,"rol",rf)], spacing=24),
                 ft.Container(height=14),
                 campo("Fallo",form,"fallo",rf,multiline=True,required=True,hint="Ej: Aplazada a los fines de que…"),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Fecha próxima audiencia",form,"fecha_proxima",rf,hint="DD/MM/AAAA",required=True),
+                ft.Row(controls=[campo("Fecha próxima audiencia",form,"fecha_proxima",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                                  campo("Abogado(s) que compareció",form,"abogados",rf,multiline=True,required=True)], spacing=24),
             ])),
             ft.Container(height=6),
@@ -530,7 +538,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True),
+                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A LA)",form,"destinatario",rf,required=True),
@@ -547,7 +555,7 @@ def main(page: ft.Page):
                                  campo("Provincia",form,"provincia",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("No. Expediente",form,"expediente",rf,required=True),
-                                 campo("Cédula",form,"cedula",rf,hint="000-0000000-0",required=True)], spacing=24),
+                                 campo("Cédula",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,input_filter=FLT_CEDULA)], spacing=24),
             ])),
             tarjeta("III", "Proceso Legal", "Tribunal, sentencia y tribunal original", ft.Column(controls=[
                 campo("Tribunal",form,"tribunal",rf,multiline=True,required=True),
@@ -586,7 +594,7 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario, atención y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True),
+                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM,input_filter=FLT_FECHA),
                                  campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
