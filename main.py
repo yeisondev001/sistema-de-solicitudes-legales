@@ -4,7 +4,7 @@ Automatización de Solicitudes Legales
 UI principal — generación de documentos en generators/
 """
 
-import os, base64, platform, pathlib, re, uuid, time
+import os, base64, platform, pathlib, re, uuid, time, threading
 from datetime import date
 
 import flet as ft
@@ -35,12 +35,73 @@ PANEL_INK  = "#0F2A3F"
 
 FONT_DISPLAY = "Cormorant Garamond"
 FONT_BODY    = "Source Serif 4"
-PDF_COLOR    = "#6B1A1A"   # rojo vino — clásico PDF, armoniza con navy+gold
+PDF_COLOR    = "#6B1A1A"
 
-# Teclado numérico para fechas y cédulas
-KT_NUM       = ft.KeyboardType.NUMBER
-RE_FECHA     = re.compile(r"[^0-9/]")   # solo dígitos y /
-RE_CEDULA    = re.compile(r"[^0-9\-]")  # solo dígitos y -
+KT_NUM    = ft.KeyboardType.NUMBER
+RE_FECHA  = re.compile(r"[^0-9/]")
+RE_CEDULA = re.compile(r"[^0-9\-]")
+
+# ── LISTAS DE TRIBUNALES Y SALAS ─────────────────
+TRIBUNALES_INMOBILIARIA = [
+    "SUPREMA CORTE DE JUSTICIA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE AZUA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE BARAHONA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE DUARTE",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE EL SEIBO",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE ESPAILLAT",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE HERMANAS MIRABAL",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE LA ALTAGRACIA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE LA VEGA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE MARIA TRINIDAD SÁNCHEZ",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE MONSEÑOR NOUEL",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE MONTE CRISTI",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE MONTE PLATA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE PERAVIA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE PUERTO PLATA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SAMANÁ",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SAN CRISTÓBAL",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SAN JUAN DE LA MAGUANA",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SAN PEDRO DE MACORÍS",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SÁNCHEZ RAMÍREZ",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SANTIAGO",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE SANTIAGO RODRIGUEZ",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DE VALVERDE",
+    "TRIBUNAL DE TIERRAS DE JURISDICCION ORIGINAL DEL DISTRITO NACIONAL",
+    "TRIBUNAL SUPERIOR DE TIERRAS DEL DEPARTAMENTO CENTRAL",
+    "TRIBUNAL SUPERIOR DE TIERRAS DEL DEPARTAMENTO ESTE",
+    "TRIBUNAL SUPERIOR DE TIERRAS DEL DEPARTAMENTO NORESTE",
+    "TRIBUNAL SUPERIOR DE TIERRAS DEL DEPARTAMENTO NORTE",
+]
+
+TRIBUNALES_CIVIL = [
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE BARAHONA",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE SAN FRANCISCO DE MACORÍS",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE LA VEGA",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE SAN CRISTÓBAL",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE SAN JUAN DE LA MAGUANA",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE SAN PEDRO DE MACORÍS",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE SANTIAGO",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DE SANTO DOMINGO",
+    "CÁMARA CIVIL Y COMERCIAL DE LA CORTE DE APELACIÓN DEL DISTRITO NACIONAL",
+    "CÁMARA CIVIL Y COMERCIAL DEL JUZGADO DE PRIMERA INSTANCIA DE AZUA",
+]
+
+SALAS_INMOBILIARIA = [
+    "Primera Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Segunda Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Tercera Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Cuarta Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Quinta Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Sexta Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Séptima Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+    "Octava Sala del Tribunal de Tierras de Jurisdicción Original del Distrito Nacional",
+]
+
+ASUNTOS_INMOBILIARIA = [
+    "DESLINDE",
+    "SANEAMIENTO",
+    "LITIS SOBRE DERECHOS REGISTRADOS",
+]
 
 
 # ── DESCARGA ─────────────────────────────────────
@@ -67,8 +128,6 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         fname = f"{uid}_{safe}"
         (dl_dir / fname).write_bytes(contenido)
 
-        # Diálogo con botón url= nativo — iOS Safari lo permite porque
-        # Flutter web lo convierte en un <a> real tocado por el usuario
         def _cerrar(e):
             dlg.open = False
             page.update()
@@ -173,6 +232,133 @@ def campo(label, form, key, on_change, hint=None, multiline=False, required=Fals
         ],
         spacing=4, expand=expand,
     )
+
+
+def combobox_campo(label, form, key, options, update_fn, required=False, expand=True, hint=None):
+    """Campo con lista desplegable buscable. Permite escribir valor personalizado."""
+
+    opts_col = ft.Column(spacing=0, scroll=ft.ScrollMode.AUTO)
+    opts_container = ft.Container(
+        content=opts_col,
+        bgcolor=PAPER,
+        border=ft.border.all(1, RULE),
+        border_radius=ft.border_radius.only(bottom_left=4, bottom_right=4),
+        shadow=ft.BoxShadow(blur_radius=8, spread_radius=0, color="#25000000"),
+        visible=False,
+        padding=0,
+        margin=ft.margin.only(top=1),
+        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+    )
+
+    tf = ft.TextField(
+        value=form.get(key, ""),
+        hint_text=hint or "Escriba para buscar o ingrese un valor personalizado…",
+        border=ft.InputBorder.UNDERLINE,
+        border_color=RULE,
+        focused_border_color=ACCENT,
+        focused_border_width=2,
+        cursor_color=ACCENT,
+        text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, italic=True),
+        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
+        content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
+        suffix=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=INK_SOFT, size=20),
+    )
+
+    _selecting = [False]
+
+    def _rebuild_opts(query=""):
+        q = query.lower().strip()
+        filtered = [o for o in options if not q or q in o.lower()]
+        opts_col.controls.clear()
+        for opt in filtered:
+            def make_item(o=opt):
+                def _mouse_down(e):
+                    _selecting[0] = True
+
+                def _on_select(e):
+                    tf.value = o
+                    form[key] = o
+                    opts_container.visible = False
+                    _selecting[0] = False
+                    update_fn()
+
+                return ft.Container(
+                    content=ft.Text(o, font_family=FONT_BODY, size=13, color=INK,
+                                    no_wrap=False),
+                    padding=ft.padding.symmetric(vertical=9, horizontal=12),
+                    on_click=_on_select,
+                    ink=True,
+                    border=ft.border.only(bottom=ft.BorderSide(0.5, PAPER_EDGE)),
+                    bgcolor=PAPER,
+                )
+            opts_col.controls.append(make_item())
+        opts_container.visible = bool(filtered)
+
+    def on_tf_change(e):
+        form[key] = e.control.value
+        _rebuild_opts(e.control.value)
+        update_fn()
+
+    def on_focus(e):
+        _rebuild_opts(tf.value or "")
+        update_fn()
+
+    def on_blur(e):
+        def _hide():
+            time.sleep(0.3)
+            if not _selecting[0]:
+                opts_container.visible = False
+                update_fn()
+        threading.Thread(target=_hide, daemon=True).start()
+
+    tf.on_change = on_tf_change
+    tf.on_focus  = on_focus
+    tf.on_blur   = on_blur
+
+    req_star = ft.Text(" *", color=ACCENT, size=10) if required else ft.Text("")
+
+    return ft.Column(
+        controls=[
+            ft.Row(controls=[
+                ft.Text(label.upper(), size=10, weight=ft.FontWeight.W_600,
+                        color=INK_SOFT, font_family=FONT_BODY),
+                req_star,
+            ], spacing=0),
+            tf,
+            opts_container,
+        ],
+        spacing=4, expand=expand,
+    )
+
+
+def materia_selector(form, key, on_materia_change):
+    """Dropdown de dos opciones: MATERIA INMOBILIARIA / MATERIA CIVIL."""
+
+    def _on_change(e):
+        form[key] = e.control.value or ""
+        on_materia_change()
+
+    return ft.Column(controls=[
+        ft.Row(controls=[
+            ft.Text("MATERIA", size=10, weight=ft.FontWeight.W_600,
+                    color=INK_SOFT, font_family=FONT_BODY),
+        ], spacing=0),
+        ft.Dropdown(
+            value=form.get(key) or None,
+            options=[
+                ft.dropdown.Option("MATERIA INMOBILIARIA"),
+                ft.dropdown.Option("MATERIA CIVIL"),
+            ],
+            border=ft.InputBorder.UNDERLINE,
+            border_color=RULE,
+            focused_border_color=ACCENT,
+            text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
+            hint_text="Seleccione una materia…",
+            hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
+            content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
+            on_change=_on_change,
+        ),
+    ], spacing=4)
 
 
 def tarjeta(romano, titulo, subtitulo, contenido):
@@ -290,15 +476,19 @@ def main(page: ft.Page):
         "nombre_cliente":       "",
         "cedula":               "",
         "descripcion_inmueble": "",
+        "materia":              "",
         "tipo_proceso":         "deslinde",
         "tribunal":             "",
+        "sala":                 "",
         "firmante_nombre":      "YOLANDA DE LA CRUZ VARGAS.",
         "firmante_cargo":       "Directora Legal.",
         "iniciales":            "YDCV/rr",
     }
 
     form_reporte = {
+        "materia":         "",
         "tribunal":        "",
+        "sala":            "",
         "expediente":      "",
         "demandantes":     "",
         "demandados":      [""],
@@ -318,6 +508,7 @@ def main(page: ft.Page):
         "cargo_destinatario": "Encargada dpto. de cobros.",
         "asunto":             "SI EXISTE CUENTA O PAGO.",
         "nombre_cliente":     "",
+        "materia":            "",
         "tipo_proceso":       "Saneamiento",
         "parcela":            "Designación Posesional No.",
         "municipio":          "",
@@ -325,6 +516,7 @@ def main(page: ft.Page):
         "expediente":         "",
         "cedula":             "",
         "tribunal":           "",
+        "sala":               "",
         "sentencia":          "",
         "fecha_sentencia":    "",
         "tribunal_original":  "",
@@ -476,9 +668,60 @@ def main(page: ft.Page):
         form = form_archivo
         def rf(): page.update()
 
+        # Wrappers reactivos a la selección de Materia
+        asunto_wrap   = ft.Column(spacing=0, expand=True)
+        tribunal_wrap = ft.Column(spacing=0, expand=True)
+        sala_wrap     = ft.Column(spacing=0, expand=True)
+
+        def rebuild_materia_fields():
+            mat = form.get("materia", "")
+            asunto_wrap.controls.clear()
+            tribunal_wrap.controls.clear()
+            sala_wrap.controls.clear()
+
+            if mat == "MATERIA INMOBILIARIA":
+                asunto_wrap.controls.append(
+                    combobox_campo("Tipo de proceso", form, "tipo_proceso",
+                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    combobox_campo("Tribunal", form, "tribunal",
+                                   TRIBUNALES_INMOBILIARIA, rf, required=True, expand=True)
+                )
+                sala_wrap.controls.append(
+                    combobox_campo("Sala", form, "sala",
+                                   SALAS_INMOBILIARIA, rf, expand=True)
+                )
+            elif mat == "MATERIA CIVIL":
+                asunto_wrap.controls.append(
+                    campo("Tipo de proceso", form, "tipo_proceso", rf,
+                          hint="deslinde / desalojo…", required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    combobox_campo("Tribunal", form, "tribunal",
+                                   TRIBUNALES_CIVIL, rf, required=True, expand=True)
+                )
+                sala_wrap.controls.append(
+                    campo("Sala", form, "sala", rf, expand=True)
+                )
+            else:
+                asunto_wrap.controls.append(
+                    campo("Tipo de proceso", form, "tipo_proceso", rf,
+                          hint="deslinde / desalojo…", required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    campo("Tribunal / Sala", form, "tribunal", rf,
+                          multiline=True, required=True, expand=True)
+                )
+
+        rebuild_materia_fields()
+
+        materia_dd = materia_selector(form, "materia", lambda: (rebuild_materia_fields(), rf()))
+
         def _validar_archivo():
             reqs = [("nombre_cliente","Nombre del cliente"),("cedula","Cédula"),
-                    ("descripcion_inmueble","Descripción del inmueble"),("tipo_proceso","Tipo de proceso"),("tribunal","Tribunal")]
+                    ("descripcion_inmueble","Descripción del inmueble"),
+                    ("tipo_proceso","Tipo de proceso"),("tribunal","Tribunal")]
             return [n for k, n in reqs if not form.get(k,"").strip()]
 
         def on_generar(e):
@@ -516,8 +759,13 @@ def main(page: ft.Page):
                 campo("Descripción del inmueble",form,"descripcion_inmueble",rf,
                       hint="Parcela No. X, del Distrito Catastral No. X…",multiline=True,required=True),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Tipo de proceso",form,"tipo_proceso",rf,hint="deslinde / desalojo…",required=True),
-                                 campo("Tribunal / Sala",form,"tribunal",rf,multiline=True,required=True)], spacing=24),
+                materia_dd,
+                ft.Container(height=14),
+                asunto_wrap,
+                ft.Container(height=14),
+                tribunal_wrap,
+                ft.Container(height=14),
+                sala_wrap,
             ])),
             tarjeta("III", "Firma", "Quien suscribe la solicitud", ft.Column(controls=[
                 ft.Row(controls=[campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
@@ -573,6 +821,53 @@ def main(page: ft.Page):
 
         build_demandados()
 
+        # Wrappers reactivos a Materia
+        asunto_wrap   = ft.Column(spacing=0, expand=True)
+        tribunal_wrap = ft.Column(spacing=0, expand=True)
+        sala_wrap     = ft.Column(spacing=0, expand=True)
+
+        def rebuild_materia_fields():
+            mat = form.get("materia", "")
+            asunto_wrap.controls.clear()
+            tribunal_wrap.controls.clear()
+            sala_wrap.controls.clear()
+
+            if mat == "MATERIA INMOBILIARIA":
+                asunto_wrap.controls.append(
+                    combobox_campo("Asunto", form, "asunto",
+                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    combobox_campo("Tribunal", form, "tribunal",
+                                   TRIBUNALES_INMOBILIARIA, rf, required=True, expand=True)
+                )
+                sala_wrap.controls.append(
+                    combobox_campo("Sala", form, "sala",
+                                   SALAS_INMOBILIARIA, rf, expand=True)
+                )
+            elif mat == "MATERIA CIVIL":
+                asunto_wrap.controls.append(
+                    campo("Asunto", form, "asunto", rf, required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    combobox_campo("Tribunal", form, "tribunal",
+                                   TRIBUNALES_CIVIL, rf, required=True, expand=True)
+                )
+                sala_wrap.controls.append(
+                    campo("Sala", form, "sala", rf, expand=True)
+                )
+            else:
+                asunto_wrap.controls.append(
+                    campo("Asunto", form, "asunto", rf, required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    campo("Tribunal", form, "tribunal", rf, multiline=True, required=True, expand=True)
+                )
+
+        rebuild_materia_fields()
+
+        materia_dd = materia_selector(form, "materia", lambda: (rebuild_materia_fields(), rf()))
+
         def _validar_reporte():
             reqs = [("tribunal","Tribunal"),("expediente","No. Expediente"),("demandantes","Demandante(s)"),
                     ("parcela","Parcela"),("fecha_audiencia","Fecha de audiencia"),("fallo","Fallo"),
@@ -608,12 +903,17 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Expediente", "Tribunal, partes y parcela", ft.Column(controls=[
-                ft.Row(controls=[campo("No. Expediente",form,"expediente",rf,required=True),
-                                 campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
+                campo("No. Expediente", form, "expediente", rf, required=True),
                 ft.Container(height=14),
-                campo("Tribunal",form,"tribunal",rf,multiline=True,required=True),
+                materia_dd,
                 ft.Container(height=14),
-                campo("Parcela / Designación",form,"parcela",rf,required=True),
+                asunto_wrap,
+                ft.Container(height=14),
+                tribunal_wrap,
+                ft.Container(height=14),
+                sala_wrap,
+                ft.Container(height=14),
+                campo("Parcela / Designación", form, "parcela", rf, required=True),
             ])),
             tarjeta("II",  "Partes", "Demandante y demandado(s)", ft.Column(controls=[
                 campo("Demandante(s)",form,"demandantes",rf,multiline=True,required=True),
@@ -644,6 +944,56 @@ def main(page: ft.Page):
     def build_cobros():
         form = form_cobros
         def rf(): page.update()
+
+        # Wrappers reactivos a Materia
+        tipo_proc_wrap = ft.Column(spacing=0, expand=True)
+        tribunal_wrap  = ft.Column(spacing=0, expand=True)
+        sala_wrap      = ft.Column(spacing=0, expand=True)
+
+        def rebuild_materia_fields():
+            mat = form.get("materia", "")
+            tipo_proc_wrap.controls.clear()
+            tribunal_wrap.controls.clear()
+            sala_wrap.controls.clear()
+
+            if mat == "MATERIA INMOBILIARIA":
+                tipo_proc_wrap.controls.append(
+                    combobox_campo("Tipo de proceso", form, "tipo_proceso",
+                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    combobox_campo("Tribunal", form, "tribunal",
+                                   TRIBUNALES_INMOBILIARIA, rf, required=True, expand=True)
+                )
+                sala_wrap.controls.append(
+                    combobox_campo("Sala", form, "sala",
+                                   SALAS_INMOBILIARIA, rf, expand=True)
+                )
+            elif mat == "MATERIA CIVIL":
+                tipo_proc_wrap.controls.append(
+                    campo("Tipo de proceso", form, "tipo_proceso", rf,
+                          hint="Saneamiento / Deslinde…", required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    combobox_campo("Tribunal", form, "tribunal",
+                                   TRIBUNALES_CIVIL, rf, required=True, expand=True)
+                )
+                sala_wrap.controls.append(
+                    campo("Sala", form, "sala", rf, expand=True)
+                )
+            else:
+                tipo_proc_wrap.controls.append(
+                    campo("Tipo de proceso", form, "tipo_proceso", rf,
+                          hint="Saneamiento / Deslinde…", required=True, expand=True)
+                )
+                tribunal_wrap.controls.append(
+                    campo("Tribunal", form, "tribunal", rf,
+                          multiline=True, required=True, expand=True)
+                )
+
+        rebuild_materia_fields()
+
+        materia_dd = materia_selector(form, "materia", lambda: (rebuild_materia_fields(), rf()))
 
         def _validar_cobros():
             reqs = [("nombre_cliente","Nombre del cliente"),("tipo_proceso","Tipo de proceso"),
@@ -685,8 +1035,13 @@ def main(page: ft.Page):
                 campo("Nombre del cliente",form,"nombre_cliente",rf,required=True,multiline=True,
                       hint="Nombre completo tal como aparece en el expediente"),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Tipo de proceso",form,"tipo_proceso",rf,hint="Saneamiento / Deslinde…",required=True),
-                                 campo("Parcela / Designación",form,"parcela",rf,hint="Designación Posesional No. …",required=True)], spacing=24),
+                ft.Row(controls=[
+                    materia_dd,
+                    ft.Container(width=24),
+                    tipo_proc_wrap,
+                ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.START),
+                ft.Container(height=14),
+                campo("Parcela / Designación",form,"parcela",rf,hint="Designación Posesional No. …",required=True),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Municipio",form,"municipio",rf,required=True),
                                  campo("Provincia",form,"provincia",rf,required=True)], spacing=24),
@@ -695,7 +1050,9 @@ def main(page: ft.Page):
                                  campo("Cédula",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,char_filter=RE_CEDULA)], spacing=24),
             ])),
             tarjeta("III", "Proceso Legal", "Tribunal, sentencia y tribunal original", ft.Column(controls=[
-                campo("Tribunal",form,"tribunal",rf,multiline=True,required=True),
+                tribunal_wrap,
+                ft.Container(height=14),
+                sala_wrap,
                 ft.Container(height=14),
                 ft.Row(controls=[campo("No. Sentencia",form,"sentencia",rf,required=True),
                                  campo("Fecha sentencia",form,"fecha_sentencia",rf,hint="01 Julio del 2022",required=True)], spacing=24),
