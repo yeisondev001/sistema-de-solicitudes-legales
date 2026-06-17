@@ -35,7 +35,13 @@ def generar(d: dict) -> bytes:
 
     # Tabla encabezado
     tabla = tabla_encabezado(doc)
+    materia = d.get("materia", "").replace("MATERIA ", "").strip()
+    if materia:
+        fila(tabla, "Materia", (materia, False))
     fila(tabla, "Tribunal",       (d["tribunal"],    False))
+    sala = d.get("sala", "").strip()
+    if sala:
+        fila(tabla, "Sala", (sala, False))
     fila(tabla, "No. Expediente", (d["expediente"],  False))
     fila(tabla, "Demandante(s)",  (d["demandantes"], False))
     demandados = [x.strip() for x in d.get("demandados", []) if x.strip()]

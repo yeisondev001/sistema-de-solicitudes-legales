@@ -152,7 +152,13 @@ def pdf_reporte_audiencia(d: dict) -> bytes:
     doc.cell(0, 6, fecha_txt, new_x="LMARGIN", new_y="NEXT")
     doc.blank()
 
+    materia = d.get("materia", "").replace("MATERIA ", "").strip()
+    if materia:
+        doc.field("Materia", (materia, False))
     doc.field("Tribunal",       (d["tribunal"],    False))
+    sala = d.get("sala", "").strip()
+    if sala:
+        doc.field("Sala", (sala, False))
     doc.field("No. Expediente", (d["expediente"],  False))
     doc.field("Demandante(s)",  (d["demandantes"], False))
     demandados = [x.strip() for x in d.get("demandados", []) if x.strip()]

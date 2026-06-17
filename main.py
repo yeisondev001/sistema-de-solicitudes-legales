@@ -916,8 +916,9 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = generar_reporte_audiencia(form)
-                dem   = next((x.strip() for x in form.get("demandados",[]) if x.strip()), "")
-                ident = dem or form.get("expediente","Reporte")
+                demte = form.get("demandantes","").strip()
+                exp   = form.get("expediente","").strip()
+                ident = "-".join([x for x in (demte, exp) if x]) or "Reporte"
                 _guardar_y_abrir(page, contenido, nombre_archivo("Reporte de Audiencia", ident), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
@@ -928,8 +929,9 @@ def main(page: ft.Page):
                 snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
             try:
                 contenido = pdf_reporte_audiencia(form)
-                dem   = next((x.strip() for x in form.get("demandados",[]) if x.strip()), "")
-                ident = dem or form.get("expediente","Reporte")
+                demte = form.get("demandantes","").strip()
+                exp   = form.get("expediente","").strip()
+                ident = "-".join([x for x in (demte, exp) if x]) or "Reporte"
                 _guardar_pdf(page, contenido, nombre_archivo("Reporte de Audiencia", ident).replace(".docx",".pdf"), snack)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
