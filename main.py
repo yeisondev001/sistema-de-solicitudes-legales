@@ -98,7 +98,7 @@ SALAS_INMOBILIARIA = [
 ]
 
 ASUNTOS_INMOBILIARIA = [
-    "DESLINDE",
+    "SOLICITUD DE DESLINDE",
     "SANEAMIENTO",
     "LITIS SOBRE DERECHOS REGISTRADOS",
 ]
@@ -331,33 +331,68 @@ def combobox_campo(label, form, key, options, update_fn, required=False, expand=
     )
 
 
-def materia_selector(form, key, on_materia_change):
-    """Dropdown de dos opciones: MATERIA INMOBILIARIA / MATERIA CIVIL."""
+def materia_selector(page, form, key, on_materia_change):
+    """Selector de dos opciones con lista en los colores de la plantilla."""
+    opciones = ["MATERIA INMOBILIARIA", "MATERIA CIVIL"]
 
-    def _on_change(e):
-        form[key] = e.control.value or ""
-        on_materia_change()
+    valor_text = ft.Text(
+        form.get(key) or "Seleccione una materia…",
+        font_family=FONT_BODY, size=15,
+        color=INK if form.get(key) else "#999",
+        italic=not bool(form.get(key)),
+    )
+
+    opts_col = ft.Column(spacing=0)
+    opts_container = ft.Container(
+        content=opts_col, bgcolor=PAPER,
+        border=ft.border.all(1, RULE),
+        border_radius=ft.border_radius.only(bottom_left=4, bottom_right=4),
+        shadow=ft.BoxShadow(blur_radius=8, spread_radius=0, color="#25000000"),
+        visible=False,
+        margin=ft.margin.only(top=1),
+        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+    )
+
+    def _build_opts():
+        opts_col.controls.clear()
+        for opt in opciones:
+            def make_item(o=opt):
+                def _sel(e):
+                    form[key] = o
+                    valor_text.value = o
+                    valor_text.color = INK
+                    valor_text.italic = False
+                    opts_container.visible = False
+                    on_materia_change()
+                return ft.Container(
+                    content=ft.Text(o, font_family=FONT_BODY, size=14, color=INK),
+                    padding=ft.padding.symmetric(vertical=10, horizontal=12),
+                    on_click=_sel, ink=True, bgcolor=PAPER,
+                    border=ft.border.only(bottom=ft.BorderSide(0.5, PAPER_EDGE)),
+                )
+            opts_col.controls.append(make_item())
+    _build_opts()
+
+    def _toggle(e):
+        opts_container.visible = not opts_container.visible
+        page.update()
+
+    cabecera = ft.Container(
+        content=ft.Row(controls=[
+            valor_text,
+            ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=INK_SOFT, size=22),
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+           vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        padding=ft.padding.only(top=8, bottom=8, left=2, right=2),
+        border=ft.border.only(bottom=ft.BorderSide(1, RULE)),
+        on_click=_toggle, ink=True,
+    )
 
     return ft.Column(controls=[
-        ft.Row(controls=[
-            ft.Text("MATERIA", size=10, weight=ft.FontWeight.W_600,
-                    color=INK_SOFT, font_family=FONT_BODY),
-        ], spacing=0),
-        ft.Dropdown(
-            value=form.get(key) or None,
-            options=[
-                ft.dropdown.Option("MATERIA INMOBILIARIA"),
-                ft.dropdown.Option("MATERIA CIVIL"),
-            ],
-            border=ft.InputBorder.UNDERLINE,
-            border_color=RULE,
-            focused_border_color=ACCENT,
-            text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
-            hint_text="Seleccione una materia…",
-            hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
-            content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
-            on_change=_on_change,
-        ),
+        ft.Text("MATERIA", size=10, weight=ft.FontWeight.W_600,
+                color=INK_SOFT, font_family=FONT_BODY),
+        cabecera,
+        opts_container,
     ], spacing=4)
 
 
@@ -668,7 +703,7 @@ def main(page: ft.Page):
         form = form_archivo
         def rf(): page.update()
 
-        # Wrappers reactivos a la selección de Materia
+        # Wrappers reactivos a la Materia (Asunto, Tribunal y Sala)
         asunto_wrap   = ft.Column(spacing=0, expand=True)
         tribunal_wrap = ft.Column(spacing=0, expand=True)
         sala_wrap     = ft.Column(spacing=0, expand=True)
@@ -681,7 +716,7 @@ def main(page: ft.Page):
 
             if mat == "MATERIA INMOBILIARIA":
                 asunto_wrap.controls.append(
-                    combobox_campo("Tipo de proceso", form, "tipo_proceso",
+                    combobox_campo("Asunto", form, "asunto",
                                    ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
                 )
                 tribunal_wrap.controls.append(
@@ -694,8 +729,7 @@ def main(page: ft.Page):
                 )
             elif mat == "MATERIA CIVIL":
                 asunto_wrap.controls.append(
-                    campo("Tipo de proceso", form, "tipo_proceso", rf,
-                          hint="deslinde / desalojo…", required=True, expand=True)
+                    campo("Asunto", form, "asunto", rf, required=True, expand=True)
                 )
                 tribunal_wrap.controls.append(
                     combobox_campo("Tribunal", form, "tribunal",
@@ -706,8 +740,7 @@ def main(page: ft.Page):
                 )
             else:
                 asunto_wrap.controls.append(
-                    campo("Tipo de proceso", form, "tipo_proceso", rf,
-                          hint="deslinde / desalojo…", required=True, expand=True)
+                    campo("Asunto", form, "asunto", rf, required=True, expand=True)
                 )
                 tribunal_wrap.controls.append(
                     campo("Tribunal / Sala", form, "tribunal", rf,
@@ -716,7 +749,7 @@ def main(page: ft.Page):
 
         rebuild_materia_fields()
 
-        materia_dd = materia_selector(form, "materia", lambda: (rebuild_materia_fields(), rf()))
+        materia_dd = materia_selector(page, form, "materia", lambda: (rebuild_materia_fields(), rf()))
 
         def _validar_archivo():
             reqs = [("nombre_cliente","Nombre del cliente"),("cedula","Cédula"),
@@ -747,7 +780,7 @@ def main(page: ft.Page):
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
                 ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
-                                 campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
+                                 asunto_wrap], spacing=24, vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
                                  campo("Cargo del destinatario",form,"cargo_destinatario",rf)], spacing=24),
@@ -759,9 +792,9 @@ def main(page: ft.Page):
                 campo("Descripción del inmueble",form,"descripcion_inmueble",rf,
                       hint="Parcela No. X, del Distrito Catastral No. X…",multiline=True,required=True),
                 ft.Container(height=14),
-                materia_dd,
+                campo("Tipo de proceso",form,"tipo_proceso",rf,hint="deslinde / desalojo…",required=True),
                 ft.Container(height=14),
-                asunto_wrap,
+                materia_dd,
                 ft.Container(height=14),
                 tribunal_wrap,
                 ft.Container(height=14),
@@ -866,7 +899,7 @@ def main(page: ft.Page):
 
         rebuild_materia_fields()
 
-        materia_dd = materia_selector(form, "materia", lambda: (rebuild_materia_fields(), rf()))
+        materia_dd = materia_selector(page, form, "materia", lambda: (rebuild_materia_fields(), rf()))
 
         def _validar_reporte():
             reqs = [("tribunal","Tribunal"),("expediente","No. Expediente"),("demandantes","Demandante(s)"),
@@ -945,20 +978,20 @@ def main(page: ft.Page):
         form = form_cobros
         def rf(): page.update()
 
-        # Wrappers reactivos a Materia
-        tipo_proc_wrap = ft.Column(spacing=0, expand=True)
-        tribunal_wrap  = ft.Column(spacing=0, expand=True)
-        sala_wrap      = ft.Column(spacing=0, expand=True)
+        # Wrappers reactivos a Materia (Asunto, Tribunal y Sala)
+        asunto_wrap   = ft.Column(spacing=0, expand=True)
+        tribunal_wrap = ft.Column(spacing=0, expand=True)
+        sala_wrap     = ft.Column(spacing=0, expand=True)
 
         def rebuild_materia_fields():
             mat = form.get("materia", "")
-            tipo_proc_wrap.controls.clear()
+            asunto_wrap.controls.clear()
             tribunal_wrap.controls.clear()
             sala_wrap.controls.clear()
 
             if mat == "MATERIA INMOBILIARIA":
-                tipo_proc_wrap.controls.append(
-                    combobox_campo("Tipo de proceso", form, "tipo_proceso",
+                asunto_wrap.controls.append(
+                    combobox_campo("Asunto", form, "asunto",
                                    ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
                 )
                 tribunal_wrap.controls.append(
@@ -970,9 +1003,8 @@ def main(page: ft.Page):
                                    SALAS_INMOBILIARIA, rf, expand=True)
                 )
             elif mat == "MATERIA CIVIL":
-                tipo_proc_wrap.controls.append(
-                    campo("Tipo de proceso", form, "tipo_proceso", rf,
-                          hint="Saneamiento / Deslinde…", required=True, expand=True)
+                asunto_wrap.controls.append(
+                    campo("Asunto", form, "asunto", rf, required=True, expand=True)
                 )
                 tribunal_wrap.controls.append(
                     combobox_campo("Tribunal", form, "tribunal",
@@ -982,9 +1014,8 @@ def main(page: ft.Page):
                     campo("Sala", form, "sala", rf, expand=True)
                 )
             else:
-                tipo_proc_wrap.controls.append(
-                    campo("Tipo de proceso", form, "tipo_proceso", rf,
-                          hint="Saneamiento / Deslinde…", required=True, expand=True)
+                asunto_wrap.controls.append(
+                    campo("Asunto", form, "asunto", rf, required=True, expand=True)
                 )
                 tribunal_wrap.controls.append(
                     campo("Tribunal", form, "tribunal", rf,
@@ -993,7 +1024,7 @@ def main(page: ft.Page):
 
         rebuild_materia_fields()
 
-        materia_dd = materia_selector(form, "materia", lambda: (rebuild_materia_fields(), rf()))
+        materia_dd = materia_selector(page, form, "materia", lambda: (rebuild_materia_fields(), rf()))
 
         def _validar_cobros():
             reqs = [("nombre_cliente","Nombre del cliente"),("tipo_proceso","Tipo de proceso"),
@@ -1026,7 +1057,7 @@ def main(page: ft.Page):
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
                 ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
-                                 campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
+                                 asunto_wrap], spacing=24, vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Container(height=14),
                 ft.Row(controls=[campo("Destinatario (A LA)",form,"destinatario",rf,required=True),
                                  campo("Cargo del destinatario",form,"cargo_destinatario",rf)], spacing=24),
@@ -1035,11 +1066,9 @@ def main(page: ft.Page):
                 campo("Nombre del cliente",form,"nombre_cliente",rf,required=True,multiline=True,
                       hint="Nombre completo tal como aparece en el expediente"),
                 ft.Container(height=14),
-                ft.Row(controls=[
-                    materia_dd,
-                    ft.Container(width=24),
-                    tipo_proc_wrap,
-                ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.START),
+                materia_dd,
+                ft.Container(height=14),
+                campo("Tipo de proceso",form,"tipo_proceso",rf,hint="Saneamiento / Deslinde…",required=True),
                 ft.Container(height=14),
                 campo("Parcela / Designación",form,"parcela",rf,hint="Designación Posesional No. …",required=True),
                 ft.Container(height=14),
