@@ -116,17 +116,28 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
     else:
         dl_dir = pathlib.Path("assets") / "dl"
         dl_dir.mkdir(parents=True, exist_ok=True)
+        # Limpieza: subcarpetas o archivos viejos (>1h)
         try:
             now = time.time()
             for f in dl_dir.iterdir():
-                if f.is_file() and (now - f.stat().st_mtime) > 3600:
-                    f.unlink(missing_ok=True)
+                try:
+                    if (now - f.stat().st_mtime) > 3600:
+                        if f.is_dir():
+                            for sub in f.iterdir():
+                                sub.unlink(missing_ok=True)
+                            f.rmdir()
+                        else:
+                            f.unlink(missing_ok=True)
+                except Exception:
+                    pass
         except Exception:
             pass
-        uid   = uuid.uuid4().hex[:8]
-        safe  = re.sub(r"[^\w._-]", "_", nombre)
-        fname = f"{uid}_{safe}"
-        (dl_dir / fname).write_bytes(contenido)
+        uid     = uuid.uuid4().hex[:8]
+        safe    = re.sub(r"[^\w \-.()ñÑáéíóúÁÉÍÓÚ]", "_", nombre).strip() or "documento"
+        sub_dir = dl_dir / uid
+        sub_dir.mkdir(parents=True, exist_ok=True)
+        (sub_dir / safe).write_bytes(contenido)
+        fname = f"{uid}/{safe}"
 
         def _cerrar(e):
             dlg.open = False
@@ -234,8 +245,9 @@ def campo(label, form, key, on_change, hint=None, multiline=False, required=Fals
     )
 
 
-def combobox_campo(label, form, key, options, update_fn, required=False, expand=True, hint=None):
-    """Campo con lista desplegable buscable. Permite escribir valor personalizado."""
+def combobox_campo(label, form, key, options, update_fn, required=False, expand=True, hint=None,
+                   filter_on_type=True):
+    """Campo con lista desplegable. Si filter_on_type=False, la lista siempre muestra todas las opciones."""
 
     opts_col = ft.Column(spacing=0, scroll=ft.ScrollMode.AUTO)
     opts_container = ft.Container(
@@ -267,8 +279,11 @@ def combobox_campo(label, form, key, options, update_fn, required=False, expand=
     _selecting = [False]
 
     def _rebuild_opts(query=""):
-        q = query.lower().strip()
-        filtered = [o for o in options if not q or q in o.lower()]
+        if filter_on_type:
+            q = query.lower().strip()
+            filtered = [o for o in options if not q or q in o.lower()]
+        else:
+            filtered = list(options)
         opts_col.controls.clear()
         for opt in filtered:
             def make_item(o=opt):
@@ -717,7 +732,8 @@ def main(page: ft.Page):
             if mat == "MATERIA INMOBILIARIA":
                 asunto_wrap.controls.append(
                     combobox_campo("Asunto", form, "asunto",
-                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
+                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True,
+                                   filter_on_type=False)
                 )
                 tribunal_wrap.controls.append(
                     combobox_campo("Tribunal", form, "tribunal",
@@ -868,7 +884,8 @@ def main(page: ft.Page):
             if mat == "MATERIA INMOBILIARIA":
                 asunto_wrap.controls.append(
                     combobox_campo("Asunto", form, "asunto",
-                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
+                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True,
+                                   filter_on_type=False)
                 )
                 tribunal_wrap.controls.append(
                     combobox_campo("Tribunal", form, "tribunal",
@@ -994,7 +1011,8 @@ def main(page: ft.Page):
             if mat == "MATERIA INMOBILIARIA":
                 asunto_wrap.controls.append(
                     combobox_campo("Asunto", form, "asunto",
-                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True)
+                                   ASUNTOS_INMOBILIARIA, rf, required=True, expand=True,
+                                   filter_on_type=False)
                 )
                 tribunal_wrap.controls.append(
                     combobox_campo("Tribunal", form, "tribunal",
