@@ -15,12 +15,16 @@ from generators import (
     generar_reporte_audiencia,
     generar_solicitud_cobros,
     generar_solicitud_inspeccion,
+    generar_informe_audiencia_provincial,
+    generar_conclusiones_saneamiento,
     nombre_archivo,
     pdf_informe_tecnico,
     pdf_copia_certificada,
     pdf_reporte_audiencia,
     pdf_solicitud_cobros,
     pdf_solicitud_inspeccion,
+    pdf_informe_audiencia_provincial,
+    pdf_conclusiones_saneamiento,
 )
 
 # ── PALETA ───────────────────────────────────────
@@ -101,6 +105,19 @@ ASUNTOS_INMOBILIARIA = [
     "SOLICITUD DE DESLINDE",
     "SANEAMIENTO",
     "LITIS SOBRE DERECHOS REGISTRADOS",
+]
+
+TIPOS_AUDIENCIA_PROVINCIAL = [
+    "Deslinde",
+    "Deslinde y su división",
+    "Deslinde, su división y refundición",
+    "Saneamiento",
+    "Litis sobre Derechos Registrados",
+]
+
+RECLAMANTES_SANEAMIENTO = [
+    "COMISIÓN PERMANENTE DE TITULACIÓN DE TERRENOS DEL ESTADO (UTEC).",
+    "INSTITUTO AGRARIO DOMINICANO (IAD), REPRESENTADO POR LA COMISIÓN PERMANENTE DE TITULACIÓN DE TERRENOS DEL ESTADO.",
 ]
 
 
@@ -588,6 +605,26 @@ def main(page: ft.Page):
         "firmante_cargo":     "Directora Legal.",
         "iniciales":          "YDLCV/rr",
         "cc":                 "",
+    }
+
+    form_audiencia_provincial = {
+        "fecha_informe": f"{hoy.day:02d}/{hoy.month:02d}/{hoy.year}",
+        "provincia": "",
+        "municipio": "",
+        "fecha_desde": f"{hoy.day:02d}/{hoy.month:02d}/{hoy.year}",
+        "fecha_hasta": "",
+        "tribunal": "",
+        "tipo_proceso": "Deslinde",
+        "inmueble": "",
+        "demandante": "",
+        "expediente": "",
+        "resultado": "",
+    }
+
+    form_conclusiones_saneamiento = {
+        "expediente": "",
+        "reclamante": RECLAMANTES_SANEAMIENTO[0],
+        "inmueble": "",
     }
 
     form_area = ft.Column(spacing=20, scroll=ft.ScrollMode.AUTO, expand=True)
@@ -1182,8 +1219,114 @@ def main(page: ft.Page):
             nota_descarga(),
         ]
 
+    # ── PLANTILLA 6: INFORME DE AUDIENCIA PROVINCIAL ──
+    def build_audiencia_provincial():
+        form = form_audiencia_provincial
+        def rf(): page.update()
+
+        def validar():
+            reqs = [
+                ("provincia", "Provincia"), ("fecha_desde", "Fecha de traslado"),
+                ("tribunal", "Tribunal"), ("tipo_proceso", "Tipo de proceso"),
+                ("inmueble", "Inmueble"), ("demandante", "Demandante"),
+                ("resultado", "Resultado de la audiencia"),
+            ]
+            return [nombre for clave, nombre in reqs if not form.get(clave, "").strip()]
+
+        def generar_documento(es_pdf=False):
+            faltantes = validar()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = (pdf_informe_audiencia_provincial if es_pdf else generar_informe_audiencia_provincial)(form)
+                ident = "-".join(x for x in [form.get("provincia", "").strip(), form.get("expediente", "").strip()] if x) or "Audiencia provincial"
+                nombre = nombre_archivo("Informe de Audiencia Provincial", ident)
+                if es_pdf:
+                    _guardar_pdf(page, contenido, nombre.replace(".docx", ".pdf"), snack)
+                else:
+                    _guardar_y_abrir(page, contenido, nombre, snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        return [
+            tarjeta("I", "Traslado", "Provincia y duración de la comisión", ft.Column(controls=[
+                ft.Row(controls=[
+                    campo("Fecha del informe", form, "fecha_informe", rf, hint="DD/MM/AAAA", required=True, keyboard_type=KT_NUM),
+                    campo("Provincia", form, "provincia", rf, required=True),
+                    campo("Municipio (opcional)", form, "municipio", rf),
+                ], spacing=24),
+                ft.Container(height=14),
+                ft.Row(controls=[
+                    campo("Fecha de traslado", form, "fecha_desde", rf, hint="DD/MM/AAAA", required=True, keyboard_type=KT_NUM),
+                    campo("Fecha de retorno (solo si fueron dos días)", form, "fecha_hasta", rf, hint="DD/MM/AAAA", keyboard_type=KT_NUM),
+                ], spacing=24),
+            ])),
+            tarjeta("II", "Audiencia", "Datos que aparecen en la referencia y el cuerpo", ft.Column(controls=[
+                campo("Tribunal", form, "tribunal", rf, required=True, multiline=True),
+                ft.Container(height=14),
+                combobox_campo("Tipo de proceso", form, "tipo_proceso", TIPOS_AUDIENCIA_PROVINCIAL, rf, required=True, filter_on_type=False),
+                ft.Container(height=14),
+                campo("Inmueble", form, "inmueble", rf, required=True, multiline=True,
+                      hint="Parcela, D. C., resultantes, municipio y provincia…"),
+                ft.Container(height=14),
+                ft.Row(controls=[
+                    campo("Demandante / requirente", form, "demandante", rf, required=True, multiline=True),
+                    campo("No. Expediente (opcional)", form, "expediente", rf),
+                ], spacing=24),
+            ])),
+            tarjeta("III", "Resultado", "Lo ocurrido en la audiencia", ft.Column(controls=[
+                campo("Resultado de la audiencia", form, "resultado", rf, required=True, multiline=True,
+                      hint="Ej.: se aplazó para el 7 de diciembre a los fines de…"),
+            ])),
+            ft.Container(height=6),
+            ft.Container(content=boton_generar(lambda e: generar_documento()), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(lambda e: generar_documento(True)), alignment=ft.alignment.center),
+            nota_descarga(),
+        ]
+
+    # ── PLANTILLA 7: CONCLUSIONES DE SANEAMIENTO ──
+    def build_conclusiones_saneamiento():
+        form = form_conclusiones_saneamiento
+        def rf(): page.update()
+
+        def validar():
+            reqs = [("expediente", "No. de expediente"), ("reclamante", "Reclamante"), ("inmueble", "Inmueble")]
+            return [nombre for clave, nombre in reqs if not form.get(clave, "").strip()]
+
+        def generar_documento(es_pdf=False):
+            faltantes = validar()
+            if faltantes:
+                snack("Campos requeridos: " + ", ".join(faltantes), ok=False); return
+            try:
+                contenido = (pdf_conclusiones_saneamiento if es_pdf else generar_conclusiones_saneamiento)(form)
+                nombre = nombre_archivo("Conclusiones de Saneamiento", form["expediente"])
+                if es_pdf:
+                    _guardar_pdf(page, contenido, nombre.replace(".docx", ".pdf"), snack)
+                else:
+                    _guardar_y_abrir(page, contenido, nombre, snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        return [
+            tarjeta("I", "Datos variables", "Los únicos datos editables del modelo de conclusiones", ft.Column(controls=[
+                campo("No. de expediente", form, "expediente", rf, required=True),
+                ft.Container(height=14),
+                combobox_campo("Reclamante", form, "reclamante", RECLAMANTES_SANEAMIENTO, rf,
+                               required=True, filter_on_type=False),
+                ft.Container(height=14),
+                campo("Inmueble", form, "inmueble", rf, required=True, multiline=True,
+                      hint="SANEAMIENTO PARCELA NO. …"),
+            ])),
+            ft.Container(height=6),
+            ft.Container(content=boton_generar(lambda e: generar_documento()), alignment=ft.alignment.center),
+            ft.Container(height=8),
+            ft.Container(content=boton_pdf(lambda e: generar_documento(True)), alignment=ft.alignment.center),
+            nota_descarga(),
+        ]
+
     # ── TABS ─────────────────────────────────────
-    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion"]
+    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento"]
 
     tabs_row = ft.Row(controls=[], spacing=4, scroll=ft.ScrollMode.AUTO)
 
@@ -1227,6 +1370,8 @@ def main(page: ft.Page):
             tab_btn("Reporte de Audiencia",   "Audiencia · Fallo y próxima fecha",   "reporte"),
             tab_btn("Solicitud de Cobros",    "Cobros · Verificación de pago",       "cobros"),
             tab_btn("Solicitud de Inspección","Inspección · Cuerpo libre",           "inspeccion"),
+            tab_btn("Informe Provincial",     "Audiencia · Traslado a provincia",    "audiencia_provincial"),
+            tab_btn("Conclusiones",            "Saneamiento · Modelo fijo",           "conclusiones_saneamiento"),
         ]
         scroll_hint.visible = plantilla["actual"] != KEYS[-1]
 
@@ -1239,6 +1384,8 @@ def main(page: ft.Page):
         "reporte":    ("Reporte de Audiencia",          "Complete los campos para generar el reporte de la audiencia."),
         "cobros":     ("Solicitud de Cobros",           "Complete los campos para verificar existencia de cuenta o pago."),
         "inspeccion": ("Solicitud de Inspección",       "Redacte el cuerpo libremente y genere el documento oficial."),
+        "audiencia_provincial": ("Informe de Audiencia Provincial", "Registre el traslado y la audiencia conforme al modelo suministrado."),
+        "conclusiones_saneamiento": ("Conclusiones de Saneamiento", "Cambie expediente, reclamante e inmueble; el resto del modelo se conserva."),
     }
 
     header_titulo = ft.Text("", size=30, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY)
@@ -1250,6 +1397,8 @@ def main(page: ft.Page):
         "reporte":    build_reporte,
         "cobros":     build_cobros,
         "inspeccion": build_inspeccion,
+        "audiencia_provincial": build_audiencia_provincial,
+        "conclusiones_saneamiento": build_conclusiones_saneamiento,
     }
 
     def rebuild_form():

@@ -11,6 +11,8 @@ Sistema web desarrollado en **Python + Flet** para automatizar la generación de
 | 3 | **Reporte de Audiencia** | Reporte de audiencia con fallo y próxima fecha |
 | 4 | **Solicitud de Cobros** | Verificación de existencia de cuenta o pago |
 | 5 | **Solicitud de Inspección** | Solicitud de inspección con cuerpo libre |
+| 6 | **Informe de Audiencia Provincial** | Informe narrativo de traslado, audiencia y resultado en una provincia |
+| 7 | **Conclusiones de Saneamiento** | Modelo de conclusiones con expediente, reclamante e inmueble variables |
 
 ## Características
 
@@ -53,7 +55,9 @@ Luego abrir el navegador en: **http://localhost:8080**
 │   ├── archivo.py                 # Generador: Copia Certificada
 │   ├── reporte.py                 # Generador: Reporte de Audiencia
 │   ├── cobros.py                  # Generador: Solicitud de Cobros
-│   └── inspeccion.py              # Generador: Solicitud de Inspección
+│   ├── inspeccion.py              # Generador: Solicitud de Inspección
+│   ├── audiencia_provincial.py     # Generador: Informe de Audiencia Provincial
+│   └── conclusiones_saneamiento.py # Generador: Conclusiones de Saneamiento
 ├── assets/
 │   ├── favicon.png                # Ícono de pestaña (escudo RDL)
 │   └── icons/

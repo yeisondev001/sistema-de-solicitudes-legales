@@ -3,6 +3,7 @@
 from fpdf import FPDF
 from datetime import date
 from .base import parse_fecha, fecha_larga, MESES
+from .audiencia_provincial import _periodo_traslado, _referencia
 
 
 class _Doc(FPDF):
@@ -200,6 +201,71 @@ def pdf_reporte_audiencia(d: dict) -> bytes:
     doc._f()
     doc.cell(0, 6, d["abogados"] + ".", new_x="LMARGIN", new_y="NEXT")
 
+    return doc.to_bytes()
+
+
+def pdf_informe_audiencia_provincial(d: dict) -> bytes:
+    doc = _Doc()
+    fecha = parse_fecha(d["fecha_informe"]) or date.today()
+    doc.par("Santo Domingo, D.N.", align="L", bold=True)
+    doc.par(fecha_larga(fecha), align="L", bold=True)
+    doc.blank()
+    doc.field("A", ("YOLANDA DE LA CRUZ VARGAS", True), ("Directora Legal.", False))
+    doc.field("DE", ("RAYMOND GREGORI ROJAS HENRIQUEZ", True), ("Abogado.", False))
+    doc.field("ASUNTO", (f"INFORMES SOBRE AUDIENCIAS EN LA PROV. {d['provincia'].upper()}", False))
+    doc.field("REFERENCIA", (_referencia(d), False))
+    doc.blank()
+    municipio = d.get("municipio", "").strip()
+    lugar = f" (municipio de {municipio})" if municipio else ""
+    texto = (
+        "Cortesmente, tenemos a bien informarle por este medio, que "
+        f"{_periodo_traslado(d['fecha_desde'], d.get('fecha_hasta', ''))}, "
+        f"nos trasladamos a la provincia {d['provincia']}{lugar} a los fines de participar "
+        f"en la audiencia fijada por ante el {d['tribunal']}, en ocasion de conocer del proceso "
+        f"de {d['tipo_proceso']} referente: {d['inmueble']}"
+    )
+    if d.get("demandante", "").strip():
+        texto += f", a requerimiento de {d['demandante'].strip()}"
+    if d.get("expediente", "").strip():
+        texto += f". Expediente No.{d['expediente'].strip()}"
+    doc.par(texto + ".", align="J")
+    doc.blank()
+    doc.par("La misma " + d["resultado"].strip().rstrip(".") + ".", align="L")
+    doc.blank()
+    doc.par("Sin mas por el momento,", align="L")
+    doc.blank(); doc.blank()
+    doc.center("________________________________________")
+    doc.center("RAYMOND ROJAS HENRIQUEZ", bold=True)
+    doc.center("Abogado")
+    return doc.to_bytes()
+
+
+def pdf_conclusiones_saneamiento(d: dict) -> bytes:
+    doc = _Doc()
+    doc.field("AL", ("KATTY ECHAVARRÍA PIMENTEL.", True),
+              ("JUEZ DE LA CUARTA SALA DEL TRIBUNAL DE TIERRAS DE JURISDICCIÓN ORIGINAL DEL DISTRITO NACIONAL.", False))
+    doc.field("ASUNTO", ("ESCRITO DE CONCLUSIONES RELATIVO A LOS TRABAJOS DE SANEAMIENTO EN EL MUNICIPIO PARAISO, PROVINCIA BARAHONA.", False))
+    doc.field("INTERVINIENTE", ("DIRECCIÓN GENERAL DE BIENES NACIONALES.", False))
+    doc.field("ABOGADOS", ("LICDOS. YOLANDA DE LA CRUZ VARGAS, CARLOS MANUEL GARO PEREZ Y RAYMOND ROJAS HENRIQUEZ.", False))
+    doc.field("RECLAMANTE", (d["reclamante"], False))
+    doc.field("INMUEBLE", (d["inmueble"], False))
+    doc.field("EXPEDIENTE", (d["expediente"], False))
+    doc.blank()
+    doc.par("HONORABLE MAGISTRADA:", align="L", bold=True)
+    doc.par("LA DIRECCIÓN GENERAL DE BIENES NACIONALES, representante del ESTADO DOMINICANO, creada mediante la ley 1832, del 3 de noviembre del año 1948, con domicilio abierto de manera permanente en la calle Fray Cipriano Utrera No.1, Centro de los Héroes, La Feria, Santo Domingo, Distrito Nacional, representado por su Director Dr.RAFAEL A. BURGOS GÓMEZ, dominicano, mayor de edad, funcionario público, portador de la cédula de identidad y electoral no.001-0734656-1,quien tiene como abogados constituidos apoderados especiales a losLICDOS. YOLANDA DE LA CRUZ VARGASY RAYMOND ROJAS HENRIQUEZ, dominicanos, mayores de edad, portadores de la cédulas de identidad y electoral nos. 001-0168488-4,,00119447456,yconCorreo:departamentolitigiosbn@gmail.com, donde mi requirente hace formal mi elección de domicilio para todos los fines y consecuencia legales de la presente instancia, tiene a bien concluir de la siguiente manera:", align="J")
+    doc.par("Conclusiones de fondo:", align="L", bold=True)
+    doc.par("Primero: Nos adherimos a las conclusiones presentadas por el Abogado del Estado, la Unidad Técnica Ejecutora de Titulación de Terrenos del Estado y el Instituto Agrario Dominicano (IAD).", align="J")
+    doc.par("Segundo: Que sean acogidos en su totalidad los documentos depositados, así como los informes técnicos y trabajos desaneamientos con sus respectivos planos, aprobados por la Dirección General de Mensuras Catastrales.", align="J")
+    doc.par("Tercero: Ordenar al Registro de Títulos correspondiente la expedición de los Certificados de Títulos que amparen los derechos de propiedad sobre las parcelas resultantes, vinculadas al presente expediente, en virtud de haberse demostrado que el reclamante ha mantenido sobre las mismas una posesión pública, pacífica, inequívoca e ininterrumpida por más de veinte (20) años, conforme ha sido debidamente comprobado por este Tribunal.", align="J")
+    doc.par("En la ciudad de Santo Domingo, Distrito Nacional, capital de la República Dominicana, a los nueve (09) días del mes de Julio del año dos mil veinticinco (2025).", align="J")
+    doc.blank(); doc.blank()
+    doc.center("_______________________________        ______________________________________")
+    doc.center("Lic. Raymond Rojas Henríquez      Licdos. Yolanda De La Cruz Vargas")
+    doc.center("Abogado.                         Encargado del Depto. de Litigios.")
+    doc.blank()
+    doc.center("__________________________________________")
+    doc.center("Licda. Yolanda De La Cruz Vargas,")
+    doc.center("Directora legal.")
     return doc.to_bytes()
 
 
