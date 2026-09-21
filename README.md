@@ -4,6 +4,12 @@ Aplicación web para el Departamento Legal que estandariza la captura de datos y
 
 El sistema reduce la redacción repetitiva, conserva la estructura de los modelos institucionales y facilita la descarga de documentos listos para revisión y firma.
 
+## Aplicación en línea
+
+Pruebe la versión publicada en [sistema-de-solicitudes-legales.onrender.com](https://sistema-de-solicitudes-legales.onrender.com/).
+
+> La primera carga puede tomar unos instantes cuando el servicio gratuito de Render se está reactivando.
+
 ## Funcionalidades
 
 - Generación de documentos en `.docx` y `.pdf`.
@@ -79,6 +85,8 @@ La aplicación estará disponible en `http://localhost:8080`.
 ## Despliegue
 
 El repositorio incluye la configuración necesaria para desplegar en [Render](https://render.com/). Render instala las dependencias y sirve la aplicación Flet en modo web.
+
+La instancia pública actual está disponible en [https://sistema-de-solicitudes-legales.onrender.com/](https://sistema-de-solicitudes-legales.onrender.com/).
 
 ## Contribuciones
 
