@@ -95,3 +95,7 @@ Las pautas de desarrollo y verificación están disponibles en [CONTRIBUTING.md]
 ## Datos y privacidad
 
 Evite versionar expedientes, cédulas, documentos generados u otra información sensible. Los archivos de prueba y las descargas deben permanecer fuera del control de versiones.
+
+## Licencia
+
+Este proyecto se distribuye bajo la [Licencia MIT](LICENSE).
