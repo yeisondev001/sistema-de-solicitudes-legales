@@ -1,83 +1,89 @@
 # Sistema de Solicitudes Legales
 
-Sistema web desarrollado en **Python + Flet** para automatizar la generación de documentos legales en formato Word (`.docx`) con el formato oficial de la institución.
+Aplicación web para el Departamento Legal que estandariza la captura de datos y la generación de documentos jurídicos en formato Word y PDF.
+
+El sistema reduce la redacción repetitiva, conserva la estructura de los modelos institucionales y facilita la descarga de documentos listos para revisión y firma.
+
+## Funcionalidades
+
+- Generación de documentos en `.docx` y `.pdf`.
+- Formularios guiados con validación de datos obligatorios.
+- Listas de tribunales, salas y materias para reducir errores de digitación.
+- Diseño adaptable para computador y móvil.
+- Descarga directa del documento generado; en Windows se guarda además en la carpeta **Descargas**.
+- Formato documental homogéneo con fuente Century Gothic.
 
 ## Plantillas disponibles
 
-| # | Plantilla | Descripción |
-|---|-----------|-------------|
-| 1 | **Informe Técnico** | Solicitud al Catastro para Investigación Parcelaria |
-| 2 | **Solicitud de Archivo** | Solicitud de Copia Certificada de Expediente |
-| 3 | **Reporte de Audiencia** | Reporte de audiencia con fallo y próxima fecha |
-| 4 | **Solicitud de Cobros** | Verificación de existencia de cuenta o pago |
-| 5 | **Solicitud de Inspección** | Solicitud de inspección con cuerpo libre |
-| 6 | **Informe de Audiencia Provincial** | Informe narrativo de traslado, audiencia y resultado en una provincia |
-| 7 | **Conclusiones de Saneamiento** | Modelo de conclusiones con expediente, reclamante e inmueble variables |
+| # | Plantilla | Uso |
+|---:|---|---|
+| 1 | Informe Técnico | Solicitud de investigación parcelaria al Catastro. |
+| 2 | Solicitud de Archivo | Solicitud de copia certificada de expediente. |
+| 3 | Reporte de Audiencia | Registro estructurado de audiencia, fallo y próxima fecha. |
+| 4 | Solicitud de Cobros | Verificación de existencia de cuenta o pago. |
+| 5 | Solicitud de Inspección | Solicitud de inspección con contenido personalizado. |
+| 6 | Informe de Audiencia Provincial | Informe narrativo de traslado, audiencia y resultado en una provincia. Admite traslados de uno o dos días. |
+| 7 | Conclusiones de Saneamiento | Modelo de conclusiones con expediente, reclamante e inmueble variables. |
 
-## Características
+## Inicio rápido
 
-- Interfaz web con estética **navy + dorado** (Cormorant Garamond / Source Serif 4)
-- Generación de documentos `.docx` con **formato exacto** al original
-- Fuente **Century Gothic** en todos los documentos
-- Campos dinámicos: anexos, demandados y partes configurables
-- Tabs deslizables con navegación por flecha en móvil
-- El documento se guarda automáticamente en la carpeta **Descargas** y se abre en Word
-
-## Tecnologías
-
-- [Flet](https://flet.dev/) `0.25.2` — Framework web en Python
-- [python-docx](https://python-docx.readthedocs.io/) `1.1.2` — Generación de documentos Word
-
-## Instalación y uso local
+Requiere Python 3.11 o superior.
 
 ```bash
-# Clonar el repositorio
 git clone https://github.com/yeisondev001/sistema-de-solicitudes-legales.git
 cd sistema-de-solicitudes-legales
-
-# Instalar dependencias
-pip install -r requirements.txt
-
-# Ejecutar la app
+python -m pip install -r requirements.txt
 python main.py
 ```
 
-Luego abrir el navegador en: **http://localhost:8080**
+La aplicación estará disponible en `http://localhost:8080`.
+
+## Uso
+
+1. Seleccione la plantilla en la barra superior.
+2. Complete los campos requeridos, identificados con un asterisco.
+3. Revise los datos antes de generar el documento.
+4. Elija **Generar documento Word** o **Generar documento PDF**.
+5. Valide el contenido jurídico y proceda con la firma institucional correspondiente.
+
+> Los documentos se generan a partir de los datos introducidos. La revisión legal y la autorización de firma siguen siendo responsabilidad del equipo competente.
 
 ## Estructura del proyecto
 
-```
-├── main.py                        # UI principal (Flet)
+```text
+├── main.py                         # Interfaz y formularios Flet
 ├── generators/
-│   ├── __init__.py                # Exporta los 5 generadores
-│   ├── base.py                    # Helpers y constantes compartidos (python-docx)
-│   ├── informe.py                 # Generador: Informe Técnico
-│   ├── archivo.py                 # Generador: Copia Certificada
-│   ├── reporte.py                 # Generador: Reporte de Audiencia
-│   ├── cobros.py                  # Generador: Solicitud de Cobros
-│   ├── inspeccion.py              # Generador: Solicitud de Inspección
-│   ├── audiencia_provincial.py     # Generador: Informe de Audiencia Provincial
-│   └── conclusiones_saneamiento.py # Generador: Conclusiones de Saneamiento
-├── assets/
-│   ├── favicon.png                # Ícono de pestaña (escudo RDL)
-│   └── icons/
-│       └── loading-animation.png  # Reemplazado por PNG transparente
-├── requirements.txt               # Dependencias
-├── Procfile                       # Comando de arranque para Render.com
-├── render.yaml                    # Configuración de Render.com
-└── README.md
+│   ├── base.py                     # Utilidades compartidas para documentos Word
+│   ├── informe.py                  # Informe Técnico
+│   ├── archivo.py                  # Solicitud de Archivo
+│   ├── reporte.py                  # Reporte de Audiencia
+│   ├── cobros.py                   # Solicitud de Cobros
+│   ├── inspeccion.py               # Solicitud de Inspección
+│   ├── audiencia_provincial.py     # Informe de Audiencia Provincial
+│   ├── conclusiones_saneamiento.py # Conclusiones de Saneamiento
+│   └── pdf_gen.py                  # Generadores PDF
+├── assets/                         # Íconos y recursos visuales
+├── requirements.txt                # Dependencias de Python
+├── render.yaml                     # Configuración de despliegue en Render
+└── Procfile                        # Comando de arranque para Render
 ```
 
-## Agregar una nueva plantilla
+## Agregar una plantilla
 
-1. Crear `generators/nueva.py` con una función `generar(d: dict) -> bytes` usando los helpers de `base.py`
-2. Registrarla en `generators/__init__.py`
-3. Agregar el formulario en `main.py` siguiendo el patrón `build_*` existente
+1. Cree un generador en `generators/` con una función `generar(d: dict) -> bytes`.
+2. Exporte la función desde `generators/__init__.py`.
+3. Agregue el formulario, validaciones y pestaña en `main.py`.
+4. Incorpore su equivalente PDF en `generators/pdf_gen.py`.
+5. Pruebe ambos formatos con datos representativos antes de publicar.
 
-## Deploy
+## Despliegue
 
-El proyecto está configurado para desplegarse en **[Render.com](https://render.com)** (tier gratuito).
+El repositorio incluye la configuración necesaria para desplegar en [Render](https://render.com/). Render instala las dependencias y sirve la aplicación Flet en modo web.
 
----
+## Contribuciones
 
-Desarrollado para automatizar el flujo de solicitudes del departamento legal.
+Las pautas de desarrollo y verificación están disponibles en [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Datos y privacidad
+
+Evite versionar expedientes, cédulas, documentos generados u otra información sensible. Los archivos de prueba y las descargas deben permanecer fuera del control de versiones.
