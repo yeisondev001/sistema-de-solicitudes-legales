@@ -9,6 +9,7 @@ from datetime import date
 
 import flet as ft
 
+import historial
 from generators import (
     generar_informe_tecnico,
     generar_copia_certificada,
@@ -17,6 +18,7 @@ from generators import (
     generar_solicitud_inspeccion,
     generar_informe_audiencia_provincial,
     generar_conclusiones_saneamiento,
+    generar_expedientes,
     nombre_archivo,
     pdf_informe_tecnico,
     pdf_copia_certificada,
@@ -454,11 +456,11 @@ def tarjeta(romano, titulo, subtitulo, contenido):
     )
 
 
-def boton_generar(on_click):
+def boton_generar(on_click, texto="GENERAR DOCUMENTO WORD"):
     return ft.Container(
         content=ft.Row(controls=[
             ft.Icon(ft.Icons.DOWNLOAD, color=PAPER, size=18),
-            ft.Text("GENERAR DOCUMENTO WORD", size=14,
+            ft.Text(texto, size=14,
                     weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY),
             ft.Text("·", size=22, color=ACCENT),
         ], spacing=14, alignment=ft.MainAxisAlignment.CENTER),
@@ -561,6 +563,7 @@ def main(page: ft.Page):
         "demandados":      [""],
         "asunto":          "Solicitud de Deslinde.",
         "parcela":         "",
+        "agrimensor":      "",
         "caja_no":         "",
         "rol":             "",
         "fecha_audiencia": f"{hoy.day:02d}/{hoy.month:02d}/{hoy.year}",
@@ -974,6 +977,7 @@ def main(page: ft.Page):
                 exp   = form.get("expediente","").strip()
                 ident = "-".join([x for x in (demte, exp) if x]) or "Reporte"
                 _guardar_y_abrir(page, contenido, nombre_archivo("Reporte de Audiencia", ident), snack)
+                registrar_en_historial(form)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -987,6 +991,7 @@ def main(page: ft.Page):
                 exp   = form.get("expediente","").strip()
                 ident = "-".join([x for x in (demte, exp) if x]) or "Reporte"
                 _guardar_pdf(page, contenido, nombre_archivo("Reporte de Audiencia", ident).replace(".docx",".pdf"), snack)
+                registrar_en_historial(form)
             except Exception as ex:
                 snack(f"Error: {ex}", ok=False)
 
@@ -1003,6 +1008,8 @@ def main(page: ft.Page):
                 sala_wrap,
                 ft.Container(height=14),
                 campo("Parcela / Designación", form, "parcela", rf, required=True),
+                ft.Container(height=14),
+                campo("Agrimensor", form, "agrimensor", rf),
             ])),
             tarjeta("II",  "Partes", "Demandante y demandado(s)", ft.Column(controls=[
                 campo("Demandante(s)",form,"demandantes",rf,multiline=True,required=True),
@@ -1325,8 +1332,104 @@ def main(page: ft.Page):
             nota_descarga(),
         ]
 
+    # ── HISTORIAL DE EXPEDIENTES ─────────────────
+    def registrar_en_historial(form):
+        try:
+            historial.guardar(historial.desde_reporte(form))
+        except Exception as ex:
+            snack(f"El documento se generó, pero no se guardó en el historial: {ex}", ok=False)
+
+    def build_historial():
+        try:
+            entradas = historial.listar()
+        except Exception as ex:
+            return [tarjeta("!", "Sin conexión", "No se pudo leer el historial",
+                            ft.Text(str(ex), size=12, color=PDF_COLOR, font_family=FONT_BODY))]
+
+        def on_descargar(e):
+            if not entradas:
+                snack("El historial está vacío.", ok=False); return
+            try:
+                _guardar_y_abrir(page, generar_expedientes(entradas), f"EXPEDIENTES {hoy.year}.docx", snack)
+            except Exception as ex:
+                snack(f"Error: {ex}", ok=False)
+
+        def confirmar_borrado(entrada, numero):
+            def on_borrar(e):
+                page.close(dlg)
+                try:
+                    historial.borrar(entrada["id"])
+                    snack(f"No.{numero:02d} borrado del historial.")
+                except Exception as ex:
+                    snack(f"No se pudo borrar: {ex}", ok=False)
+                rebuild_form(); page.update()
+
+            dlg = ft.AlertDialog(
+                modal=True, bgcolor=PAPER,
+                title=ft.Text("¿Borrar del historial?", font_family=FONT_DISPLAY, color=INK, size=18),
+                content=ft.Text(
+                    f"No.{numero:02d} · Exp. {entrada['expediente']}\n{entrada['recurrente']}\n\n"
+                    "Esta acción no se puede deshacer.",
+                    font_family=FONT_BODY, color=INK_SOFT, size=13,
+                ),
+                actions=[
+                    ft.TextButton("Cancelar", on_click=lambda e: page.close(dlg),
+                                  style=ft.ButtonStyle(color=INK_SOFT)),
+                    ft.ElevatedButton("Borrar", on_click=on_borrar, style=ft.ButtonStyle(
+                        bgcolor=PDF_COLOR, color=PAPER, shape=ft.RoundedRectangleBorder(radius=2))),
+                ],
+                actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
+            page.open(dlg)
+
+        def dato(etiqueta, valor):
+            return ft.Row(controls=[
+                ft.Text(etiqueta.upper(), size=10, weight=ft.FontWeight.W_600,
+                        color=INK_SOFT, font_family=FONT_BODY, width=130),
+                ft.Text(valor or "—", size=14, color=INK, font_family=FONT_BODY, expand=True),
+            ], vertical_alignment=ft.CrossAxisAlignment.START)
+
+        def tarjeta_expediente(numero, ent):
+            return ft.Container(
+                content=ft.Row(controls=[
+                    ft.Column(controls=[
+                        ft.Text(f"No.{numero:02d}", size=20, italic=True,
+                                color=ACCENT, font_family=FONT_DISPLAY),
+                        dato("Tribunal", ent["tribunal"]),
+                        dato("Fecha audiencia", ent["fecha_audiencia"]),
+                        dato("No. Exp.", ent["expediente"]),
+                        dato("Recurrente", ent["recurrente"]),
+                        dato("Recurrido", ent["recurrido"]),
+                        dato("Agrimensor", ent["agrimensor"]),
+                        dato("Objeto", ent["objeto"]),
+                        dato("Parcela", ent["parcela"]),
+                        dato("Fallo", ent["fallo"]),
+                        dato("Próxima audiencia", ent["fecha_proxima"]),
+                    ], spacing=6, expand=True),
+                    ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=PDF_COLOR,
+                                  tooltip="Borrar del historial",
+                                  on_click=lambda e: confirmar_borrado(ent, numero)),
+                ], vertical_alignment=ft.CrossAxisAlignment.START),
+                bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), padding=ft.padding.all(18),
+            )
+
+        if not entradas:
+            return [tarjeta("I", "Sin expedientes todavía", "El historial se llena solo",
+                            ft.Text("Cada vez que genere un Reporte de Audiencia en Word o PDF, "
+                                    "el expediente aparecerá aquí.",
+                                    size=13, italic=True, color=INK_SOFT, font_family=FONT_BODY))]
+
+        total = len(entradas)
+        return [
+            ft.Text(f"{total} expediente{'s' if total != 1 else ''} · el más reciente primero",
+                    size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY),
+            ft.Container(content=boton_generar(on_descargar, "DESCARGAR HISTORIAL EN WORD"),
+                         alignment=ft.alignment.center),
+            *[tarjeta_expediente(n, ent) for n, ent in reversed(list(enumerate(entradas, start=1)))],
+        ]
+
     # ── TABS ─────────────────────────────────────
-    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento"]
+    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento", "historial"]
 
     tabs_row = ft.Row(controls=[], spacing=4, scroll=ft.ScrollMode.AUTO)
 
@@ -1372,6 +1475,7 @@ def main(page: ft.Page):
             tab_btn("Solicitud de Inspección","Inspección · Cuerpo libre",           "inspeccion"),
             tab_btn("Informe Provincial",     "Audiencia · Traslado a provincia",    "audiencia_provincial"),
             tab_btn("Conclusiones",            "Saneamiento · Modelo fijo",           "conclusiones_saneamiento"),
+            tab_btn("Historial",               "Expedientes · Reportes generados",    "historial"),
         ]
         scroll_hint.visible = plantilla["actual"] != KEYS[-1]
 
@@ -1386,6 +1490,7 @@ def main(page: ft.Page):
         "inspeccion": ("Solicitud de Inspección",       "Redacte el cuerpo libremente y genere el documento oficial."),
         "audiencia_provincial": ("Informe de Audiencia Provincial", "Registre el traslado y la audiencia conforme al modelo suministrado."),
         "conclusiones_saneamiento": ("Conclusiones de Saneamiento", "Cambie expediente, reclamante e inmueble; el resto del modelo se conserva."),
+        "historial": ("Historial de Expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
     }
 
     header_titulo = ft.Text("", size=30, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY)
@@ -1399,6 +1504,7 @@ def main(page: ft.Page):
         "inspeccion": build_inspeccion,
         "audiencia_provincial": build_audiencia_provincial,
         "conclusiones_saneamiento": build_conclusiones_saneamiento,
+        "historial": build_historial,
     }
 
     def rebuild_form():

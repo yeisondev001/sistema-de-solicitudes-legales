@@ -31,6 +31,13 @@ Pruebe la versión publicada en [sistema-de-solicitudes-legales.onrender.com](ht
 | 6 | Informe de Audiencia Provincial | Informe narrativo de traslado, audiencia y resultado en una provincia. Admite traslados de uno o dos días. |
 | 7 | Conclusiones de Saneamiento | Modelo de conclusiones con expediente, reclamante e inmueble variables. |
 
+## Historial de expedientes
+
+Cada **Reporte de Audiencia** generado (Word o PDF) se guarda automáticamente en la pestaña **Historial**. Desde ahí se puede borrar cualquier expediente o descargar el historial completo en Word con el formato de *EXPEDIENTES* (una tabla por expediente: No., tribunal, fechas, partes, objeto, parcela y fallo). Si se genera de nuevo un reporte con el mismo No. de expediente y fecha de audiencia, se actualiza en lugar de duplicarse.
+
+- **En producción** el historial se guarda en PostgreSQL ([Neon](https://neon.tech), plan gratuito). Configure la variable de entorno `DATABASE_URL` con la cadena de conexión.
+- **En local**, si no existe `DATABASE_URL`, se usa un archivo SQLite (`historial.db`) que se crea solo.
+
 ## Inicio rápido
 
 Requiere Python 3.11 o superior.
@@ -58,6 +65,7 @@ La aplicación estará disponible en `http://localhost:8080`.
 
 ```text
 ├── main.py                         # Interfaz y formularios Flet
+├── historial.py                    # Historial de expedientes (PostgreSQL o SQLite)
 ├── generators/
 │   ├── base.py                     # Utilidades compartidas para documentos Word
 │   ├── informe.py                  # Informe Técnico
@@ -67,9 +75,11 @@ La aplicación estará disponible en `http://localhost:8080`.
 │   ├── inspeccion.py               # Solicitud de Inspección
 │   ├── audiencia_provincial.py     # Informe de Audiencia Provincial
 │   ├── conclusiones_saneamiento.py # Conclusiones de Saneamiento
+│   ├── expedientes.py              # Historial en Word (formato EXPEDIENTES)
 │   └── pdf_gen.py                  # Generadores PDF
 ├── assets/                         # Íconos y recursos visuales
-├── requirements.txt                # Dependencias de Python
+├── requirements.in                 # Dependencias directas
+├── requirements.txt                # Versiones fijas de todas las dependencias
 ├── render.yaml                     # Configuración de despliegue en Render
 └── Procfile                        # Comando de arranque para Render
 ```

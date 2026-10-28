@@ -5,6 +5,7 @@ from .cobros     import generar as generar_solicitud_cobros
 from .inspeccion import generar as generar_solicitud_inspeccion
 from .audiencia_provincial import generar as generar_informe_audiencia_provincial
 from .conclusiones_saneamiento import generar as generar_conclusiones_saneamiento
+from .expedientes import generar as generar_expedientes
 from .base       import nombre_archivo
 from .pdf_gen    import (
     pdf_informe_tecnico,
