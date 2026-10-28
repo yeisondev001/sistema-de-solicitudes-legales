@@ -33,7 +33,16 @@ Pruebe la versión publicada en [sistema-de-solicitudes-legales.onrender.com](ht
 
 ## Historial de expedientes
 
-Cada **Reporte de Audiencia** generado (Word o PDF) se guarda automáticamente en la pestaña **Historial**. Desde ahí se puede borrar cualquier expediente o descargar el historial completo en Word con el formato de *EXPEDIENTES* (una tabla por expediente: No., tribunal, fechas, partes, objeto, parcela y fallo). Si se genera de nuevo un reporte con el mismo No. de expediente y fecha de audiencia, se actualiza en lugar de duplicarse.
+Cada **Reporte de Audiencia** generado (Word o PDF) se guarda automáticamente en el **Historial** (botón dorado arriba a la derecha). Desde ahí se puede:
+
+- **Buscar** por expediente, recurrente, tribunal o parcela.
+- **Ver completo** cualquier expediente tocando su fila.
+- **Editar** un expediente: se abre el formulario con todos sus datos y, al generar, se actualiza ese mismo registro.
+- **Usar como base** un expediente: se abre una copia para cambiar solo lo necesario y se guarda como uno nuevo.
+- **Borrar** expedientes.
+- **Descargar todo en Word** con el formato de *EXPEDIENTES* (una tabla por expediente: No., tribunal, fechas, partes, objeto, parcela y fallo).
+
+Las próximas audiencias de los siguientes 7 días se resaltan en la lista. Si se genera de nuevo un reporte con el mismo No. de expediente y fecha de audiencia, se actualiza en lugar de duplicarse.
 
 - **En producción** el historial se guarda en PostgreSQL ([Neon](https://neon.tech), plan gratuito). Configure la variable de entorno `DATABASE_URL` con la cadena de conexión.
 - **En local**, si no existe `DATABASE_URL`, se usa un archivo SQLite (`historial.db`) que se crea solo.
@@ -77,7 +86,7 @@ La aplicación estará disponible en `http://localhost:8080`.
 │   ├── conclusiones_saneamiento.py # Conclusiones de Saneamiento
 │   ├── expedientes.py              # Historial en Word (formato EXPEDIENTES)
 │   └── pdf_gen.py                  # Generadores PDF
-├── assets/                         # Íconos y recursos visuales
+├── assets/                         # Íconos, fuentes (EB Garamond, Lato) y recursos visuales
 ├── requirements.in                 # Dependencias directas
 ├── requirements.txt                # Versiones fijas de todas las dependencias
 ├── render.yaml                     # Configuración de despliegue en Render

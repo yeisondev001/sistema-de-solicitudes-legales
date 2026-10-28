@@ -6,7 +6,7 @@ Sin ella, guarda en un archivo SQLite local (historial.db) para trabajar
 en la computadora sin configurar nada.
 """
 
-import os, pathlib, sqlite3
+import json, os, pathlib, sqlite3
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 SQLITE_PATH  = pathlib.Path(__file__).parent / "historial.db"
@@ -16,12 +16,15 @@ CAMPOS = (
     "agrimensor", "objeto", "parcela", "fallo", "fecha_proxima",
 )
 CLAVE = ("expediente", "fecha_audiencia")   # mismo reporte = misma entrada
+# Además se guarda el formulario completo (columna "datos", JSON) para poder
+# editar un reporte o usarlo como base de uno nuevo.
 
 _COLUMNAS = ",\n".join(f"    {c} TEXT NOT NULL DEFAULT ''" for c in CAMPOS)
 _DDL_POSTGRES = f"""
 CREATE TABLE IF NOT EXISTS expedientes (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 {_COLUMNAS},
+    datos       TEXT NOT NULL DEFAULT '',
     creado      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (expediente, fecha_audiencia)
@@ -30,6 +33,7 @@ _DDL_SQLITE = f"""
 CREATE TABLE IF NOT EXISTS expedientes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 {_COLUMNAS},
+    datos       TEXT NOT NULL DEFAULT '',
     creado      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (expediente, fecha_audiencia)
@@ -50,6 +54,7 @@ def _ejecutar(sql: str, params=(), leer=False):
         cur = conn.cursor()
         if not _tabla_lista:
             cur.execute(_DDL_POSTGRES if DATABASE_URL else _DDL_SQLITE)
+            _agregar_columna_datos(cur)
             _tabla_lista = True
         cur.execute(sql, params)
         filas = None
@@ -62,22 +67,52 @@ def _ejecutar(sql: str, params=(), leer=False):
         conn.close()
 
 
-def guardar(entrada: dict):
-    """Inserta el expediente o, si ya existe (mismo No. Exp y fecha), lo actualiza."""
-    cols   = ", ".join(CAMPOS)
-    marcas = ", ".join(["%s"] * len(CAMPOS))
-    cambia = ", ".join(f"{c} = excluded.{c}" for c in CAMPOS if c not in CLAVE)
+def _agregar_columna_datos(cur):
+    """Tablas creadas antes de existir la columna "datos"."""
+    if DATABASE_URL:
+        cur.execute("ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS datos TEXT NOT NULL DEFAULT ''")
+    else:
+        try:
+            cur.execute("ALTER TABLE expedientes ADD COLUMN datos TEXT NOT NULL DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass   # ya existe
+
+
+def guardar(entrada: dict, datos: dict = None, id_: int = None):
+    """
+    Con id_: actualiza ese expediente (modo editar).
+    Sin id_: inserta, o actualiza si ya existe el mismo No. Exp con la misma fecha.
+    """
+    columnas = CAMPOS + ("datos",)
+    valores  = tuple(entrada.get(c, "") for c in CAMPOS) + (json.dumps(datos or {}, ensure_ascii=False),)
+    if id_:
+        asignar = ", ".join(f"{c} = %s" for c in columnas)
+        _ejecutar(f"UPDATE expedientes SET {asignar}, actualizado = CURRENT_TIMESTAMP WHERE id = %s",
+                  valores + (id_,))
+        return
+    marcas = ", ".join(["%s"] * len(columnas))
+    cambia = ", ".join(f"{c} = excluded.{c}" for c in columnas if c not in CLAVE)
     _ejecutar(
-        f"INSERT INTO expedientes ({cols}) VALUES ({marcas}) "
+        f"INSERT INTO expedientes ({', '.join(columnas)}) VALUES ({marcas}) "
         f"ON CONFLICT (expediente, fecha_audiencia) DO UPDATE SET {cambia}, "
         f"actualizado = CURRENT_TIMESTAMP",
-        tuple(entrada.get(c, "") for c in CAMPOS),
+        valores,
     )
 
 
 def listar() -> list:
-    """Expedientes en orden de creación (No.01 es el primero)."""
-    return _ejecutar(f"SELECT id, {', '.join(CAMPOS)} FROM expedientes ORDER BY id", leer=True)
+    """Expedientes en orden de creación (No.01 es el primero), con el formulario en "datos"."""
+    filas = _ejecutar(f"SELECT id, {', '.join(CAMPOS)}, datos FROM expedientes ORDER BY id", leer=True)
+    for f in filas:
+        try:
+            f["datos"] = json.loads(f["datos"] or "{}")
+        except ValueError:
+            f["datos"] = {}
+    return filas
+
+
+def contar() -> int:
+    return _ejecutar("SELECT COUNT(*) AS n FROM expedientes", leer=True)[0]["n"]
 
 
 def borrar(id_: int):

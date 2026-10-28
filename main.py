@@ -4,8 +4,8 @@ Automatización de Solicitudes Legales
 UI principal — generación de documentos en generators/
 """
 
-import os, base64, platform, pathlib, re, uuid, time, threading
-from datetime import date
+import os, base64, copy, platform, pathlib, re, uuid, time, threading
+from datetime import date, datetime
 
 import flet as ft
 
@@ -39,8 +39,13 @@ RULE       = "#D9C998"
 SURFACE    = "#F7F2E6"
 PANEL_INK  = "#0F2A3F"
 
-FONT_DISPLAY = "Cormorant Garamond"
-FONT_BODY    = "Source Serif 4"
+ACCENT_TEXT = "#8A6508"   # dorado oscuro: legible como texto sobre papel
+HINT        = "#6E6E6E"
+NAV_TEXT    = "#C9D3DC"
+
+FONT_DISPLAY = "EB Garamond"
+FONT_BODY    = "Lato"
+ANCHO_MAX    = 1040       # ancho máximo del contenido en pantallas grandes
 PDF_COLOR    = "#6B1A1A"
 
 KT_NUM    = ft.KeyboardType.NUMBER
@@ -175,7 +180,7 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
                 ft.Text(
                     "Toca DESCARGAR para guardar el archivo.\n"
                     "iPhone → app Archivos → Descargas",
-                    font_family=FONT_BODY, color=INK_SOFT, size=11, italic=True,
+                    font_family=FONT_BODY, color=INK_SOFT, size=12, italic=True,
                 ),
             ], tight=True, spacing=0),
             actions=[
@@ -207,16 +212,12 @@ def _guardar_pdf(page, contenido: bytes, nombre: str, snack_fn):
 
 
 # ── HELPERS UI ───────────────────────────────────
-def ornamento(color=ACCENT):
-    return ft.Row(
-        controls=[
-            ft.Container(width=44, height=1, bgcolor=color),
-            ft.Container(width=8, height=8, bgcolor=color,
-                         border_radius=4, margin=ft.margin.symmetric(horizontal=6)),
-            ft.Container(width=44, height=1, bgcolor=color),
-        ],
-        alignment=ft.MainAxisAlignment.CENTER, spacing=0,
-    )
+def fila_campos(*controles):
+    """Campos lado a lado en pantallas anchas; uno debajo del otro en el celular."""
+    for c in controles:
+        c.col = {"xs": 12, "md": 12 // len(controles)}
+        c.expand = False
+    return ft.ResponsiveRow(controls=list(controles), spacing=24, run_spacing=14)
 
 
 def campo(label, form, key, on_change, hint=None, multiline=False, required=False, expand=True,
@@ -245,16 +246,16 @@ def campo(label, form, key, on_change, hint=None, multiline=False, required=Fals
         focused_border_width=2,
         cursor_color=ACCENT,
         text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, italic=True),
-        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
+        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color=HINT),
         content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
         keyboard_type=keyboard_type,
         on_change=_on_change,
     )
-    req_star = ft.Text(" *", color=ACCENT, size=10) if required else ft.Text("")
+    req_star = ft.Text(" *", color=ACCENT_TEXT, size=12) if required else ft.Text("")
     return ft.Column(
         controls=[
             ft.Row(controls=[
-                ft.Text(label.upper(), size=10, weight=ft.FontWeight.W_600,
+                ft.Text(label.upper(), size=12, weight=ft.FontWeight.W_600,
                         color=INK_SOFT, font_family=FONT_BODY),
                 req_star,
             ], spacing=0),
@@ -290,7 +291,7 @@ def combobox_campo(label, form, key, options, update_fn, required=False, expand=
         focused_border_width=2,
         cursor_color=ACCENT,
         text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, italic=True),
-        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
+        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color=HINT),
         content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
         suffix=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=INK_SOFT, size=20),
     )
@@ -349,12 +350,12 @@ def combobox_campo(label, form, key, options, update_fn, required=False, expand=
     tf.on_focus  = on_focus
     tf.on_blur   = on_blur
 
-    req_star = ft.Text(" *", color=ACCENT, size=10) if required else ft.Text("")
+    req_star = ft.Text(" *", color=ACCENT_TEXT, size=12) if required else ft.Text("")
 
     return ft.Column(
         controls=[
             ft.Row(controls=[
-                ft.Text(label.upper(), size=10, weight=ft.FontWeight.W_600,
+                ft.Text(label.upper(), size=12, weight=ft.FontWeight.W_600,
                         color=INK_SOFT, font_family=FONT_BODY),
                 req_star,
             ], spacing=0),
@@ -372,7 +373,7 @@ def materia_selector(page, form, key, on_materia_change):
     valor_text = ft.Text(
         form.get(key) or "Seleccione una materia…",
         font_family=FONT_BODY, size=15,
-        color=INK if form.get(key) else "#999",
+        color=INK if form.get(key) else HINT,
         italic=not bool(form.get(key)),
     )
 
@@ -423,7 +424,7 @@ def materia_selector(page, form, key, on_materia_change):
     )
 
     return ft.Column(controls=[
-        ft.Text("MATERIA", size=10, weight=ft.FontWeight.W_600,
+        ft.Text("MATERIA", size=12, weight=ft.FontWeight.W_600,
                 color=INK_SOFT, font_family=FONT_BODY),
         cabecera,
         opts_container,
@@ -436,7 +437,7 @@ def tarjeta(romano, titulo, subtitulo, contenido):
             ft.Row(controls=[
                 ft.Container(
                     content=ft.Text(romano, size=18, italic=True,
-                                    color=ACCENT, font_family=FONT_DISPLAY),
+                                    color=ACCENT_TEXT, font_family=FONT_DISPLAY),
                     width=38, height=38,
                     border=ft.border.all(1, ACCENT),
                     alignment=ft.alignment.center,
@@ -444,7 +445,7 @@ def tarjeta(romano, titulo, subtitulo, contenido):
                 ft.Column(controls=[
                     ft.Text(titulo, size=20, weight=ft.FontWeight.W_500,
                             color=INK, font_family=FONT_DISPLAY),
-                    ft.Text(subtitulo, size=11, italic=True,
+                    ft.Text(subtitulo, size=12, italic=True,
                             color=INK_SOFT, font_family=FONT_BODY),
                 ], spacing=2, tight=True),
             ], spacing=14),
@@ -490,7 +491,7 @@ def nota_descarga():
     return ft.Container(
         content=ft.Text(
             "El archivo .docx se guardará en Descargas con el formato oficial.",
-            size=11, italic=True, color=INK_SOFT, font_family=FONT_BODY,
+            size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY,
             text_align=ft.TextAlign.CENTER,
         ),
         alignment=ft.alignment.center,
@@ -507,8 +508,8 @@ def main(page: ft.Page):
     page.scroll  = ft.ScrollMode.AUTO
 
     page.fonts = {
-        FONT_DISPLAY: "https://fonts.gstatic.com/s/cormorantgaramond/v16/co3YmX5slCNuHLi8bLeY9MK7whWMhyjornGV.ttf",
-        FONT_BODY:    "https://fonts.gstatic.com/s/sourceserifpro/v15/neIQzD-0qpwxpaWvjeD0X88SAOeauXE-pg.ttf",
+        FONT_DISPLAY: "/fonts/EBGaramond.ttf",
+        FONT_BODY:    "/fonts/Lato-Regular.ttf",
     }
     page.theme = ft.Theme(font_family=FONT_BODY)
 
@@ -655,7 +656,7 @@ def main(page: ft.Page):
                         focused_border_color=ACCENT, focused_border_width=2,
                         cursor_color=ACCENT,
                         text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, italic=True),
-                        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
+                        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color=HINT),
                         content_padding=ft.padding.symmetric(vertical=8, horizontal=2),
                         expand=True,
                         on_change=lambda e, i_=i: form["anexos"].__setitem__(i_, e.control.value),
@@ -676,7 +677,7 @@ def main(page: ft.Page):
             anexos_col.controls.append(ft.TextButton(
                 content=ft.Row(controls=[
                     ft.Icon(ft.Icons.ADD_CIRCLE_OUTLINE, color=ACCENT, size=16),
-                    ft.Text("Agregar anexo", color=ACCENT, size=13, font_family=FONT_BODY),
+                    ft.Text("Agregar anexo", color=ACCENT_TEXT, size=13, font_family=FONT_BODY),
                 ], spacing=6), on_click=on_agregar,
             ))
 
@@ -712,37 +713,36 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta", form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
-                                 campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
+                fila_campos(campo("Fecha de la carta", form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
+                                 campo("Asunto",form,"asunto",rf,required=True)),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Destinatario",form,"destinatario",rf,required=True),
-                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)], spacing=24),
+                fila_campos(campo("Destinatario",form,"destinatario",rf,required=True),
+                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Nombre (Atención)",form,"atencion_nombre",rf),
-                                 campo("Cargo (Atención)",form,"atencion_cargo",rf)], spacing=24),
+                fila_campos(campo("Nombre (Atención)",form,"atencion_nombre",rf),
+                                 campo("Cargo (Atención)",form,"atencion_cargo",rf)),
             ])),
             tarjeta("II",  "Inmueble", "Inscripción catastral, anexos y propietario", ft.Column(controls=[
-                ft.Row(controls=[ft.Text("ANEXOS",size=10,weight=ft.FontWeight.W_600,color=INK_SOFT,font_family=FONT_BODY),
-                                 ft.Text(" *",color=ACCENT,size=10)], spacing=0),
+                ft.Row(controls=[ft.Text("ANEXOS",size=12,weight=ft.FontWeight.W_600,color=INK_SOFT,font_family=FONT_BODY),
+                                 ft.Text(" *", color=ACCENT_TEXT, size=12)], spacing=0),
                 anexos_col, ft.Container(height=14),
                 campo("No. Inscripción Catastral (cuerpo)",form,"inscripcion_no",rf,required=True),
                 ft.Container(height=14),
                 campo("Nombre del propietario / propietarios",form,"propietario",rf,multiline=True,required=True),
             ])),
             tarjeta("III", "Audiencia", "Fecha, lugar y expediente", ft.Column(controls=[
-                ft.Row(controls=[
+                fila_campos(
                     campo("Fecha de audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
-                    ft.Row(controls=[campo("Salón",form,"salon",rf), campo("Piso",form,"piso",rf)], spacing=16, expand=True),
-                ], spacing=24),
+                    fila_campos(campo("Salón",form,"salon",rf), campo("Piso",form,"piso",rf))),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Lugar",form,"lugar",rf),
-                                 campo("No. Expediente",form,"expediente",rf,required=True)], spacing=24),
+                fila_campos(campo("Lugar",form,"lugar",rf),
+                                 campo("No. Expediente",form,"expediente",rf,required=True)),
                 ft.Container(height=14),
                 campo("Nombre del cliente",form,"cliente",rf,multiline=True,required=True),
             ])),
             tarjeta("IV",  "Firma", "Quien suscribe la solicitud", ft.Column(controls=[
-                ft.Row(controls=[campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
-                                 campo("Cargo del firmante",form,"firmante_cargo",rf)], spacing=24),
+                fila_campos(campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
+                                 campo("Cargo del firmante",form,"firmante_cargo",rf)),
                 ft.Container(height=14),
                 campo("Iniciales",form,"iniciales",rf,expand=False),
             ])),
@@ -838,12 +838,12 @@ def main(page: ft.Page):
                 ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
                                  asunto_wrap], spacing=24, vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
-                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)], spacing=24),
+                fila_campos(campo("Destinatario (A)",form,"destinatario",rf,required=True),
+                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)),
             ])),
             tarjeta("II",  "Expediente", "Cliente, inmueble y tribunal", ft.Column(controls=[
-                ft.Row(controls=[campo("Nombre del cliente",form,"nombre_cliente",rf,required=True,multiline=True),
-                                 campo("Cédula de identidad",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,char_filter=RE_CEDULA)], spacing=24),
+                fila_campos(campo("Nombre del cliente",form,"nombre_cliente",rf,required=True,multiline=True),
+                                 campo("Cédula de identidad",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,char_filter=RE_CEDULA)),
                 ft.Container(height=14),
                 campo("Descripción del inmueble",form,"descripcion_inmueble",rf,
                       hint="Parcela No. X, del Distrito Catastral No. X…",multiline=True,required=True),
@@ -857,8 +857,8 @@ def main(page: ft.Page):
                 sala_wrap,
             ])),
             tarjeta("III", "Firma", "Quien suscribe la solicitud", ft.Column(controls=[
-                ft.Row(controls=[campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
-                                 campo("Cargo del firmante",form,"firmante_cargo",rf)], spacing=24),
+                fila_campos(campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
+                                 campo("Cargo del firmante",form,"firmante_cargo",rf)),
                 ft.Container(height=14),
                 campo("Iniciales",form,"iniciales",rf,expand=False),
             ])),
@@ -885,7 +885,7 @@ def main(page: ft.Page):
                         border=ft.InputBorder.UNDERLINE, border_color=RULE,
                         focused_border_color=ACCENT, focused_border_width=2, cursor_color=ACCENT,
                         text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, italic=True),
-                        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color="#999"),
+                        hint_style=ft.TextStyle(font_family=FONT_BODY, italic=True, color=HINT),
                         content_padding=ft.padding.symmetric(vertical=8, horizontal=2), expand=True,
                         on_change=lambda e, i_=i: form["demandados"].__setitem__(i_, e.control.value),
                     )
@@ -904,7 +904,7 @@ def main(page: ft.Page):
             dem_col.controls.append(ft.TextButton(
                 content=ft.Row(controls=[
                     ft.Icon(ft.Icons.ADD_CIRCLE_OUTLINE, color=ACCENT, size=16),
-                    ft.Text("Agregar demandado", color=ACCENT, size=13, font_family=FONT_BODY),
+                    ft.Text("Agregar demandado", color=ACCENT_TEXT, size=13, font_family=FONT_BODY),
                 ], spacing=6), on_click=on_agregar,
             ))
 
@@ -996,6 +996,7 @@ def main(page: ft.Page):
                 snack(f"Error: {ex}", ok=False)
 
         return [
+            *aviso_reporte(form),
             tarjeta("I",   "Expediente", "Tribunal, partes y parcela", ft.Column(controls=[
                 campo("No. Expediente", form, "expediente", rf, required=True),
                 ft.Container(height=14),
@@ -1014,20 +1015,20 @@ def main(page: ft.Page):
             tarjeta("II",  "Partes", "Demandante y demandado(s)", ft.Column(controls=[
                 campo("Demandante(s)",form,"demandantes",rf,multiline=True,required=True),
                 ft.Container(height=14),
-                ft.Row(controls=[ft.Text("DEMANDADO(S)",size=10,weight=ft.FontWeight.W_600,
+                ft.Row(controls=[ft.Text("DEMANDADO(S)",size=12,weight=ft.FontWeight.W_600,
                                          color=INK_SOFT,font_family=FONT_BODY),
-                                 ft.Text(" *",color=ACCENT,size=10)], spacing=0),
+                                 ft.Text(" *", color=ACCENT_TEXT, size=12)], spacing=0),
                 dem_col,
             ])),
             tarjeta("III", "Audiencia", "Fecha, fallo y próxima audiencia", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
+                fila_campos(campo("Fecha de la audiencia",form,"fecha_audiencia",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
                                  campo("Caja No.",form,"caja_no",rf),
-                                 campo("Rol",form,"rol",rf)], spacing=24),
+                                 campo("Rol",form,"rol",rf)),
                 ft.Container(height=14),
                 campo("Fallo",form,"fallo",rf,multiline=True,required=True,hint="Ej: Aplazada a los fines de que…"),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Fecha próxima audiencia",form,"fecha_proxima",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
-                                 campo("Abogado(s) que compareció",form,"abogados",rf,multiline=True,required=True)], spacing=24),
+                fila_campos(campo("Fecha próxima audiencia",form,"fecha_proxima",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
+                                 campo("Abogado(s) que compareció",form,"abogados",rf,multiline=True,required=True)),
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
@@ -1123,8 +1124,8 @@ def main(page: ft.Page):
                 ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
                                  asunto_wrap], spacing=24, vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Destinatario (A LA)",form,"destinatario",rf,required=True),
-                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)], spacing=24),
+                fila_campos(campo("Destinatario (A LA)",form,"destinatario",rf,required=True),
+                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)),
             ])),
             tarjeta("II",  "Cliente", "Datos del cliente e inmueble", ft.Column(controls=[
                 campo("Nombre del cliente",form,"nombre_cliente",rf,required=True,multiline=True,
@@ -1136,25 +1137,25 @@ def main(page: ft.Page):
                 ft.Container(height=14),
                 campo("Parcela / Designación",form,"parcela",rf,hint="Designación Posesional No. …",required=True),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Municipio",form,"municipio",rf,required=True),
-                                 campo("Provincia",form,"provincia",rf,required=True)], spacing=24),
+                fila_campos(campo("Municipio",form,"municipio",rf,required=True),
+                                 campo("Provincia",form,"provincia",rf,required=True)),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("No. Expediente",form,"expediente",rf,required=True),
-                                 campo("Cédula",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,char_filter=RE_CEDULA)], spacing=24),
+                fila_campos(campo("No. Expediente",form,"expediente",rf,required=True),
+                                 campo("Cédula",form,"cedula",rf,hint="000-0000000-0",required=True,keyboard_type=KT_NUM,char_filter=RE_CEDULA)),
             ])),
             tarjeta("III", "Proceso Legal", "Tribunal, sentencia y tribunal original", ft.Column(controls=[
                 tribunal_wrap,
                 ft.Container(height=14),
                 sala_wrap,
                 ft.Container(height=14),
-                ft.Row(controls=[campo("No. Sentencia",form,"sentencia",rf,required=True),
-                                 campo("Fecha sentencia",form,"fecha_sentencia",rf,hint="01 Julio del 2022",required=True)], spacing=24),
+                fila_campos(campo("No. Sentencia",form,"sentencia",rf,required=True),
+                                 campo("Fecha sentencia",form,"fecha_sentencia",rf,hint="01 Julio del 2022",required=True)),
                 ft.Container(height=14),
                 campo("Tribunal que dictó la sentencia",form,"tribunal_original",rf,multiline=True,required=True),
             ])),
             tarjeta("IV",  "Firma", "Quien suscribe la solicitud", ft.Column(controls=[
-                ft.Row(controls=[campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
-                                 campo("Cargo del firmante",form,"firmante_cargo",rf)], spacing=24),
+                fila_campos(campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
+                                 campo("Cargo del firmante",form,"firmante_cargo",rf)),
                 ft.Container(height=14),
                 campo("Iniciales",form,"iniciales",rf,expand=False),
             ])),
@@ -1196,14 +1197,14 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I",   "Encabezado", "Destinatario, atención y asunto", ft.Column(controls=[
-                ft.Row(controls=[campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
-                                 campo("Asunto",form,"asunto",rf,required=True)], spacing=24),
+                fila_campos(campo("Fecha de la carta",form,"fecha_carta",rf,hint="DD/MM/AAAA",required=True,keyboard_type=KT_NUM),
+                                 campo("Asunto",form,"asunto",rf,required=True)),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Destinatario (A)",form,"destinatario",rf,required=True),
-                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)], spacing=24),
+                fila_campos(campo("Destinatario (A)",form,"destinatario",rf,required=True),
+                                 campo("Cargo del destinatario",form,"cargo_destinatario",rf)),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Atención (nombre)",form,"atencion_nombre",rf),
-                                 campo("Atención (cargo)",form,"atencion_cargo",rf)], spacing=24),
+                fila_campos(campo("Atención (nombre)",form,"atencion_nombre",rf),
+                                 campo("Atención (cargo)",form,"atencion_cargo",rf)),
             ])),
             tarjeta("II",  "Contenido", "Cuerpo de la solicitud", ft.Column(controls=[
                 campo("Párrafo 1 — Cuerpo principal",form,"cuerpo_1",rf,multiline=True,required=True,
@@ -1213,11 +1214,11 @@ def main(page: ft.Page):
                       hint="Es oportuno mencionar que…"),
             ])),
             tarjeta("III", "Firma", "Quien suscribe y copia", ft.Column(controls=[
-                ft.Row(controls=[campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
-                                 campo("Cargo del firmante",form,"firmante_cargo",rf)], spacing=24),
+                fila_campos(campo("Nombre del firmante",form,"firmante_nombre",rf,required=True),
+                                 campo("Cargo del firmante",form,"firmante_cargo",rf)),
                 ft.Container(height=14),
-                ft.Row(controls=[campo("Iniciales",form,"iniciales",rf,expand=False),
-                                 campo("Cc.",form,"cc",rf,hint="Dirección General.",expand=True)], spacing=24),
+                fila_campos(campo("Iniciales",form,"iniciales",rf,expand=False),
+                                 campo("Cc.",form,"cc",rf,hint="Dirección General.",expand=True)),
             ])),
             ft.Container(height=6),
             ft.Container(content=boton_generar(on_generar), alignment=ft.alignment.center),
@@ -1257,16 +1258,14 @@ def main(page: ft.Page):
 
         return [
             tarjeta("I", "Traslado", "Provincia y duración de la comisión", ft.Column(controls=[
-                ft.Row(controls=[
+                fila_campos(
                     campo("Fecha del informe", form, "fecha_informe", rf, hint="DD/MM/AAAA", required=True, keyboard_type=KT_NUM),
                     campo("Provincia", form, "provincia", rf, required=True),
-                    campo("Municipio (opcional)", form, "municipio", rf),
-                ], spacing=24),
+                    campo("Municipio (opcional)", form, "municipio", rf)),
                 ft.Container(height=14),
-                ft.Row(controls=[
+                fila_campos(
                     campo("Fecha de traslado", form, "fecha_desde", rf, hint="DD/MM/AAAA", required=True, keyboard_type=KT_NUM),
-                    campo("Fecha de retorno (solo si fueron dos días)", form, "fecha_hasta", rf, hint="DD/MM/AAAA", keyboard_type=KT_NUM),
-                ], spacing=24),
+                    campo("Fecha de retorno (solo si fueron dos días)", form, "fecha_hasta", rf, hint="DD/MM/AAAA", keyboard_type=KT_NUM)),
             ])),
             tarjeta("II", "Audiencia", "Datos que aparecen en la referencia y el cuerpo", ft.Column(controls=[
                 campo("Tribunal", form, "tribunal", rf, required=True, multiline=True),
@@ -1276,10 +1275,9 @@ def main(page: ft.Page):
                 campo("Inmueble", form, "inmueble", rf, required=True, multiline=True,
                       hint="Parcela, D. C., resultantes, municipio y provincia…"),
                 ft.Container(height=14),
-                ft.Row(controls=[
+                fila_campos(
                     campo("Demandante / requirente", form, "demandante", rf, required=True, multiline=True),
-                    campo("No. Expediente (opcional)", form, "expediente", rf),
-                ], spacing=24),
+                    campo("No. Expediente (opcional)", form, "expediente", rf)),
             ])),
             tarjeta("III", "Resultado", "Lo ocurrido en la audiencia", ft.Column(controls=[
                 campo("Resultado de la audiencia", form, "resultado", rf, required=True, multiline=True,
@@ -1333,22 +1331,107 @@ def main(page: ft.Page):
         ]
 
     # ── HISTORIAL DE EXPEDIENTES ─────────────────
+    reporte_vacio = copy.deepcopy(form_reporte)
+    hist_estado   = {"filtro": ""}
+
     def registrar_en_historial(form):
+        datos = {k: v for k, v in form.items() if not k.startswith("_")}
         try:
-            historial.guardar(historial.desde_reporte(form))
+            historial.guardar(historial.desde_reporte(form), datos=datos, id_=form.get("_editando_id"))
         except Exception as ex:
             snack(f"El documento se generó, pero no se guardó en el historial: {ex}", ok=False)
+        actualizar_contador()
+
+    def cargar_en_reporte(entrada, numero, editar):
+        """Llena el Reporte de Audiencia con un expediente del historial."""
+        datos = entrada.get("datos") or {}
+        form_reporte.clear()
+        form_reporte.update(copy.deepcopy(reporte_vacio))
+        form_reporte.update(copy.deepcopy(datos))
+        if not datos:   # guardado antes de existir "datos": lo que se pueda recuperar
+            form_reporte.update({
+                "tribunal": entrada["tribunal"], "expediente": entrada["expediente"],
+                "demandantes": entrada["recurrente"],
+                "demandados": [x.strip() for x in entrada["recurrido"].split(",") if x.strip()] or [""],
+                "asunto": entrada["objeto"], "parcela": entrada["parcela"],
+                "agrimensor": entrada["agrimensor"], "fallo": entrada["fallo"],
+                "fecha_audiencia": entrada["fecha_audiencia"], "fecha_proxima": entrada["fecha_proxima"],
+            })
+        if editar:
+            form_reporte["_editando_id"] = entrada["id"]
+        form_reporte["_origen_no"] = numero
+        ir_a("reporte")
+
+    def aviso_reporte(form):
+        """Barra sobre el Reporte de Audiencia cuando viene del historial."""
+        no = form.get("_origen_no")
+        if not no:
+            return []
+
+        def nuevo_en_blanco(e):
+            form_reporte.clear(); form_reporte.update(copy.deepcopy(reporte_vacio))
+            rebuild_form(); page.update()
+
+        if form.get("_editando_id"):
+            texto = (f"Editando el No.{no:02d} del historial. Al generar el documento "
+                     "se actualiza ese mismo expediente.")
+        else:
+            texto = (f"Copia del No.{no:02d} del historial. Cambie lo necesario; al generar "
+                     "se guarda como un expediente nuevo.")
+        return [ft.Container(
+            content=ft.ResponsiveRow(controls=[
+                ft.Row(controls=[
+                    ft.Icon(ft.Icons.EDIT_NOTE if form.get("_editando_id") else ft.Icons.CONTENT_COPY,
+                            color=ACCENT_TEXT, size=20),
+                    ft.Text(texto, size=13, color=INK, font_family=FONT_BODY, expand=True),
+                ], col={"xs": 12, "md": 9}),
+                ft.Container(
+                    content=ft.TextButton("Empezar uno en blanco", on_click=nuevo_en_blanco,
+                                          style=ft.ButtonStyle(color=INK_SOFT)),
+                    col={"xs": 12, "md": 3}, alignment=ft.alignment.center_right,
+                ),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            bgcolor="#FAEEDA", border=ft.border.all(1, RULE), border_radius=4,
+            padding=ft.padding.symmetric(horizontal=16, vertical=10),
+        )]
+
+    def etiqueta_proxima(txt):
+        """'Hoy' / 'Mañana' / 'En N días' si la próxima audiencia es esta semana."""
+        try:
+            dias = (datetime.strptime(txt.strip(), "%d/%m/%Y").date() - date.today()).days
+        except ValueError:
+            return None
+        if dias == 0:
+            return "Hoy"
+        if dias == 1:
+            return "Mañana"
+        if 1 < dias <= 7:
+            return f"En {dias} días"
+        return None
 
     def build_historial():
         try:
             entradas = historial.listar()
         except Exception as ex:
             return [tarjeta("!", "Sin conexión", "No se pudo leer el historial",
-                            ft.Text(str(ex), size=12, color=PDF_COLOR, font_family=FONT_BODY))]
+                            ft.Text(str(ex), size=13, color=PDF_COLOR, font_family=FONT_BODY))]
+
+        if not entradas:
+            return [tarjeta("I", "Empiece su historial", "Se llena solo al generar reportes",
+                ft.Column(controls=[
+                    ft.Text("Cada Reporte de Audiencia que genere en Word o PDF aparecerá aquí, "
+                            "listo para buscarlo, editarlo o descargarlo con el formato de EXPEDIENTES.",
+                            size=14, color=INK_SOFT, font_family=FONT_BODY),
+                    ft.Container(height=12),
+                    boton_generar(lambda e: ir_a("reporte"), "CREAR REPORTE DE AUDIENCIA"),
+                ]))]
+
+        ancho     = page.width or 1280
+        compacto  = ancho < 760
+        hist_estado["compacto"] = compacto
+        numeradas = list(enumerate(entradas, start=1))
 
         def on_descargar(e):
-            if not entradas:
-                snack("El historial está vacío.", ok=False); return
             try:
                 _guardar_y_abrir(page, generar_expedientes(entradas), f"EXPEDIENTES {hoy.year}.docx", snack)
             except Exception as ex:
@@ -1362,15 +1445,15 @@ def main(page: ft.Page):
                     snack(f"No.{numero:02d} borrado del historial.")
                 except Exception as ex:
                     snack(f"No se pudo borrar: {ex}", ok=False)
-                rebuild_form(); page.update()
+                actualizar_contador(); rebuild_form(); page.update()
 
             dlg = ft.AlertDialog(
                 modal=True, bgcolor=PAPER,
-                title=ft.Text("¿Borrar del historial?", font_family=FONT_DISPLAY, color=INK, size=18),
+                title=ft.Text("¿Borrar del historial?", font_family=FONT_DISPLAY, color=INK, size=22),
                 content=ft.Text(
                     f"No.{numero:02d} · Exp. {entrada['expediente']}\n{entrada['recurrente']}\n\n"
                     "Esta acción no se puede deshacer.",
-                    font_family=FONT_BODY, color=INK_SOFT, size=13,
+                    font_family=FONT_BODY, color=INK_SOFT, size=14,
                 ),
                 actions=[
                     ft.TextButton("Cancelar", on_click=lambda e: page.close(dlg),
@@ -1382,61 +1465,161 @@ def main(page: ft.Page):
             )
             page.open(dlg)
 
-        def dato(etiqueta, valor):
-            return ft.Row(controls=[
-                ft.Text(etiqueta.upper(), size=10, weight=ft.FontWeight.W_600,
-                        color=INK_SOFT, font_family=FONT_BODY, width=130),
-                ft.Text(valor or "—", size=14, color=INK, font_family=FONT_BODY, expand=True),
-            ], vertical_alignment=ft.CrossAxisAlignment.START)
+        def celda(texto, ancho_=None, expand=False, **kw):
+            return ft.Text(texto or "—", size=13, color=INK, font_family=FONT_BODY, width=ancho_,
+                           expand=expand, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, **kw)
 
-        def tarjeta_expediente(numero, ent):
-            return ft.Container(
-                content=ft.Row(controls=[
-                    ft.Column(controls=[
-                        ft.Text(f"No.{numero:02d}", size=20, italic=True,
-                                color=ACCENT, font_family=FONT_DISPLAY),
-                        dato("Tribunal", ent["tribunal"]),
-                        dato("Fecha audiencia", ent["fecha_audiencia"]),
-                        dato("No. Exp.", ent["expediente"]),
-                        dato("Recurrente", ent["recurrente"]),
-                        dato("Recurrido", ent["recurrido"]),
-                        dato("Agrimensor", ent["agrimensor"]),
-                        dato("Objeto", ent["objeto"]),
-                        dato("Parcela", ent["parcela"]),
-                        dato("Fallo", ent["fallo"]),
-                        dato("Próxima audiencia", ent["fecha_proxima"]),
-                    ], spacing=6, expand=True),
-                    ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=PDF_COLOR,
-                                  tooltip="Borrar del historial",
-                                  on_click=lambda e: confirmar_borrado(ent, numero)),
-                ], vertical_alignment=ft.CrossAxisAlignment.START),
-                bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), padding=ft.padding.all(18),
+        def dato(etiqueta, valor):
+            return ft.ResponsiveRow(controls=[
+                ft.Text(etiqueta.upper(), size=12, weight=ft.FontWeight.W_600, color=INK_SOFT,
+                        font_family=FONT_BODY, col={"xs": 12, "sm": 4, "md": 3}),
+                ft.Text(valor or "—", size=14, color=INK, font_family=FONT_BODY, selectable=True,
+                        col={"xs": 12, "sm": 8, "md": 9}),
+            ], spacing=8, run_spacing=0)
+
+        def boton_accion(texto, icono, on_click, color=INK):
+            return ft.OutlinedButton(
+                content=ft.Row(controls=[ft.Icon(icono, size=16, color=color),
+                                         ft.Text(texto, size=13, color=color, font_family=FONT_BODY)],
+                               spacing=6, tight=True),
+                on_click=on_click,
+                style=ft.ButtonStyle(side=ft.BorderSide(1, RULE), shape=ft.RoundedRectangleBorder(radius=4),
+                                     padding=ft.padding.symmetric(horizontal=14, vertical=12)),
             )
 
-        if not entradas:
-            return [tarjeta("I", "Sin expedientes todavía", "El historial se llena solo",
-                            ft.Text("Cada vez que genere un Reporte de Audiencia en Word o PDF, "
-                                    "el expediente aparecerá aquí.",
-                                    size=13, italic=True, color=INK_SOFT, font_family=FONT_BODY))]
+        def fila_expediente(numero, ent):
+            d = ent.get("datos") or {}
+            detalle = ft.Container(visible=False, padding=ft.padding.only(left=8, right=8, top=4, bottom=16),
+                content=ft.Column(controls=[
+                    dato("Tribunal", ent["tribunal"]),
+                    dato("Fecha audiencia", ent["fecha_audiencia"]),
+                    dato("No. Exp.", ent["expediente"]),
+                    dato("Recurrente", ent["recurrente"]),
+                    dato("Recurrido", ent["recurrido"]),
+                    dato("Agrimensor", ent["agrimensor"]),
+                    dato("Objeto", ent["objeto"]),
+                    dato("Parcela", ent["parcela"]),
+                    dato("Fallo", ent["fallo"]),
+                    dato("Próxima audiencia", ent["fecha_proxima"]),
+                    *([dato("Abogado(s)", d["abogados"])] if d.get("abogados") else []),
+                    *([dato("Caja / Rol", f"{d.get('caja_no') or '—'} / {d.get('rol') or '—'}")]
+                      if d.get("caja_no") or d.get("rol") else []),
+                    ft.Container(height=6),
+                    ft.Row(controls=[
+                        boton_accion("Editar", ft.Icons.EDIT_OUTLINED,
+                                     lambda e: cargar_en_reporte(ent, numero, editar=True)),
+                        boton_accion("Usar como base", ft.Icons.CONTENT_COPY,
+                                     lambda e: cargar_en_reporte(ent, numero, editar=False)),
+                        boton_accion("Borrar", ft.Icons.DELETE_OUTLINE,
+                                     lambda e: confirmar_borrado(ent, numero), color=PDF_COLOR),
+                    ], wrap=True, spacing=8, run_spacing=8),
+                ], spacing=8))
+
+            prox = etiqueta_proxima(ent["fecha_proxima"])
+            prox_ctrl = (ft.Container(content=ft.Text(prox, size=12, weight=ft.FontWeight.W_600,
+                                                      color="#633806", font_family=FONT_BODY),
+                                      bgcolor="#FAEEDA", border_radius=10,
+                                      padding=ft.padding.symmetric(horizontal=8, vertical=2), width=110)
+                         if prox else celda(ent["fecha_proxima"], 110))
+            flecha = ft.Icon(ft.Icons.EXPAND_MORE, color=INK_SOFT, size=20)
+
+            def alternar(e):
+                detalle.visible = not detalle.visible
+                flecha.name = ft.Icons.EXPAND_LESS if detalle.visible else ft.Icons.EXPAND_MORE
+                page.update()
+
+            numero_txt = ft.Text(f"{numero:02d}", size=18, color=ACCENT_TEXT, font_family=FONT_DISPLAY, width=36)
+            if compacto:
+                resumen = [numero_txt,
+                           ft.Column(controls=[celda(ent["expediente"]), celda(ent["recurrente"], color=INK_SOFT)],
+                                     spacing=0, expand=True),
+                           prox_ctrl, flecha]
+            else:
+                resumen = [numero_txt, celda(ent["fecha_audiencia"], 100), celda(ent["expediente"], 150),
+                           celda(ent["recurrente"], expand=True), prox_ctrl, flecha]
+            return ft.Container(
+                content=ft.Column(controls=[
+                    ft.Container(content=ft.Row(controls=resumen, spacing=12,
+                                                vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                                 padding=ft.padding.symmetric(horizontal=8, vertical=12),
+                                 on_click=alternar, ink=True, tooltip="Ver completo"),
+                    detalle,
+                ], spacing=0),
+                border=ft.border.only(bottom=ft.BorderSide(1, PAPER_EDGE)),
+            )
+
+        def coincide(ent, q):
+            return any(q in (ent[c] or "").lower()
+                       for c in ("expediente", "recurrente", "recurrido", "tribunal", "parcela", "objeto"))
+
+        lista = ft.Column(spacing=0)
+
+        def pintar_lista():
+            q = hist_estado["filtro"].strip().lower()
+            filas = [fila_expediente(n, ent) for n, ent in reversed(numeradas) if not q or coincide(ent, q)]
+            lista.controls = filas or [ft.Container(
+                content=ft.Text(f'Ningún expediente coincide con "{hist_estado["filtro"]}".',
+                                size=14, color=INK_SOFT, font_family=FONT_BODY),
+                padding=ft.padding.all(16))]
+
+        def on_buscar(e):
+            hist_estado["filtro"] = e.control.value
+            pintar_lista(); page.update()
+
+        pintar_lista()
+        encabezado = [] if compacto else [ft.Container(
+            content=ft.Row(controls=[
+                ft.Text("NO.", width=36), ft.Text("AUDIENCIA", width=100), ft.Text("EXP.", width=150),
+                ft.Text("RECURRENTE", expand=True), ft.Text("PRÓXIMA", width=110), ft.Container(width=20),
+            ], spacing=12),
+            padding=ft.padding.symmetric(horizontal=8, vertical=8),
+            border=ft.border.only(bottom=ft.BorderSide(1, RULE)),
+        )]
+        for t in (encabezado[0].content.controls if encabezado else []):
+            if isinstance(t, ft.Text):
+                t.size, t.weight, t.color, t.font_family = 12, ft.FontWeight.W_600, INK_SOFT, FONT_BODY
 
         total = len(entradas)
         return [
-            ft.Text(f"{total} expediente{'s' if total != 1 else ''} · el más reciente primero",
-                    size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY),
-            ft.Container(content=boton_generar(on_descargar, "DESCARGAR HISTORIAL EN WORD"),
-                         alignment=ft.alignment.center),
-            *[tarjeta_expediente(n, ent) for n, ent in reversed(list(enumerate(entradas, start=1)))],
+            ft.ResponsiveRow(controls=[
+                ft.TextField(
+                    value=hist_estado["filtro"], on_change=on_buscar,
+                    hint_text="Buscar por expediente, recurrente, tribunal o parcela",
+                    prefix_icon=ft.Icons.SEARCH, border_color=RULE, focused_border_color=ACCENT,
+                    cursor_color=ACCENT, bgcolor=PAPER, border_radius=4,
+                    text_style=ft.TextStyle(font_family=FONT_BODY, size=14, color=INK),
+                    hint_style=ft.TextStyle(font_family=FONT_BODY, size=14, color=HINT),
+                    content_padding=ft.padding.symmetric(vertical=10, horizontal=12),
+                    col={"xs": 12, "md": 8},
+                ),
+                ft.Container(content=boton_generar(on_descargar, "DESCARGAR TODO EN WORD"),
+                             col={"xs": 12, "md": 4}),
+            ], spacing=12, run_spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            ft.Text(f"{total} expediente{'s' if total != 1 else ''} · el más reciente primero · "
+                    "toque una fila para verla completa",
+                    size=12, color=INK_SOFT, font_family=FONT_BODY),
+            ft.Container(content=ft.Column(controls=[*encabezado, lista], spacing=0),
+                         bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=4),
         ]
 
-    # ── TABS ─────────────────────────────────────
-    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento", "historial"]
+    # ── NAVEGACIÓN ───────────────────────────────
+    KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento"]
+    PESTANAS = {
+        "informe": "Informe Técnico", "archivo": "Archivo", "reporte": "Reporte de Audiencia",
+        "cobros": "Cobros", "inspeccion": "Inspección", "audiencia_provincial": "Provincial",
+        "conclusiones_saneamiento": "Conclusiones",
+    }
 
-    tabs_row = ft.Row(controls=[], spacing=4, scroll=ft.ScrollMode.AUTO)
+    tabs_row = ft.Row(controls=[], spacing=2, scroll=ft.ScrollMode.AUTO)
+
+    def ir_a(key):
+        plantilla["actual"] = key
+        rebuild_form(); rebuild_tabs(); page.update()
 
     def on_arrow_click(e):
-        idx = KEYS.index(plantilla["actual"])
-        plantilla["actual"] = KEYS[idx + 1] if idx < len(KEYS) - 1 else KEYS[0]
-        rebuild_form(); rebuild_tabs(); page.update()
+        actual = plantilla["actual"]
+        idx = KEYS.index(actual) if actual in KEYS else -1
+        ir_a(KEYS[idx + 1] if idx < len(KEYS) - 1 else KEYS[0])
 
     scroll_hint = ft.Container(
         content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ACCENT, size=26),
@@ -1445,43 +1628,52 @@ def main(page: ft.Page):
         on_click=on_arrow_click, ink=True, border_radius=4,
     )
 
-    def tab_btn(label, subtitulo, key):
-        is_active = plantilla["actual"] == key
-
-        def on_click(e, k=key):
-            plantilla["actual"] = k
-            rebuild_form(); rebuild_tabs(); page.update()
-
+    def tab_btn(key):
+        activa = plantilla["actual"] == key
         return ft.Container(
-            content=ft.Column(controls=[
-                ft.Text(label, size=15, weight=ft.FontWeight.W_500,
-                        color=PAPER if is_active else RULE, font_family=FONT_DISPLAY),
-                ft.Text(subtitulo, size=10, italic=True,
-                        color=RULE if is_active else INK_SOFT, font_family=FONT_BODY),
-            ], spacing=2, tight=True),
-            bgcolor=INK_SOFT if is_active else "transparent",
-            padding=ft.padding.symmetric(vertical=12, horizontal=20),
-            border=ft.border.only(bottom=ft.BorderSide(3, ACCENT if is_active else "transparent")),
-            on_click=on_click, ink=True,
+            content=ft.Text(PESTANAS[key], size=14, weight=ft.FontWeight.W_600 if activa else ft.FontWeight.W_400,
+                            color=PAPER if activa else NAV_TEXT, font_family=FONT_BODY),
+            bgcolor=INK_SOFT if activa else "transparent",
+            padding=ft.padding.symmetric(vertical=12, horizontal=16),
+            border=ft.border.only(bottom=ft.BorderSide(3, ACCENT if activa else "transparent")),
+            on_click=lambda e, k=key: ir_a(k), ink=True,
             border_radius=ft.border_radius.only(top_left=4, top_right=4),
         )
 
+    contador = ft.Container(
+        content=ft.Text("", size=12, weight=ft.FontWeight.W_600, color=PAPER, font_family=FONT_BODY),
+        bgcolor=PANEL_INK, border_radius=10, padding=ft.padding.symmetric(horizontal=7, vertical=1),
+        visible=False,
+    )
+    historial_txt = ft.Text("Historial", size=14, weight=ft.FontWeight.W_600, color=PANEL_INK, font_family=FONT_BODY)
+    historial_btn = ft.Container(
+        content=ft.Row(controls=[ft.Icon(ft.Icons.HISTORY, color=PANEL_INK, size=18), historial_txt, contador],
+                       spacing=6, tight=True),
+        bgcolor=ACCENT, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
+        on_click=lambda e: ir_a("historial"), ink=True, tooltip="Ver expedientes generados",
+    )
+
     def rebuild_tabs():
-        tabs_row.controls = [
-            tab_btn("Informe Técnico",        "Catastro · Investigación Parcelaria", "informe"),
-            tab_btn("Solicitud de Archivo",   "Archivo · Expediente",                "archivo"),
-            tab_btn("Reporte de Audiencia",   "Audiencia · Fallo y próxima fecha",   "reporte"),
-            tab_btn("Solicitud de Cobros",    "Cobros · Verificación de pago",       "cobros"),
-            tab_btn("Solicitud de Inspección","Inspección · Cuerpo libre",           "inspeccion"),
-            tab_btn("Informe Provincial",     "Audiencia · Traslado a provincia",    "audiencia_provincial"),
-            tab_btn("Conclusiones",            "Saneamiento · Modelo fijo",           "conclusiones_saneamiento"),
-            tab_btn("Historial",               "Expedientes · Reportes generados",    "historial"),
-        ]
+        tabs_row.controls = [tab_btn(k) for k in KEYS]
         scroll_hint.visible = plantilla["actual"] != KEYS[-1]
+        en_historial = plantilla["actual"] == "historial"
+        historial_btn.bgcolor = PAPER if en_historial else ACCENT
+        historial_btn.border = ft.border.all(2, ACCENT) if en_historial else None
+
+    def actualizar_contador():
+        def tarea():
+            try:
+                n = historial.contar()
+            except Exception:
+                return
+            contador.content.value = str(n)
+            contador.visible = n > 0
+            page.update()
+        page.run_thread(tarea)
 
     rebuild_tabs()
 
-    # ── HEADER + FORM ─────────────────────────────
+    # ── ENCABEZADO + FORMULARIO ──────────────────
     SUBTITULOS = {
         "informe":    ("Nueva solicitud al Catastro",  "Complete los campos para generar la solicitud de Informe Técnico."),
         "archivo":    ("Solicitud de Archivo",          "Complete los campos para generar la solicitud de Copia Certificada."),
@@ -1490,11 +1682,8 @@ def main(page: ft.Page):
         "inspeccion": ("Solicitud de Inspección",       "Redacte el cuerpo libremente y genere el documento oficial."),
         "audiencia_provincial": ("Informe de Audiencia Provincial", "Registre el traslado y la audiencia conforme al modelo suministrado."),
         "conclusiones_saneamiento": ("Conclusiones de Saneamiento", "Cambie expediente, reclamante e inmueble; el resto del modelo se conserva."),
-        "historial": ("Historial de Expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
+        "historial": ("Historial de expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
     }
-
-    header_titulo = ft.Text("", size=30, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY)
-    header_sub    = ft.Text("", size=13, italic=True, color=INK_SOFT, font_family=FONT_BODY)
 
     BUILDERS = {
         "informe":    build_informe,
@@ -1509,46 +1698,61 @@ def main(page: ft.Page):
 
     def rebuild_form():
         key = plantilla["actual"]
-        header_titulo.value, header_sub.value = SUBTITULOS[key]
+        titulo, sub = SUBTITULOS[key]
+        ruta = "Inicio  ›  Historial" if key == "historial" else f"Plantillas  ›  {PESTANAS[key]}"
         form_area.controls = [
-            ft.Container(
-                content=ft.Column(controls=[
-                    ornamento(ACCENT), ft.Container(height=10),
-                    ft.Text("EXPEDIENTE", size=12, color=INK_SOFT, font_family=FONT_BODY),
-                    header_titulo, header_sub,
-                ], horizontal_alignment=ft.CrossAxisAlignment.START),
-                padding=ft.padding.only(bottom=6),
-            ),
+            ft.Column(controls=[
+                ft.Text(ruta, size=12, color=INK_SOFT, font_family=FONT_BODY),
+                ft.Text(titulo, size=32, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
+                ft.Text(sub, size=14, color=INK_SOFT, font_family=FONT_BODY),
+            ], spacing=4),
             *BUILDERS[key](),
         ]
 
     rebuild_form()
 
-    # ── TOPBAR ───────────────────────────────────
+    # ── BARRA SUPERIOR ───────────────────────────
+    titulo_app = ft.Text("Automatización Legal", size=24,
+                         weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY)
     topbar = ft.Container(
         content=ft.Column(controls=[
             ft.Row(controls=[
                 ft.Column(controls=[
-                    ft.Text("SISTEMA DE SOLICITUDES", size=10, italic=True,
-                            color=RULE, font_family=FONT_BODY),
-                    ft.Text("Automatización Legal", size=22,
-                            weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY),
-                ], spacing=2, tight=True),
-            ], alignment=ft.MainAxisAlignment.START),
+                    ft.Text("DEPARTAMENTO LEGAL", size=12, color=RULE, font_family=FONT_BODY),
+                    titulo_app,
+                ], spacing=0, tight=True, expand=True),
+                historial_btn,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Row(controls=[
                 ft.Container(content=tabs_row, expand=True),
                 scroll_hint,
             ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.END),
-        ], spacing=0),
+        ], spacing=8),
         bgcolor=PANEL_INK,
-        padding=ft.padding.only(top=18, bottom=0, left=36, right=8),
         border=ft.border.only(bottom=ft.BorderSide(3, ACCENT)),
     )
+    contenido = ft.Container(content=form_area, expand=True)
 
-    page.add(ft.Column(controls=[
-        topbar,
-        ft.Container(content=form_area, padding=ft.padding.symmetric(horizontal=48, vertical=24), expand=True),
-    ], spacing=0, expand=True))
+    def ajustar_ancho():
+        """Contenido centrado con ancho máximo; márgenes chicos en el celular."""
+        ancho = page.width or 1280
+        lado  = max(24, (ancho - ANCHO_MAX) / 2) if ancho >= 760 else 16
+        titulo_app.size = 24 if ancho >= 480 else 19
+        topbar.padding    = ft.padding.only(top=16, bottom=0, left=lado, right=lado)
+        contenido.padding = ft.padding.symmetric(horizontal=lado, vertical=24 if ancho >= 760 else 16)
+
+    def on_resized(e):
+        ajustar_ancho()
+        compacto = (page.width or 1280) < 760
+        if plantilla["actual"] == "historial" and compacto != hist_estado.get("compacto"):
+            rebuild_form()
+        page.update()
+
+    page.on_resized = on_resized
+    ajustar_ancho()
+
+    page.add(ft.Column(controls=[topbar, contenido], spacing=0, expand=True))
+    actualizar_contador()
 
 
 if __name__ == "__main__":
