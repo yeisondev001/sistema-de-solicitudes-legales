@@ -42,6 +42,7 @@ PANEL_INK  = "#0F2A3F"
 ACCENT_TEXT = "#8A6508"   # dorado oscuro: legible como texto sobre papel
 HINT        = "#6E6E6E"
 NAV_TEXT    = "#C9D3DC"
+NAV_SUB     = "#93A8BA"   # subtítulo de pestaña inactiva (6:1 sobre PANEL_INK)
 
 FONT_DISPLAY = "EB Garamond"
 FONT_BODY    = "Lato"
@@ -1605,9 +1606,18 @@ def main(page: ft.Page):
     # ── NAVEGACIÓN ───────────────────────────────
     KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento"]
     PESTANAS = {
-        "informe": "Informe Técnico", "archivo": "Archivo", "reporte": "Reporte de Audiencia",
-        "cobros": "Cobros", "inspeccion": "Inspección", "audiencia_provincial": "Provincial",
+        "informe":    "Informe Técnico", "archivo": "Archivo", "reporte": "Reporte de Audiencia",
+        "cobros":     "Cobros", "inspeccion": "Inspección", "audiencia_provincial": "Provincial",
         "conclusiones_saneamiento": "Conclusiones",
+    }
+    SUB_PESTANAS = {
+        "informe":    "Catastro · Investigación Parcelaria",
+        "archivo":    "Archivo · Expediente",
+        "reporte":    "Audiencia · Fallo y próxima fecha",
+        "cobros":     "Cobros · Verificación de pago",
+        "inspeccion": "Inspección · Cuerpo libre",
+        "audiencia_provincial":     "Audiencia · Traslado a provincia",
+        "conclusiones_saneamiento": "Saneamiento · Modelo fijo",
     }
 
     tabs_row = ft.Row(controls=[], spacing=2, scroll=ft.ScrollMode.AUTO)
@@ -1631,8 +1641,12 @@ def main(page: ft.Page):
     def tab_btn(key):
         activa = plantilla["actual"] == key
         return ft.Container(
-            content=ft.Text(PESTANAS[key], size=14, weight=ft.FontWeight.W_600 if activa else ft.FontWeight.W_400,
-                            color=PAPER if activa else NAV_TEXT, font_family=FONT_BODY),
+            content=ft.Column(controls=[
+                ft.Text(PESTANAS[key], size=14, weight=ft.FontWeight.W_600 if activa else ft.FontWeight.W_400,
+                        color=PAPER if activa else NAV_TEXT, font_family=FONT_BODY),
+                ft.Text(SUB_PESTANAS[key], size=12, italic=True,
+                        color=RULE if activa else NAV_SUB, font_family=FONT_BODY),
+            ], spacing=2, tight=True),
             bgcolor=INK_SOFT if activa else "transparent",
             padding=ft.padding.symmetric(vertical=12, horizontal=16),
             border=ft.border.only(bottom=ft.BorderSide(3, ACCENT if activa else "transparent")),
