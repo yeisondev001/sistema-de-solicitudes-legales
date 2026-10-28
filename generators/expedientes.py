@@ -28,6 +28,10 @@ FILAS = (
 FECHAS      = {"fecha_audiencia", "fecha_proxima"}
 SIN_FORMATO = {"expediente", "parcela"}   # códigos: se copian tal cual
 
+# Espaciado del estilo Normal del archivo original: 8 pt después, interlineado 1.08
+ESPACIO_DESPUES = Pt(8)
+INTERLINEADO    = 1.08
+
 C = WD_ALIGN_PARAGRAPH.CENTER
 J = WD_ALIGN_PARAGRAPH.JUSTIFY
 
@@ -59,7 +63,8 @@ def _escribir(cell, texto, bold, align):
     par = cell.paragraphs[0]
     par.alignment = align
     par.paragraph_format.space_before = Pt(0)
-    par.paragraph_format.space_after  = Pt(0)
+    par.paragraph_format.space_after  = ESPACIO_DESPUES
+    par.paragraph_format.line_spacing = INTERLINEADO
     r = par.add_run(texto)
     r.font.name = FUENTE
     r.font.size = Pt(12)
@@ -102,6 +107,8 @@ def generar(entradas: list) -> bytes:
     s.left_margin, s.right_margin  = Twips(1701),  Twips(1701)
     doc.styles["Normal"].font.name = FUENTE
     doc.styles["Normal"].font.size = Pt(12)
+    doc.styles["Normal"].paragraph_format.space_after  = ESPACIO_DESPUES
+    doc.styles["Normal"].paragraph_format.line_spacing = INTERLINEADO
 
     for n, entrada in enumerate(entradas, start=1):
         if n > 1:
