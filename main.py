@@ -46,7 +46,7 @@ NAV_SUB     = "#93A8BA"   # subtítulo de pestaña inactiva (6:1 sobre PANEL_INK
 
 FONT_DISPLAY = "EB Garamond"
 FONT_BODY    = "Lato"
-ANCHO_MAX    = 1040       # ancho máximo del contenido en pantallas grandes
+ANCHO_MAX    = 1200       # ancho máximo del contenido en pantallas grandes
 PDF_COLOR    = "#6B1A1A"
 
 KT_NUM    = ft.KeyboardType.NUMBER
@@ -1638,8 +1638,13 @@ def main(page: ft.Page):
         on_click=on_arrow_click, ink=True, border_radius=4,
     )
 
+    # En pantallas anchas las pestañas se reparten el ancho (sin cortes);
+    # en las angostas se desliza la fila con la flecha.
+    pestanas_llenan = {"si": True, "alto": 78}
+
     def tab_btn(key):
         activa = plantilla["actual"] == key
+        llenar = pestanas_llenan["si"]
         return ft.Container(
             content=ft.Column(controls=[
                 ft.Text(PESTANAS[key], size=14, weight=ft.FontWeight.W_600 if activa else ft.FontWeight.W_400,
@@ -1648,7 +1653,8 @@ def main(page: ft.Page):
                         color=RULE if activa else NAV_SUB, font_family=FONT_BODY),
             ], spacing=2, tight=True),
             bgcolor=INK_SOFT if activa else "transparent",
-            padding=ft.padding.symmetric(vertical=12, horizontal=16),
+            padding=ft.padding.symmetric(vertical=10, horizontal=12 if llenar else 16),
+            expand=llenar, height=pestanas_llenan["alto"] if llenar else None,
             border=ft.border.only(bottom=ft.BorderSide(3, ACCENT if activa else "transparent")),
             on_click=lambda e, k=key: ir_a(k), ink=True,
             border_radius=ft.border_radius.only(top_left=4, top_right=4),
@@ -1669,7 +1675,8 @@ def main(page: ft.Page):
 
     def rebuild_tabs():
         tabs_row.controls = [tab_btn(k) for k in KEYS]
-        scroll_hint.visible = plantilla["actual"] != KEYS[-1]
+        tabs_row.scroll   = None if pestanas_llenan["si"] else ft.ScrollMode.AUTO
+        scroll_hint.visible = not pestanas_llenan["si"] and plantilla["actual"] != KEYS[-1]
         en_historial = plantilla["actual"] == "historial"
         historial_btn.bgcolor = PAPER if en_historial else ACCENT
         historial_btn.border = ft.border.all(2, ACCENT) if en_historial else None
@@ -1753,6 +1760,11 @@ def main(page: ft.Page):
         lado  = max(24, (ancho - ANCHO_MAX) / 2) if ancho >= 760 else 16
         titulo_app.size = 24 if ancho >= 480 else 19
         topbar.padding    = ft.padding.only(top=16, bottom=0, left=lado, right=lado)
+        llenar = ancho >= 900
+        alto   = 78 if ancho >= 1150 else 100   # más angosto: el texto ocupa más líneas
+        if (llenar, alto) != (pestanas_llenan["si"], pestanas_llenan["alto"]):
+            pestanas_llenan.update(si=llenar, alto=alto)
+            rebuild_tabs()
         contenido.padding = ft.padding.symmetric(horizontal=lado, vertical=24 if ancho >= 760 else 16)
 
     def on_resized(e):
