@@ -47,6 +47,27 @@ Las próximas audiencias de los siguientes 7 días se resaltan en la lista. Si s
 - **En producción** el historial se guarda en PostgreSQL ([Neon](https://neon.tech), plan gratuito). Configure la variable de entorno `DATABASE_URL` con la cadena de conexión.
 - **En local**, si no existe `DATABASE_URL`, se usa un archivo SQLite (`historial.db`) que se crea solo.
 
+## Usuarios y jurisprudencia
+
+La aplicación pide **usuario y contraseña**. La primera vez se crea la cuenta de administrador, que luego puede crear más usuarios desde el menú de la cuenta (arriba a la derecha) → **Usuarios**. Las contraseñas se guardan cifradas con scrypt.
+
+La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde con sentencias reales, indicando número, sala y página:
+
+- Busca en el **Boletín Judicial** (público) y en los **documentos propios** de cada usuario.
+- Cada usuario puede **subir PDF digitales o Word**; solo él los ve. Los PDF escaneados (sin texto) todavía no se leen.
+- La IA solo redacta con las fuentes encontradas, y se eliminan las citas que no correspondan a una fuente real. Es una herramienta de apoyo: las citas deben verificarse.
+
+### Variables de entorno
+
+| Variable | Para qué |
+|---|---|
+| `DATABASE_URL` | Historial, usuarios y sesiones (PostgreSQL / Neon). Sin ella se usa SQLite local |
+| `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
+| `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
+| `IA_BASE_URL`, `IA_MODELO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI) |
+| `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
+| `FLET_SECRET_KEY` | Opcional: firma de las subidas de archivos (si falta, se genera una al arrancar) |
+
 ## Inicio rápido
 
 Requiere Python 3.11 o superior.
@@ -75,6 +96,8 @@ La aplicación estará disponible en `http://localhost:8080`.
 ```text
 ├── main.py                         # Interfaz y formularios Flet
 ├── historial.py                    # Historial de expedientes (PostgreSQL o SQLite)
+├── cuentas.py                      # Usuarios, contraseñas y sesiones
+├── jurisprudencia/                 # Buscador: procesar documentos, búsqueda e IA
 ├── generators/
 │   ├── base.py                     # Utilidades compartidas para documentos Word
 │   ├── informe.py                  # Informe Técnico

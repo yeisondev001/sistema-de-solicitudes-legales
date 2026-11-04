@@ -4,12 +4,14 @@ Automatización de Solicitudes Legales
 UI principal — generación de documentos en generators/
 """
 
-import os, base64, copy, platform, pathlib, re, uuid, time, threading
+import os, base64, copy, platform, pathlib, re, secrets, uuid, time, threading
 from datetime import date, datetime
 
 import flet as ft
 
+import cuentas
 import historial
+from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
 from generators import (
     generar_informe_tecnico,
     generar_copia_certificada,
@@ -502,18 +504,7 @@ def nota_descarga():
 # ══════════════════════════════════════════════════
 #  APP PRINCIPAL
 # ══════════════════════════════════════════════════
-def main(page: ft.Page):
-    page.title   = "Solicitudes Legales"
-    page.bgcolor = SURFACE
-    page.padding = 0
-    page.scroll  = ft.ScrollMode.AUTO
-
-    page.fonts = {
-        FONT_DISPLAY: "/fonts/EBGaramond.ttf",
-        FONT_BODY:    "/fonts/Lato-Regular.ttf",
-    }
-    page.theme = ft.Theme(font_family=FONT_BODY)
-
+def app_principal(page: ft.Page, usuario: dict, salir):
     hoy = date.today()
     plantilla = {"actual": "informe"}
 
@@ -1603,6 +1594,241 @@ def main(page: ft.Page):
                          bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=4),
         ]
 
+    # ── JURISPRUDENCIA ───────────────────────────
+    MAX_MB_SUBIDA = 20
+    juris_estado  = {"pregunta": "", "respuesta": None, "fuentes": [], "subidas": {}}
+
+    def _sin_html(texto):
+        return re.sub(r"</?b>", "", texto or "")
+
+    def tarjeta_fuente(n, f, citada):
+        return ft.Container(
+            content=ft.Column(controls=[
+                ft.Row(controls=[
+                    ft.Text(f"[{n}]", size=14, weight=ft.FontWeight.W_600,
+                            color=ACCENT_TEXT if citada else INK_SOFT, font_family=FONT_BODY),
+                    ft.Text(juris_buscar.referencia(f), size=13, weight=ft.FontWeight.W_600,
+                            color=INK, font_family=FONT_BODY, expand=True),
+                ], vertical_alignment=ft.CrossAxisAlignment.START),
+                ft.Text(f"«…{_sin_html(f['extracto'])}…»", size=13, italic=True, color=INK_SOFT,
+                        font_family=FONT_BODY, selectable=True),
+                *([ft.TextButton("Abrir en el Boletín Judicial", icon=ft.Icons.OPEN_IN_NEW,
+                                 url=f"{f['fuente_url']}#page={f['pagina']}", url_target="_blank",
+                                 style=ft.ButtonStyle(color=INK_SOFT))] if f["fuente_url"] else []),
+            ], spacing=4),
+            bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=4,
+            padding=ft.padding.all(12),
+        )
+
+    def procesar_subida(nombre_original, nombre_servidor):
+        ruta = pathlib.Path(DIR_SUBIDAS) / nombre_servidor
+        try:
+            r = juris_proc.subir_documento(str(ruta), usuario["id"], nombre_original)
+            detalle = f" — {r['numero']}" if r["numero"] else ""
+            snack(f"«{nombre_original}» agregado al buscador{detalle} ({r['paginas']} pág.).")
+        except juris_proc.DocumentoSinTexto as ex:
+            snack(f"«{nombre_original}»: {ex} Por ahora solo se leen PDF digitales y Word.", ok=False)
+        except Exception:
+            snack(f"«{nombre_original}» no se pudo leer. Verifique que sea un PDF o Word válido.", ok=False)
+        finally:
+            ruta.unlink(missing_ok=True)
+        if plantilla["actual"] == "jurisprudencia":
+            rebuild_form()
+        page.update()
+
+    def al_elegir_archivos(e: ft.FilePickerResultEvent):
+        if not e.files:
+            return
+        lista = []
+        for f in e.files:
+            if f.size and f.size > MAX_MB_SUBIDA * 1024 * 1024:
+                snack(f"«{f.name}» pesa más de {MAX_MB_SUBIDA} MB.", ok=False); continue
+            ext = pathlib.Path(f.name).suffix.lower()
+            if ext not in (".pdf", ".docx"):
+                snack(f"«{f.name}»: solo se aceptan PDF o Word (.docx).", ok=False); continue
+            destino = f"u{usuario['id']}_{uuid.uuid4().hex[:10]}{ext}"
+            juris_estado["subidas"][f.name] = destino
+            lista.append(ft.FilePickerUploadFile(f.name, upload_url=page.get_upload_url(destino, 600)))
+        if lista:
+            snack(f"Subiendo {len(lista)} archivo{'s' if len(lista) != 1 else ''}…")
+            selector.upload(lista)
+
+    def al_subir(e: ft.FilePickerUploadEvent):
+        if e.error:
+            snack(f"«{e.file_name}» no se pudo subir: {e.error}", ok=False); return
+        if e.progress is not None and e.progress >= 1:
+            destino = juris_estado["subidas"].pop(e.file_name, None)
+            if destino:
+                page.run_thread(procesar_subida, e.file_name, destino)
+
+    selector = ft.FilePicker(on_result=al_elegir_archivos, on_upload=al_subir)
+    page.overlay.append(selector)
+
+    def build_jurisprudencia():
+        if not juris_db.configurada():
+            return [tarjeta("!", "Falta configurar el buscador", "Base de jurisprudencia",
+                            ft.Text("Agregue la variable JURIS_DATABASE_URL (Neon) para activar esta sección.",
+                                    size=14, color=INK_SOFT, font_family=FONT_BODY))]
+
+        respuesta_col = ft.Column(spacing=10)
+        estado_txt = ft.Text("", size=13, italic=True, color=INK_SOFT, font_family=FONT_BODY)
+        pregunta_tf = ft.TextField(
+            value=juris_estado["pregunta"], multiline=True, min_lines=2, max_lines=5,
+            hint_text="Ej.: ¿Qué ha dicho la SCJ sobre la caducidad del recurso de casación?",
+            border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=PAPER,
+            text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
+            hint_style=ft.TextStyle(font_family=FONT_BODY, size=14, color=HINT),
+        )
+
+        def pintar_respuesta():
+            r, fuentes = juris_estado["respuesta"], juris_estado["fuentes"]
+            respuesta_col.controls.clear()
+            if r:
+                respuesta_col.controls.append(ft.Container(
+                    content=ft.Markdown(r["texto"], selectable=True,
+                                        md_style_sheet=ft.MarkdownStyleSheet(p_text_style=ft.TextStyle(
+                                            font_family=FONT_BODY, size=15, color=INK))),
+                    bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=4,
+                    padding=ft.padding.all(16)))
+            if fuentes:
+                respuesta_col.controls.append(ft.Text("FUENTES ENCONTRADAS", size=12, weight=ft.FontWeight.W_600,
+                                                      color=INK_SOFT, font_family=FONT_BODY))
+                citadas = set((r or {}).get("citadas", []))
+                respuesta_col.controls.extend(tarjeta_fuente(n, f, n in citadas)
+                                              for n, f in enumerate(fuentes, start=1))
+
+        def preguntar(e):
+            q = (pregunta_tf.value or "").strip()
+            if len(q) < 4:
+                snack("Escriba su pregunta.", ok=False); return
+            juris_estado["pregunta"] = q
+            estado_txt.value = "Buscando en las sentencias…"
+            page.update()
+
+            def tarea():
+                try:
+                    busquedas = juris_ia.generar_busquedas(q) if juris_ia.disponible() else [q]
+                    fuentes = juris_buscar.buscar(busquedas, usuario["id"], limite=8)
+                    if not fuentes:
+                        respuesta = {"texto": "No encontré sentencias relacionadas. Pruebe con otras palabras "
+                                              "o suba sus propios documentos.", "citadas": []}
+                    elif juris_ia.disponible():
+                        estado_txt.value = "Redactando la respuesta…"; page.update()
+                        respuesta = juris_ia.responder(q, fuentes, juris_buscar.referencia)
+                    else:
+                        respuesta = {"texto": "_La IA no está configurada (IA_API_KEY): se muestran solo los "
+                                              "fragmentos encontrados._", "citadas": []}
+                    juris_estado.update(respuesta=respuesta, fuentes=fuentes)
+                except Exception as ex:
+                    snack(f"No se pudo completar la consulta: {ex}", ok=False)
+                estado_txt.value = ""
+                pintar_respuesta()
+                page.update()
+            page.run_thread(tarea)
+
+        def lista_documentos():
+            try:
+                docs = juris_proc.mis_documentos(usuario["id"])
+            except Exception as ex:
+                return [ft.Text(f"No se pudieron leer sus documentos: {ex}", size=13, color=PDF_COLOR)]
+            if not docs:
+                return [ft.Text("Todavía no ha subido documentos. Puede subir sentencias, resoluciones o escritos "
+                                "en PDF digital o Word; solo usted los verá.",
+                                size=13, color=INK_SOFT, font_family=FONT_BODY)]
+
+            def borrar(d):
+                juris_proc.borrar_documento(d["id"], usuario["id"])
+                snack(f"«{d['titulo']}» quitado del buscador.")
+                rebuild_form(); page.update()
+
+            return [ft.Container(
+                content=ft.Row(controls=[
+                    ft.Icon(ft.Icons.DESCRIPTION_OUTLINED, color=INK_SOFT, size=18),
+                    ft.Column(controls=[
+                        ft.Text(d["titulo"], size=14, color=INK, font_family=FONT_BODY,
+                                max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                        ft.Text(" · ".join(x for x in (d["numero"], d["sala"], d["materia"]) if x) or "Sin ficha",
+                                size=12, color=INK_SOFT, font_family=FONT_BODY,
+                                max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                    ], spacing=0, expand=True),
+                    ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=PDF_COLOR, tooltip="Quitar del buscador",
+                                  on_click=lambda e, d=d: borrar(d)),
+                ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                border=ft.border.only(bottom=ft.BorderSide(1, PAPER_EDGE)),
+                padding=ft.padding.symmetric(vertical=6, horizontal=4),
+            ) for d in docs]
+
+        pintar_respuesta()
+        return [
+            tarjeta("I", "Pregunte", "Responde con sentencias reales y su página", ft.Column(controls=[
+                pregunta_tf,
+                ft.Row(controls=[
+                    ft.ElevatedButton("Buscar y responder", icon=ft.Icons.SEARCH, on_click=preguntar,
+                                      style=ft.ButtonStyle(bgcolor=PANEL_INK, color=PAPER,
+                                                           shape=ft.RoundedRectangleBorder(radius=4),
+                                                           padding=ft.padding.symmetric(horizontal=18, vertical=14))),
+                    estado_txt,
+                ], spacing=14, wrap=True),
+                ft.Text("Herramienta de apoyo: verifique cada cita en la fuente antes de usarla. "
+                        "No escriba datos personales de clientes en la pregunta.",
+                        size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY),
+            ], spacing=12)),
+            respuesta_col,
+            tarjeta("II", "Mis documentos", "Solo usted los ve; entran al mismo buscador", ft.Column(controls=[
+                ft.OutlinedButton("Subir PDF o Word", icon=ft.Icons.UPLOAD_FILE,
+                                  on_click=lambda e: selector.pick_files(allow_multiple=True,
+                                                                         allowed_extensions=["pdf", "docx"]),
+                                  style=ft.ButtonStyle(color=INK, icon_color=INK, side=ft.BorderSide(1, INK_SOFT),
+                                                       shape=ft.RoundedRectangleBorder(radius=4),
+                                                       padding=ft.padding.symmetric(horizontal=16, vertical=14))),
+                ft.Column(controls=lista_documentos(), spacing=0),
+            ], spacing=12)),
+        ]
+
+    # ── USUARIOS (solo administradores) ──────────
+    def abrir_usuarios():
+        lista = ft.Column(spacing=2, tight=True)
+
+        def pintar():
+            lista.controls = [ft.Row(controls=[
+                ft.Text(f"{u['nombre'] or u['usuario']}  ·  {u['usuario']}{'  ·  admin' if u['es_admin'] else ''}",
+                        size=13, color=INK, font_family=FONT_BODY, expand=True),
+                ft.Switch(value=bool(u["activo"]), active_color=ACCENT, disabled=u["id"] == usuario["id"],
+                          tooltip="Activo", on_change=lambda e, uid=u["id"]: cuentas.cambiar_activo(uid, e.control.value)),
+            ]) for u in cuentas.listar_usuarios()]
+
+        def campo_dialogo(etiqueta, clave=False):
+            return ft.TextField(label=etiqueta, password=clave, can_reveal_password=clave, dense=True,
+                                border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT)
+
+        tf_usuario, tf_nombre, tf_clave = campo_dialogo("Usuario"), campo_dialogo("Nombre"), campo_dialogo("Contraseña", True)
+        cb_admin = ft.Checkbox(label="Administrador", value=False, active_color=ACCENT)
+
+        def crear(e):
+            try:
+                cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", cb_admin.value)
+            except ValueError as ex:
+                snack(str(ex), ok=False); return
+            snack(f"Usuario «{tf_usuario.value.strip().lower()}» creado.")
+            tf_usuario.value = tf_nombre.value = tf_clave.value = ""; cb_admin.value = False
+            pintar(); page.update()
+
+        pintar()
+        dlg = ft.AlertDialog(
+            modal=True, bgcolor=PAPER,
+            title=ft.Text("Usuarios", font_family=FONT_DISPLAY, color=INK, size=24),
+            content=ft.Column(controls=[
+                lista, ft.Divider(color=RULE),
+                ft.Text("NUEVO USUARIO", size=12, weight=ft.FontWeight.W_600, color=INK_SOFT, font_family=FONT_BODY),
+                tf_usuario, tf_nombre, tf_clave, cb_admin,
+            ], tight=True, scroll=ft.ScrollMode.AUTO, width=420, spacing=8),
+            actions=[ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK_SOFT)),
+                     ft.ElevatedButton("Crear usuario", on_click=crear, style=ft.ButtonStyle(
+                         bgcolor=PANEL_INK, color=PAPER, shape=ft.RoundedRectangleBorder(radius=4)))],
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
+        page.open(dlg)
+
     # ── NAVEGACIÓN ───────────────────────────────
     KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento"]
     PESTANAS = {
@@ -1673,13 +1899,31 @@ def main(page: ft.Page):
         on_click=lambda e: ir_a("historial"), ink=True, tooltip="Ver expedientes generados",
     )
 
+    juris_btn = ft.Container(
+        content=ft.Row(controls=[ft.Icon(ft.Icons.GAVEL, color=PANEL_INK, size=18),
+                                 ft.Text("Jurisprudencia", size=14, weight=ft.FontWeight.W_600,
+                                         color=PANEL_INK, font_family=FONT_BODY)], spacing=6, tight=True),
+        bgcolor=ACCENT, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
+        on_click=lambda e: ir_a("jurisprudencia"), ink=True, tooltip="Buscar sentencias y consultar sus documentos",
+    )
+    menu_usuario = ft.PopupMenuButton(
+        icon=ft.Icons.ACCOUNT_CIRCLE, icon_color=PAPER, tooltip=usuario["nombre"],
+        items=[
+            ft.PopupMenuItem(text=f'{usuario["nombre"]} ({usuario["usuario"]})', disabled=True),
+            *([ft.PopupMenuItem(text="Usuarios", icon=ft.Icons.GROUP, on_click=lambda e: abrir_usuarios())]
+              if usuario["es_admin"] else []),
+            ft.PopupMenuItem(text="Cerrar sesión", icon=ft.Icons.LOGOUT, on_click=lambda e: salir()),
+        ],
+    )
+
     def rebuild_tabs():
         tabs_row.controls = [tab_btn(k) for k in KEYS]
         tabs_row.scroll   = None if pestanas_llenan["si"] else ft.ScrollMode.AUTO
         scroll_hint.visible = not pestanas_llenan["si"] and plantilla["actual"] != KEYS[-1]
-        en_historial = plantilla["actual"] == "historial"
-        historial_btn.bgcolor = PAPER if en_historial else ACCENT
-        historial_btn.border = ft.border.all(2, ACCENT) if en_historial else None
+        for clave, boton in (("historial", historial_btn), ("jurisprudencia", juris_btn)):
+            activo = plantilla["actual"] == clave
+            boton.bgcolor = PAPER if activo else ACCENT
+            boton.border = ft.border.all(2, ACCENT) if activo else None
 
     def actualizar_contador():
         def tarea():
@@ -1704,6 +1948,7 @@ def main(page: ft.Page):
         "audiencia_provincial": ("Informe de Audiencia Provincial", "Registre el traslado y la audiencia conforme al modelo suministrado."),
         "conclusiones_saneamiento": ("Conclusiones de Saneamiento", "Cambie expediente, reclamante e inmueble; el resto del modelo se conserva."),
         "historial": ("Historial de expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
+        "jurisprudencia": ("Jurisprudencia", "Pregunte en lenguaje normal; la respuesta cita sentencias del Boletín Judicial y sus documentos."),
     }
 
     BUILDERS = {
@@ -1715,12 +1960,14 @@ def main(page: ft.Page):
         "audiencia_provincial": build_audiencia_provincial,
         "conclusiones_saneamiento": build_conclusiones_saneamiento,
         "historial": build_historial,
+        "jurisprudencia": build_jurisprudencia,
     }
 
     def rebuild_form():
         key = plantilla["actual"]
         titulo, sub = SUBTITULOS[key]
-        ruta = "Inicio  ›  Historial" if key == "historial" else f"Plantillas  ›  {PESTANAS[key]}"
+        ruta = (f"Inicio  ›  {SUBTITULOS[key][0]}" if key in ("historial", "jurisprudencia")
+                else f"Plantillas  ›  {PESTANAS[key]}")
         form_area.controls = [
             ft.Column(controls=[
                 ft.Text(ruta, size=12, color=INK_SOFT, font_family=FONT_BODY),
@@ -1742,7 +1989,7 @@ def main(page: ft.Page):
                     ft.Text("DEPARTAMENTO LEGAL", size=12, color=RULE, font_family=FONT_BODY),
                     titulo_app,
                 ], spacing=0, tight=True, expand=True),
-                historial_btn,
+                ft.Row(controls=[juris_btn, historial_btn, menu_usuario], spacing=8, tight=True),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Row(controls=[
                 ft.Container(content=tabs_row, expand=True),
@@ -1759,6 +2006,7 @@ def main(page: ft.Page):
         ancho = page.width or 1280
         lado  = max(24, (ancho - ANCHO_MAX) / 2) if ancho >= 760 else 16
         titulo_app.size = 24 if ancho >= 480 else 19
+        juris_btn.content.controls[1].visible = historial_txt.visible = ancho >= 640   # solo íconos en el celular
         topbar.padding    = ft.padding.only(top=16, bottom=0, left=lado, right=lado)
         llenar = ancho >= 900
         alto   = 78 if ancho >= 1150 else 100   # más angosto: el texto ocupa más líneas
@@ -1781,6 +2029,141 @@ def main(page: ft.Page):
     actualizar_contador()
 
 
+# ══════════════════════════════════════════════════
+#  INICIO DE SESIÓN
+# ══════════════════════════════════════════════════
+CLAVE_SESION = "solicitudes_legales.sesion"
+DIR_SUBIDAS  = "uploads"
+
+
+def pantalla_login(page: ft.Page, al_entrar):
+    """Formulario de entrada; la primera vez permite crear el administrador."""
+    try:
+        primera_vez = not cuentas.hay_usuarios()
+    except Exception as ex:
+        page.add(ft.Container(ft.Text(f"No se pudo conectar con la base de datos: {ex}", color=PDF_COLOR),
+                              padding=40))
+        return
+    # En el servidor, el primer administrador exige el código de instalación (variable de entorno)
+    codigo_instalacion = os.environ.get("CODIGO_INSTALACION", "").strip()
+    pide_codigo = primera_vez and bool(historial.DATABASE_URL)
+
+    def campo(etiqueta, clave=False, al_enviar=None):
+        return ft.TextField(label=etiqueta, password=clave, can_reveal_password=clave, on_submit=al_enviar,
+                            border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=PAPER,
+                            text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK))
+
+    error = ft.Text("", size=13, color=PDF_COLOR, font_family=FONT_BODY)
+
+    def entrar(e=None):
+        try:
+            r = cuentas.iniciar_sesion(tf_usuario.value or "", tf_clave.value or "")
+        except Exception as ex:
+            error.value = f"No se pudo conectar: {ex}"; page.update(); return
+        if not r:
+            error.value = "Usuario o contraseña incorrectos."; page.update(); return
+        al_entrar(*r)
+
+    def crear_admin(e=None):
+        if pide_codigo and (not codigo_instalacion or (tf_codigo.value or "").strip() != codigo_instalacion):
+            error.value = "Código de instalación incorrecto."; page.update(); return
+        if (tf_clave.value or "") != (tf_clave2.value or ""):
+            error.value = "Las contraseñas no coinciden."; page.update(); return
+        try:
+            cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", es_admin=True)
+        except ValueError as ex:
+            error.value = str(ex); page.update(); return
+        entrar()
+
+    tf_usuario = campo("Usuario")
+    tf_clave   = campo("Contraseña", True, crear_admin if primera_vez else entrar)
+    tf_nombre, tf_clave2, tf_codigo = campo("Nombre completo"), campo("Repita la contraseña", True), campo("Código de instalación", True)
+
+    if primera_vez:
+        titulo, sub = "Crear administrador", "Primera vez: cree la cuenta principal del sistema."
+        campos = [tf_nombre, tf_usuario, tf_clave, tf_clave2, *([tf_codigo] if pide_codigo else [])]
+        boton = ("Crear y entrar", crear_admin)
+        if pide_codigo and not codigo_instalacion:
+            error.value = "Falta la variable CODIGO_INSTALACION en el servidor para crear el administrador."
+    else:
+        titulo, sub = "Iniciar sesión", "Entre con su usuario y contraseña."
+        campos = [tf_usuario, tf_clave]
+        boton = ("Entrar", entrar)
+
+    page.add(ft.Container(
+        alignment=ft.alignment.center, padding=ft.padding.symmetric(horizontal=16, vertical=60),
+        content=ft.Container(
+            width=420, bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=6,
+            padding=ft.padding.all(28),
+            content=ft.Column(controls=[
+                ft.Text("DEPARTAMENTO LEGAL", size=12, color=ACCENT_TEXT, font_family=FONT_BODY),
+                ft.Text("Automatización Legal", size=28, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
+                ft.Container(height=1, bgcolor=RULE, margin=ft.margin.symmetric(vertical=8)),
+                ft.Text(titulo, size=20, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
+                ft.Text(sub, size=13, color=INK_SOFT, font_family=FONT_BODY),
+                *campos,
+                error,
+                ft.ElevatedButton(boton[0], on_click=boton[1], width=360, style=ft.ButtonStyle(
+                    bgcolor=PANEL_INK, color=PAPER, shape=ft.RoundedRectangleBorder(radius=4),
+                    padding=ft.padding.symmetric(vertical=16))),
+            ], spacing=12, tight=True),
+        ),
+    ))
+
+
+def main(page: ft.Page):
+    page.title   = "Solicitudes Legales"
+    page.bgcolor = SURFACE
+    page.padding = 0
+    page.scroll  = ft.ScrollMode.AUTO
+    page.fonts = {
+        FONT_DISPLAY: "/fonts/EBGaramond.ttf",
+        FONT_BODY:    "/fonts/Lato-Regular.ttf",
+    }
+    page.theme = ft.Theme(font_family=FONT_BODY)
+
+    def leer_token():
+        try:
+            return page.client_storage.get(CLAVE_SESION)
+        except Exception:
+            return None
+
+    def mostrar_login():
+        page.controls.clear(); page.overlay.clear(); page.on_resized = None
+        pantalla_login(page, entrar)
+        page.update()
+
+    def entrar(usuario, token):
+        try:
+            page.client_storage.set(CLAVE_SESION, token)
+        except Exception:
+            pass
+        page.controls.clear(); page.overlay.clear()
+        app_principal(page, usuario, salir)
+        page.update()
+
+    def salir():
+        token = leer_token()
+        try:
+            cuentas.cerrar_sesion(token)
+            page.client_storage.remove(CLAVE_SESION)
+        except Exception:
+            pass
+        mostrar_login()
+
+    token = leer_token()
+    try:
+        usuario = cuentas.usuario_de_sesion(token) if token else None
+    except Exception:
+        usuario = None
+    if usuario:
+        entrar(usuario, token)
+    else:
+        mostrar_login()
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, assets_dir="assets")
+    os.environ.setdefault("FLET_SECRET_KEY", secrets.token_hex(32))   # firma las URLs de subida
+    pathlib.Path(DIR_SUBIDAS).mkdir(exist_ok=True)
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, assets_dir="assets", upload_dir=DIR_SUBIDAS)
