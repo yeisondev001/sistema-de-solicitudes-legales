@@ -18,9 +18,11 @@ def _cadenas(texto: str) -> list:
     return [u for u in re.split(r"[\s,;]+", texto) if u.startswith(("postgresql://", "postgres://"))]
 
 
-JURIS_DATABASE_URL = (_cadenas(os.environ.get("JURIS_DATABASE_URL", "")) or [""])[0]
-JURIS_ARCHIVO_URLS = [u for u in dict.fromkeys(_cadenas(os.environ.get("JURIS_ARCHIVO_URLS", "")))
-                      if u != JURIS_DATABASE_URL]
+# También se pueden poner todas en una sola variable: la primera es la principal
+_todas = list(dict.fromkeys(_cadenas(os.environ.get("JURIS_DATABASE_URL", ""))
+                            + _cadenas(os.environ.get("JURIS_ARCHIVO_URLS", ""))))
+JURIS_DATABASE_URL = _todas[0] if _todas else ""
+JURIS_ARCHIVO_URLS = _todas[1:]
 LIMITE_MB = int(os.environ.get("JURIS_LIMITE_MB", "870"))   # Neon gratis: 1 GB por proyecto
 RESERVA_MB = 200    # en la principal se deja lugar para los documentos que suben los usuarios
 

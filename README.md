@@ -87,7 +87,7 @@ En GitHub corre solo todos los días (`.github/workflows/boletines.yml`). Necesi
 |---|---|
 | `DATABASE_URL` | Historial, usuarios y sesiones (PostgreSQL / Neon). Sin ella se usa SQLite local |
 | `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
-| `JURIS_ARCHIVO_URLS` | Opcional: más bases para el Boletín cuando no cabe en una, separadas por espacios |
+| `JURIS_ARCHIVO_URLS` | Opcional: más bases para el Boletín cuando no cabe en una, separadas por espacios. También pueden ir todas en `JURIS_DATABASE_URL`: la primera es la principal |
 | `JURIS_LIMITE_MB` | Opcional: hasta cuántos MB se llena cada base (por defecto 870, del 1 GB gratis) |
 | `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
 | `IA_BASE_URL`, `IA_MODELO`, `IA_MODELO_RAPIDO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI). Por defecto `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` arma las búsquedas y lo reemplaza si llega al límite |
