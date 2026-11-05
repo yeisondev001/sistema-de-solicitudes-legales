@@ -62,7 +62,24 @@ La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde c
 
 - Busca en el **Boletín Judicial** (público) y en los **documentos propios** de cada usuario.
 - Cada usuario puede **subir PDF digitales o Word**; solo él los ve. Los PDF escaneados (sin texto) todavía no se leen.
+- La búsqueda es **híbrida**: por palabras (búsqueda de texto de PostgreSQL en español) y por significado (vectores de Cloudflare guardados con pgvector). Así encuentra tanto números de expediente y artículos como ideas dichas con otras palabras. Si Cloudflare no responde, busca solo por palabras.
 - La IA solo redacta con las fuentes encontradas, y se eliminan las citas que no correspondan a una fuente real. Es una herramienta de apoyo: las citas deben verificarse.
+- Las respuestas las redacta Groq; si llega a su límite gratis, contesta Cloudflare.
+
+### Carga del Boletín Judicial
+
+`cargar_boletines.py` descarga el Boletín mensual de la Suprema Corte, lo corta en sentencias, lo guarda y borra el PDF. Desde 2025 el índice trae materia y decisión (se descartan las entradas de prueba); los boletines anteriores se cortan por la cabecera de cada sentencia. Después calcula los vectores que falten, sin pasarse de la cuota gratis del día. Los meses ya cargados se saltan.
+
+El Boletín sale con más de un año de atraso, así que los meses se cuentan desde el último publicado. Se conservan los últimos 60 meses publicados (`--conservar`).
+
+El 1 GB gratis de un proyecto de Neon alcanza para unos 18 meses de Boletín. Para más, se crean otros proyectos en la misma cuenta y se ponen en `JURIS_ARCHIVO_URLS`: cada mes va a la primera base con espacio (la principal al final, con 200 MB libres para los documentos de los usuarios) y el buscador busca en todas a la vez.
+
+```bash
+python cargar_boletines.py                 # últimos 60 meses publicados que falten
+python cargar_boletines.py --mes 2025-05   # un mes concreto
+```
+
+En GitHub corre solo todos los días (`.github/workflows/boletines.yml`). Necesita los secretos `JURIS_DATABASE_URL`, `JURIS_ARCHIVO_URLS`, `CF_ACCOUNT_ID` y `CF_API_TOKEN` en *Settings → Secrets and variables → Actions*.
 
 ### Variables de entorno
 
@@ -70,8 +87,12 @@ La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde c
 |---|---|
 | `DATABASE_URL` | Historial, usuarios y sesiones (PostgreSQL / Neon). Sin ella se usa SQLite local |
 | `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
+| `JURIS_ARCHIVO_URLS` | Opcional: más bases para el Boletín cuando no cabe en una, separadas por espacios |
+| `JURIS_LIMITE_MB` | Opcional: hasta cuántos MB se llena cada base (por defecto 870, del 1 GB gratis) |
 | `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
 | `IA_BASE_URL`, `IA_MODELO`, `IA_MODELO_RAPIDO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI). Por defecto `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` arma las búsquedas y lo reemplaza si llega al límite |
+| `CF_ACCOUNT_ID`, `CF_API_TOKEN` | Cloudflare Workers AI: vectores de significado y reemplazo de la IA cuando Groq se llena. Sin ellas la búsqueda es solo por palabras |
+| `EMB_MODELO`, `CF_MODELO_TEXTO` | Opcional: modelos de Cloudflare (por defecto `@cf/qwen/qwen3-embedding-0.6b` y `@cf/openai/gpt-oss-120b`) |
 | `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
 | `FLET_SECRET_KEY` | Opcional: firma de las subidas de archivos (si falta, se genera una al arrancar) |
 
@@ -105,6 +126,7 @@ La aplicación estará disponible en `http://localhost:8080`.
 ├── historial.py                    # Historial de expedientes (PostgreSQL o SQLite)
 ├── cuentas.py                      # Usuarios, contraseñas y sesiones
 ├── crear_usuario.py                # Crear usuarios desde la terminal
+├── cargar_boletines.py             # Cargar el Boletín Judicial y sus vectores
 ├── jurisprudencia/                 # Buscador: procesar documentos, búsqueda e IA
 ├── generators/
 │   ├── base.py                     # Utilidades compartidas para documentos Word

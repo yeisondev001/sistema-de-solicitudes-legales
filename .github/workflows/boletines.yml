@@ -1,0 +1,33 @@
+# Carga el Boletín Judicial en la base de jurisprudencia y calcula los vectores.
+# Corre todos los días: los meses ya cargados se saltan, y cada día se gastan
+# como máximo 7.000 neuronas de Cloudflare en vectores (el resto queda para respuestas).
+# Necesita los secretos del repo: JURIS_DATABASE_URL, JURIS_ARCHIVO_URLS (las bases extra,
+# separadas por espacios), CF_ACCOUNT_ID y CF_API_TOKEN.
+name: Cargar boletines
+
+on:
+  schedule:
+    - cron: "0 9 * * *"     # 5:00 a. m. en República Dominicana
+  workflow_dispatch:
+    inputs:
+      meses:
+        description: "Meses publicados hacia atrás"
+        default: "60"
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get install -y poppler-utils   # pdftotext: lee el PDF mucho más rápido
+      - run: pip install "psycopg[binary]==3.2.9" "pypdf==6.1.1" "httpx==0.28.1"
+      - run: python -u cargar_boletines.py --meses "${{ github.event.inputs.meses || '60' }}"
+        env:
+          JURIS_DATABASE_URL: ${{ secrets.JURIS_DATABASE_URL }}
+          JURIS_ARCHIVO_URLS: ${{ secrets.JURIS_ARCHIVO_URLS }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}

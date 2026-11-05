@@ -4,7 +4,7 @@ de la sentencia y partirla en fragmentos para el buscador.
 Lo usan por igual los documentos subidos y los boletines.
 """
 
-import re
+import re, shutil, subprocess
 from pathlib import Path
 
 PALABRAS_POR_FRAGMENTO = 400
@@ -16,13 +16,29 @@ class DocumentoSinTexto(Exception):
     """El archivo no tiene texto extraíble (por ejemplo, un PDF escaneado)."""
 
 
+def _paginas_pdftotext(ruta: Path):
+    """pdftotext (poppler) es unas 10 veces más rápido que pypdf con el Boletín (7.000+ páginas)."""
+    if not shutil.which("pdftotext"):
+        return None
+    r = subprocess.run(["pdftotext", "-enc", "UTF-8", str(ruta), "-"], capture_output=True, timeout=1800)
+    if r.returncode != 0:
+        return None
+    partes = r.stdout.decode("utf-8", "replace").split("\f")
+    if partes and not partes[-1].strip():
+        partes = partes[:-1]
+    return [(i + 1, t.replace("\x00", "")) for i, t in enumerate(partes)]
+
+
 def extraer_paginas(ruta: str) -> list:
     """Lista de (número de página, texto)."""
     ruta = Path(ruta)
     ext = ruta.suffix.lower()
     if ext == ".pdf":
-        from pypdf import PdfReader   # licencia BSD (PyMuPDF es AGPL)
-        paginas = [(i + 1, p.extract_text() or "") for i, p in enumerate(PdfReader(ruta).pages)]
+        paginas = _paginas_pdftotext(ruta)
+        if paginas is None:
+            from pypdf import PdfReader   # licencia BSD (PyMuPDF es AGPL)
+            paginas = [(i + 1, (p.extract_text() or "").replace("\x00", ""))
+                       for i, p in enumerate(PdfReader(ruta).pages)]
         if not paginas or sum(len(t.strip()) for _, t in paginas) < MIN_CARACTERES_POR_PAGINA * len(paginas) / 2:
             raise DocumentoSinTexto("El PDF no tiene texto (parece escaneado).")
         return paginas
@@ -53,8 +69,9 @@ def detectar_ficha(texto: str) -> dict:
     return {
         "numero":     _campo(r"\b(SCJ-[A-Z]{2,3}-\d{2}-\d{3,5}|TC/\d{4}/\d{2,4}|\d{3}-\d{3}-\d{4}-SRES-\d+)", inicio),
         "expediente": _campo(r"Exp(?:ediente)?\.?\s*(?:n[úu]m\.?|No\.?)\s*([^\n]{3,60})", inicio),
-        "materia":    _campo(r"Materia:\s*([^\n]{3,120})", inicio),
-        "decision":   _campo(r"Decisi[óo]n:\s*([^\n]{3,120})", inicio),
+        # a veces "Materia: … Decisión: … Ponente: …" vienen en la misma línea
+        "materia":    _campo(r"Materia:\s*([^\n]{3,120}?)(?:\s+Decisi[óo]n:|\n|$)", inicio),
+        "decision":   _campo(r"Decisi[óo]n:\s*([^\n]{3,120}?)(?:\s+Ponente:|\n|$)", inicio),
         "fecha":      _campo(r"en fecha\s+(\d{1,2} de [a-záéíóú]+ de \d{4})", texto[:8000]),
         "sala":       sala,
     }
@@ -92,6 +109,40 @@ def guardar(conn, ficha: dict, fragmentos: list, origen: str, usuario_id=None, t
     return doc_id
 
 
+def vectorizar_pendientes(conn, documento_id=None, max_neuronas=None, lote=256) -> dict:
+    """Calcula los vectores que faltan, los más nuevos primero, sin pasarse de max_neuronas."""
+    from . import basedatos, vectores
+    hechos, gastadas = 0, 0.0
+    tipo = basedatos.vector_tipo(conn)
+    if not (tipo and vectores.configurado()):
+        return {"fragmentos": 0, "neuronas": 0.0, "agotado": False, "saltados": 0}
+    filtro, params = ("AND f.documento_id = %s", [documento_id]) if documento_id else ("", [])
+    saltados = []   # los que Cloudflare rechaza se dejan para otra corrida
+    while max_neuronas is None or gastadas < max_neuronas:
+        with conn.cursor() as cur:
+            cur.execute(f"""SELECT f.id, f.texto, d.numero, d.sala, d.materia
+                            FROM fragmentos f JOIN documentos d ON d.id = f.documento_id
+                            WHERE f.emb IS NULL AND NOT (f.id = ANY(%s)) {filtro}
+                            ORDER BY f.id DESC LIMIT %s""", [saltados] + params + [lote])
+            filas = cur.fetchall()
+        if not filas:
+            break
+        # la cabecera (número, sala, materia) ayuda a ubicar el fragmento
+        textos = [" · ".join(p for p in (num, sala, mat) if p) + "\n" + texto for _, texto, num, sala, mat in filas]
+        try:
+            vecs, neuronas = vectores.de_documentos(textos)
+        except vectores.LimiteAlcanzado:
+            return {"fragmentos": hechos, "neuronas": gastadas, "agotado": True, "saltados": len(saltados)}
+        listos = [(vectores.como_texto(v), fila[0]) for v, fila in zip(vecs, filas) if v]
+        saltados += [fila[0] for v, fila in zip(vecs, filas) if not v]
+        with conn.cursor() as cur:
+            cur.executemany(f"UPDATE fragmentos SET emb = %s::{tipo} WHERE id = %s", listos)
+        conn.commit()
+        hechos += len(listos)
+        gastadas += neuronas
+    return {"fragmentos": hechos, "neuronas": gastadas, "agotado": False, "saltados": len(saltados)}
+
+
 def subir_documento(ruta: str, usuario_id: int, nombre_archivo: str) -> dict:
     """Procesa un archivo subido por un usuario y lo agrega a su parte del buscador."""
     from .basedatos import conectar
@@ -100,6 +151,10 @@ def subir_documento(ruta: str, usuario_id: int, nombre_archivo: str) -> dict:
     fragmentos = fragmentar(paginas)
     with conectar() as conn:
         doc_id = guardar(conn, ficha, fragmentos, "propio", usuario_id, titulo=nombre_archivo)
+        try:   # si falla (sin cuota, sin red) se busca por palabras y el vector se calcula después
+            vectorizar_pendientes(conn, documento_id=doc_id)
+        except Exception:
+            conn.rollback()
     return {"id": doc_id, "fragmentos": len(fragmentos), "paginas": len(paginas), **ficha}
 
 

@@ -1,23 +1,29 @@
 """
 IA para responder con las sentencias encontradas.
-Usa cualquier proveedor compatible con la API de OpenAI (por defecto Groq).
-Para cambiar de proveedor basta con IA_BASE_URL, IA_MODELO e IA_API_KEY.
+Usa proveedores compatibles con la API de OpenAI, en cadena: si uno llega a su
+límite gratis (o falla), contesta el siguiente.
+
+  1. Groq, modelo principal (IA_MODELO)        -> redacta
+  2. Groq, modelo rápido (IA_MODELO_RAPIDO)    -> arma las búsquedas y reemplaza al 1
+  3. Cloudflare Workers AI (CF_MODELO_TEXTO)   -> reemplazo si Groq se llena
 
 En Groq gratis cada modelo tiene su propio límite (8.000 tokens por minuto,
-200.000 por día), así que se reparten: el modelo rápido arma las búsquedas y
-sirve de reemplazo; el principal solo redacta.
+200.000 por día). Cloudflare comparte sus 10.000 neuronas diarias con los vectores.
 """
 
 import json, os, re
 
 import httpx
 
-IA_BASE_URL     = os.environ.get("IA_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
-IA_MODELO       = os.environ.get("IA_MODELO", "openai/gpt-oss-120b")
+IA_BASE_URL      = os.environ.get("IA_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
+IA_MODELO        = os.environ.get("IA_MODELO", "openai/gpt-oss-120b")
 IA_MODELO_RAPIDO = os.environ.get("IA_MODELO_RAPIDO", "openai/gpt-oss-20b")
-IA_API_KEY      = os.environ.get("IA_API_KEY", "").strip()
+IA_API_KEY       = os.environ.get("IA_API_KEY", "").strip()
+CF_ACCOUNT_ID    = os.environ.get("CF_ACCOUNT_ID", "").strip()
+CF_API_TOKEN     = os.environ.get("CF_API_TOKEN", "").strip()
+CF_MODELO_TEXTO  = os.environ.get("CF_MODELO_TEXTO", "@cf/openai/gpt-oss-120b")
 
-MAX_FUENTES = 6           # fragmentos que se le pasan a la IA
+MAX_FUENTES = 6            # fragmentos que se le pasan a la IA
 CARACTERES_FUENTES = 7000  # texto total de las fuentes (~2.000 tokens)
 
 _SISTEMA = (
@@ -30,47 +36,65 @@ _SISTEMA = (
 
 
 class LimiteAlcanzado(Exception):
-    """Se agotó el límite gratis de la IA (por minuto o por día)."""
+    """Todas las IAs llegaron a su límite gratis (por minuto o por día)."""
+
+
+def _proveedores(para_busquedas: bool = False) -> list:
+    """(url, clave, modelo) en el orden en que se prueban."""
+    lista = []
+    if IA_API_KEY:
+        if not para_busquedas:
+            lista.append((IA_BASE_URL, IA_API_KEY, IA_MODELO))
+        if IA_MODELO_RAPIDO != IA_MODELO or para_busquedas:
+            lista.append((IA_BASE_URL, IA_API_KEY, IA_MODELO_RAPIDO))
+    if CF_ACCOUNT_ID and CF_API_TOKEN:
+        lista.append((f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1",
+                      CF_API_TOKEN, CF_MODELO_TEXTO))
+    return lista
 
 
 def disponible() -> bool:
-    return bool(IA_API_KEY)
+    return bool(_proveedores())
 
 
-def _chat(mensajes: list, modelo: str, max_tokens: int = 700, json_modo: bool = False) -> str:
+def _chat(mensajes: list, proveedor: tuple, max_tokens: int = 700, json_modo: bool = False) -> str:
+    url, clave, modelo = proveedor
     cuerpo = {"model": modelo, "messages": mensajes, "temperature": 0.1, "max_tokens": max_tokens}
     if json_modo:
         cuerpo["response_format"] = {"type": "json_object"}
     if "gpt-oss" in modelo:
         cuerpo["reasoning_effort"] = "low"   # que no gaste los tokens pensando
         cuerpo["include_reasoning"] = False
-    r = httpx.post(f"{IA_BASE_URL}/chat/completions", json=cuerpo, timeout=60,
-                   headers={"Authorization": f"Bearer {IA_API_KEY}"})
+    r = httpx.post(f"{url}/chat/completions", json=cuerpo, timeout=60,
+                   headers={"Authorization": f"Bearer {clave}"})
     if r.status_code in (413, 429):
         raise LimiteAlcanzado(r.text[:200])
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+    return r.json()["choices"][0]["message"]["content"] or ""
 
 
-def _chat_con_reemplazo(mensajes: list, **kw) -> str:
-    """Prueba el modelo principal y, si llegó al límite, el rápido."""
-    try:
-        return _chat(mensajes, IA_MODELO, **kw)
-    except LimiteAlcanzado:
-        if IA_MODELO_RAPIDO == IA_MODELO:
-            raise
-        return _chat(mensajes, IA_MODELO_RAPIDO, **kw)
+def _chat_en_cadena(mensajes: list, para_busquedas: bool = False, **kw) -> str:
+    """Prueba cada proveedor en orden hasta que uno conteste."""
+    ultimo = LimiteAlcanzado("No hay IA configurada.")
+    for proveedor in _proveedores(para_busquedas):
+        try:
+            texto = _chat(mensajes, proveedor, **kw)
+            if texto.strip():
+                return texto
+        except (LimiteAlcanzado, httpx.HTTPError) as ex:
+            ultimo = ex
+    raise ultimo if isinstance(ultimo, LimiteAlcanzado) else LimiteAlcanzado(str(ultimo))
 
 
 def generar_busquedas(pregunta: str) -> list:
     """Convierte la pregunta en 2–4 búsquedas con palabras clave y sinónimos jurídicos."""
     try:
-        salida = _chat([
+        salida = _chat_en_cadena([
             {"role": "system", "content":
                 "Convierte la pregunta de un abogado dominicano en búsquedas para un buscador de "
                 "palabras clave de sentencias. Devuelve JSON: {\"busquedas\": [\"...\", \"...\"]} "
                 "con 2 a 4 búsquedas cortas (3 a 8 palabras), con sinónimos y términos jurídicos."},
-            {"role": "user", "content": pregunta}], IA_MODELO_RAPIDO, max_tokens=200, json_modo=True)
+            {"role": "user", "content": pregunta}], para_busquedas=True, max_tokens=400, json_modo=True)
         busquedas = [b for b in json.loads(salida).get("busquedas", []) if isinstance(b, str)]
         return (busquedas or [])[:4] + [pregunta]
     except Exception:
@@ -82,7 +106,7 @@ def responder(pregunta: str, fuentes: list, referencia) -> dict:
     fuentes = fuentes[:MAX_FUENTES]
     por_fuente = CARACTERES_FUENTES // max(len(fuentes), 1)
     bloque = "\n\n".join(f"[{n}] {referencia(f)}\n{f['texto'][:por_fuente]}" for n, f in enumerate(fuentes, 1))
-    texto = _chat_con_reemplazo([
+    texto = _chat_en_cadena([
         {"role": "system", "content": _SISTEMA},
         {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\nPregunta: {pregunta}"}])
     # algunos modelos citan como 【1】 o 【1†fuente】: se pasan a [1]
