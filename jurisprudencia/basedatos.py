@@ -12,9 +12,15 @@ Los documentos de los usuarios van siempre en la principal.
 
 import os, re
 
-JURIS_DATABASE_URL = os.environ.get("JURIS_DATABASE_URL", "").strip()
-JURIS_ARCHIVO_URLS = [u for u in re.split(r"[\s,]+", os.environ.get("JURIS_ARCHIVO_URLS", ""))
-                      if u and u != JURIS_DATABASE_URL]
+def _cadenas(texto: str) -> list:
+    """Cadenas de conexión que hay en el texto; se ignora lo demás (por ejemplo, el nombre
+    del proyecto pegado delante: "jurisprudencia-archivo-1, postgresql://...")."""
+    return [u for u in re.split(r"[\s,;]+", texto) if u.startswith(("postgresql://", "postgres://"))]
+
+
+JURIS_DATABASE_URL = (_cadenas(os.environ.get("JURIS_DATABASE_URL", "")) or [""])[0]
+JURIS_ARCHIVO_URLS = [u for u in dict.fromkeys(_cadenas(os.environ.get("JURIS_ARCHIVO_URLS", "")))
+                      if u != JURIS_DATABASE_URL]
 LIMITE_MB = int(os.environ.get("JURIS_LIMITE_MB", "870"))   # Neon gratis: 1 GB por proyecto
 RESERVA_MB = 200    # en la principal se deja lugar para los documentos que suben los usuarios
 
