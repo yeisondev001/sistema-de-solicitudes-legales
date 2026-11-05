@@ -86,17 +86,37 @@ def _chat_en_cadena(mensajes: list, para_busquedas: bool = False, **kw) -> str:
     raise ultimo if isinstance(ultimo, LimiteAlcanzado) else LimiteAlcanzado(str(ultimo))
 
 
+NO_ES_CONSULTA = ("Escriba una consulta jurídica, por ejemplo: «deslinde aprobado sin citar a los colindantes» "
+                  "o un número de sentencia como SCJ-TS-25-1451.")
+_SALUDOS = {"hola", "buenas", "buenos", "buen", "dia", "dias", "días", "tardes", "noches", "gracias", "ok", "oki",
+            "listo", "prueba", "probando", "test", "saludos", "hey", "que", "qué", "tal", "como", "cómo", "estas",
+            "estás", "bien", "si", "sí", "no"}
+
+
+def parece_consulta(texto: str) -> bool:
+    """Descarta saludos y pruebas ("hola", "gracias") antes de gastar búsquedas e IA."""
+    if re.search(r"\d", texto):
+        return True   # puede ser un número de sentencia o expediente
+    palabras = [p for p in re.findall(r"[a-záéíóúüñ]+", texto.lower()) if p not in _SALUDOS]
+    return any(len(p) > 3 for p in palabras)
+
+
 def generar_busquedas(pregunta: str) -> list:
-    """Convierte la pregunta en 2–4 búsquedas con palabras clave y sinónimos jurídicos."""
+    """Convierte la pregunta en 2–4 búsquedas con palabras clave y sinónimos jurídicos.
+    Devuelve [] si el texto no es una consulta jurídica (saludo, charla, texto sin sentido)."""
     try:
         salida = _chat_en_cadena([
             {"role": "system", "content":
                 "Convierte la pregunta de un abogado dominicano en búsquedas para un buscador de "
                 "palabras clave de sentencias. Devuelve JSON: {\"busquedas\": [\"...\", \"...\"]} "
-                "con 2 a 4 búsquedas cortas (3 a 8 palabras), con sinónimos y términos jurídicos."},
+                "con 2 a 4 búsquedas cortas (3 a 8 palabras), con sinónimos y términos jurídicos. "
+                "Si el texto no es una consulta jurídica (un saludo, una charla, una prueba o algo sin "
+                "sentido), devuelve {\"busquedas\": []}. Un tema jurídico de una o dos palabras sí es consulta."},
             {"role": "user", "content": pregunta}], para_busquedas=True, max_tokens=400, json_modo=True)
-        busquedas = [b for b in json.loads(salida).get("busquedas", []) if isinstance(b, str)]
-        return (busquedas or [])[:4] + [pregunta]
+        busquedas = [b for b in json.loads(salida).get("busquedas", []) if isinstance(b, str) and b.strip()]
+        if not busquedas and not re.search(r"\d", pregunta):
+            return []
+        return busquedas[:4] + [pregunta]
     except Exception:
         return [pregunta]
 
