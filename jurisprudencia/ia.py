@@ -86,8 +86,21 @@ def _chat_en_cadena(mensajes: list, para_busquedas: bool = False, **kw) -> str:
     raise ultimo if isinstance(ultimo, LimiteAlcanzado) else LimiteAlcanzado(str(ultimo))
 
 
-NO_ES_CONSULTA = ("Escriba una consulta jurídica, por ejemplo: «deslinde aprobado sin citar a los colindantes» "
-                  "o un número de sentencia como SCJ-TS-25-1451.")
+_PRESENTACION = ("Busco en las sentencias de la Suprema Corte y en sus documentos. Puede preguntarme, por "
+                 "ejemplo, por «deslinde aprobado sin citar a los colindantes» o por un número de sentencia "
+                 "como SCJ-TS-25-1451.")
+
+
+def no_es_consulta(texto: str) -> str:
+    """Respuesta a un saludo o a algo que no es una consulta (sin buscar ni gastar IA)."""
+    t = texto.lower()
+    if "gracias" in t:
+        inicio = "¡Con gusto! ¿En qué más le puedo ayudar?"
+    elif re.search(r"\b(hola|buen[oa]s?|saludos|hey)\b", t):
+        inicio = "¡Hola! ¿En qué le puedo ayudar?"
+    else:
+        inicio = "¿En qué le puedo ayudar?"
+    return f"{inicio} {_PRESENTACION}"
 _SALUDOS = {"hola", "buenas", "buenos", "buen", "dia", "dias", "días", "tardes", "noches", "gracias", "ok", "oki",
             "listo", "prueba", "probando", "test", "saludos", "hey", "que", "qué", "tal", "como", "cómo", "estas",
             "estás", "bien", "si", "sí", "no"}

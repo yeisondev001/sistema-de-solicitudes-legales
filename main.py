@@ -1704,7 +1704,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             juris_estado["pregunta"] = q
             # un saludo o una prueba ("hola") no se busca: siempre saldría "lo más parecido"
             if not juris_ia.parece_consulta(q):
-                juris_estado.update(respuesta={"texto": juris_ia.NO_ES_CONSULTA, "citadas": []}, fuentes=[])
+                juris_estado.update(respuesta={"texto": juris_ia.no_es_consulta(q), "citadas": []}, fuentes=[])
                 pintar_respuesta(); page.update(); return
             estado_txt.value = "Buscando en las sentencias…"
             page.update()
@@ -1715,7 +1715,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                     fuentes = juris_buscar.buscar(busquedas, usuario["id"], limite=juris_ia.MAX_FUENTES) \
                         if busquedas else []
                     if not busquedas:
-                        respuesta = {"texto": juris_ia.NO_ES_CONSULTA, "citadas": []}
+                        respuesta = {"texto": juris_ia.no_es_consulta(q), "citadas": []}
                     elif not fuentes:
                         respuesta = {"texto": "No encontré sentencias relacionadas. Pruebe con otras palabras "
                                               "o suba sus propios documentos.", "citadas": []}
