@@ -10,7 +10,8 @@ hay, JURIS_ARCHIVO_URLS) y calcula los vectores que falten con Cloudflare
     python cargar_boletines.py --solo-vectores      # no descarga nada, solo vectores
 
 El Boletín sale con más de un año de atraso, así que los meses se cuentan desde el
-último publicado. Los meses ya cargados se saltan, así que se puede correr todos los días.
+último publicado. Los meses ya cargados se saltan, así que se puede correr todos los días:
+los nuevos se van sumando y no se borra nada (salvo que se pida con --conservar).
 Cada mes va a la primera base con espacio: primero las de archivo y al final la principal,
 que se deja con lugar para los documentos de los usuarios.
 """
@@ -82,8 +83,8 @@ def main():
     ap.add_argument("--max-meses", type=int, default=12, help="máximo de meses a descargar en esta corrida")
     ap.add_argument("--neuronas", type=float, default=7000,
                     help="neuronas de Cloudflare para vectores en esta corrida (deja el resto para respuestas)")
-    ap.add_argument("--conservar", type=int, default=60,
-                    help="borra los boletines más viejos que estos meses publicados (0 = no borrar nada)")
+    ap.add_argument("--conservar", type=int, default=0,
+                    help="borra los boletines más viejos que estos meses publicados (por defecto 0: no borra nada)")
     ap.add_argument("--solo-vectores", action="store_true")
     ap.add_argument("--sin-vectores", action="store_true")
     a = ap.parse_args()

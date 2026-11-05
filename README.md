@@ -70,7 +70,7 @@ La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde c
 
 `cargar_boletines.py` descarga el Boletín mensual de la Suprema Corte, lo corta en sentencias, lo guarda y borra el PDF. Desde 2025 el índice trae materia y decisión (se descartan las entradas de prueba); los boletines anteriores se cortan por la cabecera de cada sentencia. Después calcula los vectores que falten, sin pasarse de la cuota gratis del día. Los meses ya cargados se saltan.
 
-El Boletín sale con más de un año de atraso, así que los meses se cuentan desde el último publicado. Se conservan los últimos 60 meses publicados (`--conservar`).
+El Boletín sale con más de un año de atraso, así que los meses se cuentan desde el último publicado. La primera vez carga los últimos 60 meses publicados; después se van sumando los nuevos y no se borra nada (con `--conservar N` se pueden quitar los de más de N meses).
 
 El 1 GB gratis de un proyecto de Neon alcanza para unos 18 meses de Boletín. Para más, se crean otros proyectos en la misma cuenta y se ponen en `JURIS_ARCHIVO_URLS`: cada mes va a la primera base con espacio (la principal al final, con 200 MB libres para los documentos de los usuarios) y el buscador busca en todas a la vez.
 

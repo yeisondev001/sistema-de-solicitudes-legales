@@ -1,6 +1,7 @@
 # Carga el Boletín Judicial en la base de jurisprudencia y calcula los vectores.
 # Corre todos los días: los meses ya cargados se saltan, y cada día se gastan
 # como máximo 7.000 neuronas de Cloudflare en vectores (el resto queda para respuestas).
+# No borra nada: los meses nuevos se van sumando a los que ya están.
 # Necesita los secretos del repo: JURIS_DATABASE_URL, JURIS_ARCHIVO_URLS (las bases extra,
 # separadas por espacios), CF_ACCOUNT_ID y CF_API_TOKEN.
 name: Cargar boletines
