@@ -1708,13 +1708,18 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             def tarea():
                 try:
                     busquedas = juris_ia.generar_busquedas(q) if juris_ia.disponible() else [q]
-                    fuentes = juris_buscar.buscar(busquedas, usuario["id"], limite=8)
+                    fuentes = juris_buscar.buscar(busquedas, usuario["id"], limite=juris_ia.MAX_FUENTES)
                     if not fuentes:
                         respuesta = {"texto": "No encontré sentencias relacionadas. Pruebe con otras palabras "
                                               "o suba sus propios documentos.", "citadas": []}
                     elif juris_ia.disponible():
                         estado_txt.value = "Redactando la respuesta…"; page.update()
-                        respuesta = juris_ia.responder(q, fuentes, juris_buscar.referencia)
+                        try:
+                            respuesta = juris_ia.responder(q, fuentes, juris_buscar.referencia)
+                        except juris_ia.LimiteAlcanzado:
+                            respuesta = {"texto": "_Se alcanzó el límite gratis de la IA por ahora; intente en un "
+                                                  "minuto. Mientras tanto, estas son las sentencias encontradas._",
+                                         "citadas": []}
                     else:
                         respuesta = {"texto": "_La IA no está configurada (IA_API_KEY): se muestran solo los "
                                               "fragmentos encontrados._", "citadas": []}

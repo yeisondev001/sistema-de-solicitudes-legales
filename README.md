@@ -51,6 +51,13 @@ Las próximas audiencias de los siguientes 7 días se resaltan en la lista. Si s
 
 La aplicación pide **usuario y contraseña**. La primera vez se crea la cuenta de administrador, que luego puede crear más usuarios desde el menú de la cuenta (arriba a la derecha) → **Usuarios**. Las contraseñas se guardan cifradas con scrypt.
 
+También se pueden crear desde la terminal (la contraseña no se ve al escribirla). Con `DATABASE_URL` definida se crean en Neon:
+
+```bash
+python crear_usuario.py           # usuario normal
+python crear_usuario.py --admin   # administrador
+```
+
 La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde con sentencias reales, indicando número, sala y página:
 
 - Busca en el **Boletín Judicial** (público) y en los **documentos propios** de cada usuario.
@@ -64,7 +71,7 @@ La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde c
 | `DATABASE_URL` | Historial, usuarios y sesiones (PostgreSQL / Neon). Sin ella se usa SQLite local |
 | `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
 | `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
-| `IA_BASE_URL`, `IA_MODELO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI) |
+| `IA_BASE_URL`, `IA_MODELO`, `IA_MODELO_RAPIDO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI). Por defecto `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` arma las búsquedas y lo reemplaza si llega al límite |
 | `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
 | `FLET_SECRET_KEY` | Opcional: firma de las subidas de archivos (si falta, se genera una al arrancar) |
 
@@ -97,6 +104,7 @@ La aplicación estará disponible en `http://localhost:8080`.
 ├── main.py                         # Interfaz y formularios Flet
 ├── historial.py                    # Historial de expedientes (PostgreSQL o SQLite)
 ├── cuentas.py                      # Usuarios, contraseñas y sesiones
+├── crear_usuario.py                # Crear usuarios desde la terminal
 ├── jurisprudencia/                 # Buscador: procesar documentos, búsqueda e IA
 ├── generators/
 │   ├── base.py                     # Utilidades compartidas para documentos Word

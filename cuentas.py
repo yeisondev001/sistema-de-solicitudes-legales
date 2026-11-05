@@ -10,6 +10,8 @@ import hashlib, hmac, os, secrets, sqlite3, time
 from historial import DATABASE_URL, SQLITE_PATH
 
 DURACION_SESION = 30 * 24 * 3600   # 30 días
+# En el servidor (Neon) la página es pública: contraseñas largas. En local se permiten cortas para probar.
+MIN_CLAVE = 8 if DATABASE_URL else 3
 
 _DDL = {
     "postgres": [
@@ -96,8 +98,8 @@ def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = F
     usuario = usuario.strip().lower()
     if len(usuario) < 3:
         raise ValueError("El usuario debe tener al menos 3 caracteres.")
-    if len(clave) < 8:
-        raise ValueError("La contraseña debe tener al menos 8 caracteres.")
+    if len(clave) < MIN_CLAVE:
+        raise ValueError(f"La contraseña debe tener al menos {MIN_CLAVE} caracteres.")
     if _ejecutar("SELECT id FROM usuarios WHERE usuario = %s", (usuario,), leer=True):
         raise ValueError(f'El usuario "{usuario}" ya existe.')
     _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, es_admin) VALUES (%s, %s, %s, %s)",
