@@ -127,6 +127,7 @@ La aplicación estará disponible en `http://localhost:8080`.
 ├── cuentas.py                      # Usuarios, contraseñas y sesiones
 ├── crear_usuario.py                # Crear usuarios desde la terminal
 ├── cargar_boletines.py             # Cargar el Boletín Judicial y sus vectores
+├── ESTADO_DEL_PROYECTO.md          # Por dónde va el trabajo y qué falta (leer primero)
 ├── jurisprudencia/                 # Buscador: procesar documentos, búsqueda e IA
 ├── generators/
 │   ├── base.py                     # Utilidades compartidas para documentos Word
