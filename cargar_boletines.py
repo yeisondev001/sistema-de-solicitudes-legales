@@ -20,7 +20,7 @@ import argparse, datetime, sys, tempfile
 from pathlib import Path
 
 from jurisprudencia import basedatos, boletin
-from jurisprudencia.procesar import vectorizar_pendientes
+from jurisprudencia.procesar import PRIORITARIOS, vectorizar_pendientes
 
 MAX_ESPERA = 36   # meses sin publicar que se aceptan antes del último boletín
 
@@ -156,20 +156,30 @@ def main():
             print(f"Base {_nombre(urls.index(url))}: {n} palabras comunes")
 
     if not a.sin_vectores:
-        restantes = a.neuronas
-        for i, url in enumerate(urls):
-            with basedatos.conectar(url) as conn:
-                r = vectorizar_pendientes(conn, max_neuronas=restantes)
+        restantes, hechos = a.neuronas, [0] * len(urls)
+        # primero Tierras e Inmobiliario en todas las bases, después el resto
+        for solo_prioritarios in (True, False):
+            for i, url in enumerate(urls):
+                if restantes <= 0:
+                    break
+                with basedatos.conectar(url) as conn:
+                    r = vectorizar_pendientes(conn, max_neuronas=restantes, solo_prioritarios=solo_prioritarios)
                 restantes -= r["neuronas"]
-                with conn.cursor() as cur:
-                    cur.execute("SELECT COUNT(*), COUNT(emb) FROM fragmentos" if basedatos.vector_tipo(conn)
-                                else "SELECT COUNT(*), 0 FROM fragmentos")
-                    total, con_vector = cur.fetchone()
-                print(f"Base {_nombre(i)}: {r['fragmentos']} vectores nuevos ({r['neuronas']:.0f} neuronas); "
-                      f"{con_vector} de {total} fragmentos con vector, {basedatos.tamano_mb(conn):.0f} MB")
-            if r["agotado"] or restantes <= 0:
-                print("Se acabó la cuota de vectores de hoy; sigue mañana.")
-                break
+                hechos[i] += r["fragmentos"]
+                if r["agotado"]:
+                    restantes = 0
+        if restantes <= 0:
+            print("Se acabó la cuota de vectores de hoy; sigue mañana.")
+        for i, url in enumerate(urls):
+            with basedatos.conectar(url) as conn, conn.cursor() as cur:
+                cur.execute(f"""SELECT COUNT(*), COUNT(f.emb), COUNT(*) FILTER (WHERE {PRIORITARIOS}),
+                                       COUNT(f.emb) FILTER (WHERE {PRIORITARIOS})
+                                FROM fragmentos f JOIN documentos d ON d.id = f.documento_id"""
+                            if basedatos.vector_tipo(conn) else
+                            "SELECT COUNT(*), 0, 0, 0 FROM fragmentos")
+                total, con_vector, tierras, tierras_con = cur.fetchone()
+                print(f"Base {_nombre(i)}: {hechos[i]} vectores nuevos; {con_vector} de {total} fragmentos con "
+                      f"vector (Tierras e Inmobiliario: {tierras_con} de {tierras}), {basedatos.tamano_mb(conn):.0f} MB")
 
 
 if __name__ == "__main__":

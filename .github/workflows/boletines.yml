@@ -14,6 +14,14 @@ on:
       meses:
         description: "Meses publicados hacia atrás"
         default: "60"
+      max_meses:
+        description: "Máximo de meses a descargar en esta corrida (unos 3 minutos cada uno)"
+        default: "12"
+
+# una corrida a la vez: si la de las 5 a. m. coincide con una manual, espera a que termine
+concurrency:
+  group: boletines
+  cancel-in-progress: false
 
 jobs:
   cargar:
@@ -26,7 +34,7 @@ jobs:
           python-version: "3.11"
       - run: sudo apt-get install -y poppler-utils   # pdftotext: lee el PDF mucho más rápido
       - run: pip install "psycopg[binary]==3.2.9" "pypdf==6.1.1" "httpx==0.28.1"
-      - run: python -u cargar_boletines.py --meses "${{ github.event.inputs.meses || '60' }}"
+      - run: python -u cargar_boletines.py --meses "${{ github.event.inputs.meses || '60' }}" --max-meses "${{ github.event.inputs.max_meses || '12' }}"
         env:
           JURIS_DATABASE_URL: ${{ secrets.JURIS_DATABASE_URL }}
           JURIS_ARCHIVO_URLS: ${{ secrets.JURIS_ARCHIVO_URLS }}

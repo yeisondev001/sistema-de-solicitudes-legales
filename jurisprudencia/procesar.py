@@ -109,21 +109,29 @@ def guardar(conn, ficha: dict, fragmentos: list, origen: str, usuario_id=None, t
     return doc_id
 
 
-def vectorizar_pendientes(conn, documento_id=None, max_neuronas=None, lote=256) -> dict:
-    """Calcula los vectores que faltan, los más nuevos primero, sin pasarse de max_neuronas."""
+# Tierras e Inmobiliario (la materia de los primeros usuarios) reciben vectores antes que el resto
+PRIORITARIOS = r"(d.materia || ' ' || d.titulo) ~* 'tierra|inmobiliari|deslinde|saneamiento|registrad|litis'"
+
+
+def vectorizar_pendientes(conn, documento_id=None, max_neuronas=None, lote=256, solo_prioritarios=False) -> dict:
+    """Calcula los vectores que faltan sin pasarse de max_neuronas: primero los documentos
+    propios, luego Tierras e Inmobiliario, y dentro de eso los más nuevos."""
     from . import basedatos, vectores
     hechos, gastadas = 0, 0.0
     tipo = basedatos.vector_tipo(conn)
     if not (tipo and vectores.configurado()):
         return {"fragmentos": 0, "neuronas": 0.0, "agotado": False, "saltados": 0}
     filtro, params = ("AND f.documento_id = %s", [documento_id]) if documento_id else ("", [])
+    if solo_prioritarios:
+        filtro += f" AND {PRIORITARIOS}"
     saltados = []   # los que Cloudflare rechaza se dejan para otra corrida
     while max_neuronas is None or gastadas < max_neuronas:
         with conn.cursor() as cur:
             cur.execute(f"""SELECT f.id, f.texto, d.numero, d.sala, d.materia
                             FROM fragmentos f JOIN documentos d ON d.id = f.documento_id
                             WHERE f.emb IS NULL AND NOT (f.id = ANY(%s)) {filtro}
-                            ORDER BY f.id DESC LIMIT %s""", [saltados] + params + [lote])
+                            ORDER BY d.origen = 'propio' DESC, {PRIORITARIOS} DESC, f.id DESC
+                            LIMIT %s""", [saltados] + params + [lote])
             filas = cur.fetchall()
         if not filas:
             break
