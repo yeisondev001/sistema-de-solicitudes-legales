@@ -169,6 +169,7 @@ def main():
                     if r["fragmentos"]:
                         # cada vector reescribe su fila: VACUUM deja reusable el lugar de las versiones viejas
                         # (si no, la base crece el doble hasta que Postgres limpie por su cuenta)
+                        conn.commit()   # la última consulta deja una transacción abierta
                         conn.autocommit = True
                         conn.execute("VACUUM fragmentos")
                 restantes -= r["neuronas"]
