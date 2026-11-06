@@ -1706,6 +1706,14 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             if not juris_ia.parece_consulta(q):
                 juris_estado.update(respuesta={"texto": juris_ia.no_es_consulta(q), "citadas": []}, fuentes=[])
                 pintar_respuesta(); page.update(); return
+            # las cuentas de prueba tienen un máximo de preguntas por día
+            try:
+                cuentas.registrar_pregunta(usuario["id"], usuario.get("plan", "activo"))
+            except ValueError as ex:
+                juris_estado.update(respuesta={"texto": str(ex), "citadas": []}, fuentes=[])
+                pintar_respuesta(); page.update(); return
+            except Exception:
+                pass   # si no se puede contar, no se le niega la pregunta
             estado_txt.value = "Buscando en las sentencias…"
             page.update()
 
@@ -1799,30 +1807,73 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
     # ── USUARIOS (solo administradores) ──────────
     def abrir_usuarios():
-        lista = ft.Column(spacing=2, tight=True)
+        lista = ft.Column(spacing=0, tight=True)
+
+        def fila(u):
+            vence = (f"  ·  prueba hasta {time.strftime('%d/%m/%Y', time.localtime(u['prueba_hasta']))}"
+                     if u.get("plan") == "prueba" and u.get("prueba_hasta") else "")
+
+            def plan_cambiado(e, uid=u["id"]):
+                try:
+                    cuentas.cambiar_plan(uid, e.control.value)
+                except ValueError as ex:
+                    snack(str(ex), ok=False); return
+                pintar(); page.update()
+
+            def correo_cambiado(e, uid=u["id"], antes=u.get("email") or ""):
+                nuevo = (e.control.value or "").strip().lower()
+                if nuevo == antes:
+                    return
+                try:
+                    cuentas.asignar_email(uid, nuevo)
+                except ValueError as ex:
+                    snack(str(ex), ok=False); return
+                snack("Correo guardado: con él puede entrar con Google a esta misma cuenta." if nuevo else "Correo quitado.")
+                pintar(); page.update()
+
+            texto = ft.TextStyle(font_family=FONT_BODY, size=13, color=INK)
+            return ft.Container(
+                padding=ft.padding.symmetric(vertical=10), border=ft.border.only(bottom=ft.BorderSide(1, RULE)),
+                content=ft.Column(controls=[
+                    ft.Text(spans=[
+                        ft.TextSpan(u["nombre"] or u["usuario"], ft.TextStyle(weight=ft.FontWeight.W_600)),
+                        ft.TextSpan(f"  ·  {u['usuario']}{'  ·  admin' if u['es_admin'] else ''}{vence}",
+                                    ft.TextStyle(color=INK_SOFT)),
+                    ], size=13, color=INK, font_family=FONT_BODY),
+                    ft.Row(controls=[
+                        ft.Dropdown(value=u.get("plan") or "activo",
+                                    options=[ft.dropdown.Option(p) for p in cuentas.PLANES],
+                                    width=120, dense=True, tooltip="Plan", on_change=plan_cambiado,
+                                    text_style=texto, bgcolor=PAPER, border_color=RULE, focused_border_color=ACCENT,
+                                    disabled=u["id"] == usuario["id"]),
+                        ft.TextField(value=u.get("email") or "", hint_text="correo de Google", dense=True, expand=True,
+                                     text_style=texto, border_color=RULE, focused_border_color=ACCENT,
+                                     cursor_color=ACCENT, on_submit=correo_cambiado, on_blur=correo_cambiado),
+                        ft.Switch(value=bool(u["activo"]), active_color=ACCENT, disabled=u["id"] == usuario["id"],
+                                  tooltip="Activo",
+                                  on_change=lambda e, uid=u["id"]: cuentas.cambiar_activo(uid, e.control.value)),
+                    ], spacing=8),
+                ], spacing=6))
 
         def pintar():
-            lista.controls = [ft.Row(controls=[
-                ft.Text(f"{u['nombre'] or u['usuario']}  ·  {u['usuario']}{'  ·  admin' if u['es_admin'] else ''}",
-                        size=13, color=INK, font_family=FONT_BODY, expand=True),
-                ft.Switch(value=bool(u["activo"]), active_color=ACCENT, disabled=u["id"] == usuario["id"],
-                          tooltip="Activo", on_change=lambda e, uid=u["id"]: cuentas.cambiar_activo(uid, e.control.value)),
-            ]) for u in cuentas.listar_usuarios()]
+            lista.controls = [fila(u) for u in cuentas.listar_usuarios()]
 
         def campo_dialogo(etiqueta, clave=False):
             return ft.TextField(label=etiqueta, password=clave, can_reveal_password=clave, dense=True,
                                 border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT)
 
         tf_usuario, tf_nombre, tf_clave = campo_dialogo("Usuario"), campo_dialogo("Nombre"), campo_dialogo("Contraseña", True)
+        tf_correo = campo_dialogo("Correo de Google (opcional)")
         cb_admin = ft.Checkbox(label="Administrador", value=False, active_color=ACCENT)
 
         def crear(e):
             try:
-                cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", cb_admin.value)
+                cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", cb_admin.value,
+                                      email=tf_correo.value or "")
             except ValueError as ex:
                 snack(str(ex), ok=False); return
             snack(f"Usuario «{tf_usuario.value.strip().lower()}» creado.")
-            tf_usuario.value = tf_nombre.value = tf_clave.value = ""; cb_admin.value = False
+            tf_usuario.value = tf_nombre.value = tf_clave.value = tf_correo.value = ""; cb_admin.value = False
             pintar(); page.update()
 
         pintar()
@@ -1832,7 +1883,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             content=ft.Column(controls=[
                 lista, ft.Divider(color=RULE),
                 ft.Text("NUEVO USUARIO", size=12, weight=ft.FontWeight.W_600, color=INK_SOFT, font_family=FONT_BODY),
-                tf_usuario, tf_nombre, tf_clave, cb_admin,
+                tf_usuario, tf_nombre, tf_clave, tf_correo, cb_admin,
             ], tight=True, scroll=ft.ScrollMode.AUTO, width=420, spacing=8),
             actions=[ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK_SOFT)),
                      ft.ElevatedButton("Crear usuario", on_click=crear, style=ft.ButtonStyle(
@@ -2048,6 +2099,27 @@ CLAVE_SESION = "solicitudes_legales.sesion"
 DIR_SUBIDAS  = "uploads"
 
 
+def proveedor_google():
+    """Entrar con Google (variables GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET); None si no está configurado.
+    En Google Cloud, la URL de redirección autorizada es <dirección de la app>/oauth_callback."""
+    cliente = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    secreto = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    if not (cliente and secreto):
+        return None
+    from flet.auth.oauth_provider import OAuthProvider
+    # Render pone la dirección pública en RENDER_EXTERNAL_URL
+    base = (os.environ.get("APP_URL") or os.environ.get("RENDER_EXTERNAL_URL")
+            or f"http://localhost:{os.environ.get('PORT', 8080)}").rstrip("/")
+    return OAuthProvider(
+        client_id=cliente, client_secret=secreto,
+        authorization_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
+        token_endpoint="https://oauth2.googleapis.com/token",
+        redirect_url=f"{base}/oauth_callback",
+        user_scopes=["openid", "email", "profile"],
+        user_endpoint="https://openidconnect.googleapis.com/v1/userinfo",
+        user_id_fn=lambda u: u["sub"])
+
+
 def pantalla_login(page: ft.Page, al_entrar):
     """Formulario de entrada; la primera vez permite crear el administrador."""
     try:
@@ -2065,27 +2137,69 @@ def pantalla_login(page: ft.Page, al_entrar):
                             border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=PAPER,
                             text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK))
 
-    error = ft.Text("", size=13, color=PDF_COLOR, font_family=FONT_BODY)
+    error = ft.Text("", size=13, color=PDF_COLOR, font_family=FONT_BODY, visible=False)   # solo ocupa lugar con texto
+
+    def avisar(texto, es_error=True):
+        # la base gratis tarda unos segundos en despertar: sin aviso parece que el botón no hace nada
+        error.value, error.color, error.visible = texto, (PDF_COLOR if es_error else INK_SOFT), bool(texto)
+        page.update()
 
     def entrar(e=None):
+        avisar("Un momento…", es_error=False)
         try:
             r = cuentas.iniciar_sesion(tf_usuario.value or "", tf_clave.value or "")
         except Exception as ex:
-            error.value = f"No se pudo conectar: {ex}"; page.update(); return
+            avisar(f"No se pudo conectar: {ex}"); return
         if not r:
-            error.value = "Usuario o contraseña incorrectos."; page.update(); return
+            avisar("Usuario o contraseña incorrectos."); return
         al_entrar(*r)
 
     def crear_admin(e=None):
         if pide_codigo and (not codigo_instalacion or (tf_codigo.value or "").strip() != codigo_instalacion):
-            error.value = "Código de instalación incorrecto."; page.update(); return
+            avisar("Código de instalación incorrecto."); return
         if (tf_clave.value or "") != (tf_clave2.value or ""):
-            error.value = "Las contraseñas no coinciden."; page.update(); return
+            avisar("Las contraseñas no coinciden."); return
+        avisar("Creando la cuenta…", es_error=False)
         try:
             cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", es_admin=True)
         except ValueError as ex:
-            error.value = str(ex); page.update(); return
+            avisar(str(ex)); return
+        except Exception as ex:
+            avisar(f"No se pudo conectar: {ex}"); return
         entrar()
+
+    # Entrar con Google: la primera vez crea la cuenta en plan de prueba; después entra a la misma cuenta
+    google = None if primera_vez else proveedor_google()
+    otro_enlace = ft.TextButton("¿No se abrió Google? Toque aquí", visible=False, url_target=ft.UrlTarget.BLANK,
+                                style=ft.ButtonStyle(color=INK_SOFT))
+
+    def con_google(e):
+        def abrir(url):
+            # si el navegador bloquea la ventana, queda el enlace para abrirla con un toque
+            otro_enlace.url, otro_enlace.visible = url, True
+            page.launch_url(url, web_window_name="flet_oauth_signin", web_popup_window=True)
+            avisar("Elija su cuenta de Google en la ventana que se abrió…", es_error=False)
+        try:
+            page.login(google, on_open_authorization_url=abrir)
+        except Exception as ex:
+            avisar(f"No se pudo abrir Google: {ex}")
+
+    def al_volver_de_google(e):
+        if e.error:
+            avisar("No se completó la entrada con Google. Intente otra vez."); return
+        datos = dict(page.auth.user) if page.auth and page.auth.user else {}
+        avisar("Un momento…", es_error=False)
+        try:
+            r = cuentas.entrar_con_google(datos.get("email", ""), datos.get("name", ""),
+                                          bool(datos.get("email_verified")))
+        except ValueError as ex:
+            avisar(str(ex)); return
+        except Exception as ex:
+            avisar(f"No se pudo conectar: {ex}"); return
+        al_entrar(*r)
+
+    if google:
+        page.on_login = al_volver_de_google
 
     tf_usuario = campo("Usuario")
     tf_clave   = campo("Contraseña", True, crear_admin if primera_vez else entrar)
@@ -2096,28 +2210,69 @@ def pantalla_login(page: ft.Page, al_entrar):
         campos = [tf_nombre, tf_usuario, tf_clave, tf_clave2, *([tf_codigo] if pide_codigo else [])]
         boton = ("Crear y entrar", crear_admin)
         if pide_codigo and not codigo_instalacion:
-            error.value = "Falta la variable CODIGO_INSTALACION en el servidor para crear el administrador."
+            error.value, error.visible = "Falta la variable CODIGO_INSTALACION en el servidor para crear el administrador.", True
     else:
         titulo, sub = "Iniciar sesión", "Entre con su usuario y contraseña."
         campos = [tf_usuario, tf_clave]
         boton = ("Entrar", entrar)
+
+    boton_principal = ft.ElevatedButton(boton[0], on_click=boton[1], width=360, style=ft.ButtonStyle(
+        bgcolor=PANEL_INK, color=PAPER, shape=ft.RoundedRectangleBorder(radius=4),
+        padding=ft.padding.symmetric(vertical=16)))
+
+    if google:
+        # Para los clientes, Google va primero; el usuario y la contraseña quedan plegados
+        sub = "Entre con su cuenta de Google."
+        formulario = ft.Column(controls=[*campos, boton_principal], spacing=12, visible=False)
+
+        def mostrar_formulario(e):
+            formulario.visible = not formulario.visible
+            enlace_clave.text = ("Ocultar usuario y contraseña" if formulario.visible
+                                 else "Entrar con usuario y contraseña")
+            page.update()
+
+        enlace_clave = ft.TextButton("Entrar con usuario y contraseña", on_click=mostrar_formulario,
+                                     style=ft.ButtonStyle(color=INK_SOFT))
+        cuerpo = [
+            ft.OutlinedButton(
+                content=ft.Row(controls=[
+                    ft.Image(src="/google_g.svg", width=20, height=20),
+                    ft.Text("Continuar con Google", size=15, weight=ft.FontWeight.W_500, color="#1F1F1F",
+                            font_family=FONT_BODY),
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=12),
+                on_click=con_google, width=360,
+                style=ft.ButtonStyle(bgcolor="#FFFFFF", side=ft.BorderSide(1, "#747775"),
+                                     shape=ft.RoundedRectangleBorder(radius=20),
+                                     padding=ft.padding.symmetric(vertical=16))),
+            otro_enlace,
+            ft.Container(
+                content=ft.Row(controls=[
+                    ft.Icon(ft.Icons.CARD_GIFTCARD_OUTLINED, size=18, color=ACCENT),
+                    ft.Text(f"¿Primera vez? Se crea su cuenta sola, con {cuentas.DIAS_PRUEBA} días de prueba gratis.",
+                            size=13, color=INK, font_family=FONT_BODY, expand=True),
+                ], spacing=10),
+                bgcolor=SURFACE, border_radius=4, padding=ft.padding.symmetric(horizontal=12, vertical=10)),
+            error,
+            ft.Container(height=1, bgcolor=RULE, margin=ft.margin.only(top=4)),
+            ft.Row(controls=[enlace_clave], alignment=ft.MainAxisAlignment.CENTER),
+            formulario,
+        ]
+    else:
+        cuerpo = [*campos, error, boton_principal]
 
     page.add(ft.Container(
         alignment=ft.alignment.center, padding=ft.padding.symmetric(horizontal=16, vertical=60),
         content=ft.Container(
             width=420, bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=6,
             padding=ft.padding.all(28),
+            shadow=ft.BoxShadow(blur_radius=24, spread_radius=0, color="#14000000", offset=ft.Offset(0, 6)),
             content=ft.Column(controls=[
                 ft.Text("DEPARTAMENTO LEGAL", size=12, color=ACCENT_TEXT, font_family=FONT_BODY),
                 ft.Text("Automatización Legal", size=28, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
                 ft.Container(height=1, bgcolor=RULE, margin=ft.margin.symmetric(vertical=8)),
                 ft.Text(titulo, size=20, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
                 ft.Text(sub, size=13, color=INK_SOFT, font_family=FONT_BODY),
-                *campos,
-                error,
-                ft.ElevatedButton(boton[0], on_click=boton[1], width=360, style=ft.ButtonStyle(
-                    bgcolor=PANEL_INK, color=PAPER, shape=ft.RoundedRectangleBorder(radius=4),
-                    padding=ft.padding.symmetric(vertical=16))),
+                *cuerpo,
             ], spacing=12, tight=True),
         ),
     ))

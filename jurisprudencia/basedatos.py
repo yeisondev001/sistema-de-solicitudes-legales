@@ -23,8 +23,10 @@ _todas = list(dict.fromkeys(_cadenas(os.environ.get("JURIS_DATABASE_URL", ""))
                             + _cadenas(os.environ.get("JURIS_ARCHIVO_URLS", ""))))
 JURIS_DATABASE_URL = _todas[0] if _todas else ""
 JURIS_ARCHIVO_URLS = _todas[1:]
-LIMITE_MB = int(os.environ.get("JURIS_LIMITE_MB", "870"))   # Neon gratis: 1 GB por proyecto
+LIMITE_MB = int(os.environ.get("JURIS_LIMITE_MB", "850"))   # Neon gratis: 1 GB por proyecto
 RESERVA_MB = 200    # en la principal se deja lugar para los documentos que suben los usuarios
+VECTOR_KB = 2.5     # lo que ocupa cada vector cuando se calcule (halfvec de 1024 + su índice)
+MARGEN_MES_MB = 80  # un mes del Boletín con sus vectores ocupa hasta ~70 MB
 
 _DDL = [
     # quita tildes para que "casación" y "casacion" coincidan (sin depender de extensiones)
@@ -136,6 +138,17 @@ def tamano_mb(conn) -> float:
     with conn.cursor() as cur:
         cur.execute("SELECT pg_database_size(current_database())")
         return cur.fetchone()[0] / 2 ** 20
+
+
+def tamano_final_mb(conn) -> float:
+    """Lo que va a ocupar la base cuando tenga todos sus vectores: los vectores se calculan
+    días después de cargar el texto, así que hay que contar su lugar desde el principio."""
+    pendientes = 0
+    if vector_tipo(conn):
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM fragmentos WHERE emb IS NULL")
+            pendientes = cur.fetchone()[0]
+    return tamano_mb(conn) + pendientes * VECTOR_KB / 1024
 
 
 def limite_mb(url: str) -> float:

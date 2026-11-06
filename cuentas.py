@@ -3,15 +3,26 @@ Cuentas de usuario y sesiones
 =============================
 Misma base que el historial: PostgreSQL (DATABASE_URL) o SQLite local.
 Las contraseñas se guardan con scrypt (nunca en texto plano).
+
+Se entra con usuario y contraseña (cuentas que crea el administrador) o con Google.
+Quien entra con Google por primera vez queda en plan "prueba": unos días y un máximo
+de preguntas por día. El administrador cambia el plan desde el panel de usuarios:
+  beta     sin límites y sin cobro (primeros usuarios que prueban la app)
+  prueba   PRUEBA_DIAS días y PRUEBA_PREGUNTAS_DIA preguntas por día
+  activo   cliente que paga, sin límites
+  vencido  no puede entrar
 """
 
-import hashlib, hmac, os, secrets, sqlite3, time
+import hashlib, hmac, os, re, secrets, sqlite3, time
 
 from historial import DATABASE_URL, SQLITE_PATH
 
 DURACION_SESION = 30 * 24 * 3600   # 30 días
 # En el servidor (Neon) la página es pública: contraseñas largas. En local se permiten cortas para probar.
 MIN_CLAVE = 8 if DATABASE_URL else 3
+PLANES = ("beta", "prueba", "activo", "vencido")
+DIAS_PRUEBA = int(os.environ.get("PRUEBA_DIAS", "14"))
+PREGUNTAS_PRUEBA = int(os.environ.get("PRUEBA_PREGUNTAS_DIA", "20"))
 
 _DDL = {
     "postgres": [
@@ -43,6 +54,31 @@ _DDL = {
             vence INTEGER NOT NULL)""",
     ],
 }
+# Columnas agregadas después (las bases ya creadas se actualizan solas)
+_MIGRACIONES = {
+    "postgres": [
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email TEXT",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'activo'",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS prueba_hasta BIGINT",
+        "CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email ON usuarios (lower(email))",
+        """CREATE TABLE IF NOT EXISTS uso (
+            usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            dia TEXT NOT NULL,
+            preguntas INT NOT NULL DEFAULT 0,
+            PRIMARY KEY (usuario_id, dia))""",
+    ],
+    "sqlite": [
+        "ALTER TABLE usuarios ADD COLUMN email TEXT",
+        "ALTER TABLE usuarios ADD COLUMN plan TEXT NOT NULL DEFAULT 'activo'",
+        "ALTER TABLE usuarios ADD COLUMN prueba_hasta INTEGER",
+        "CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email ON usuarios (lower(email))",
+        """CREATE TABLE IF NOT EXISTS uso (
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            dia TEXT NOT NULL,
+            preguntas INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (usuario_id, dia))""",
+    ],
+}
 _tablas_listas = False
 
 
@@ -59,6 +95,11 @@ def _ejecutar(sql: str, params=(), leer=False):
         if not _tablas_listas:
             for ddl in _DDL[motor]:
                 cur.execute(ddl)
+            for m in _MIGRACIONES[motor]:
+                try:
+                    cur.execute(m)
+                except sqlite3.OperationalError:
+                    pass   # SQLite no tiene ADD COLUMN IF NOT EXISTS: la columna ya estaba
             _tablas_listas = True
         cur.execute(sql, params)
         filas = None
@@ -87,14 +128,32 @@ def _verificar(clave: str, guardado: str) -> bool:
 
 def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
-            "es_admin": bool(u["es_admin"])}
+            "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": u.get("plan") or "activo"}
+
+
+def _bloqueo(u: dict):
+    """Motivo por el que la cuenta no puede entrar, o None si puede."""
+    if not u["activo"]:
+        return "Su cuenta está desactivada. Escríbanos para reactivarla."
+    if u.get("plan") == "vencido":
+        return "Su acceso terminó. Escríbanos para activar su cuenta."
+    if u.get("plan") == "prueba" and u.get("prueba_hasta") and u["prueba_hasta"] < time.time():
+        return "Su prueba gratis terminó. Escríbanos para activar su cuenta."
+    return None
+
+
+def _nueva_sesion(usuario_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    _ejecutar("INSERT INTO sesiones (token, usuario_id, vence) VALUES (%s, %s, %s)",
+              (token, usuario_id, int(time.time()) + DURACION_SESION))
+    return token
 
 
 def hay_usuarios() -> bool:
     return _ejecutar("SELECT COUNT(*) AS n FROM usuarios", leer=True)[0]["n"] > 0
 
 
-def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = False):
+def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = False, email: str = ""):
     usuario = usuario.strip().lower()
     if len(usuario) < 3:
         raise ValueError("El usuario debe tener al menos 3 caracteres.")
@@ -102,12 +161,14 @@ def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = F
         raise ValueError(f"La contraseña debe tener al menos {MIN_CLAVE} caracteres.")
     if _ejecutar("SELECT id FROM usuarios WHERE usuario = %s", (usuario,), leer=True):
         raise ValueError(f'El usuario "{usuario}" ya existe.')
-    _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, es_admin) VALUES (%s, %s, %s, %s)",
-              (usuario, nombre.strip(), _hash(clave), es_admin))
+    email = _validar_email(email) if email.strip() else None
+    _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, es_admin, email) VALUES (%s, %s, %s, %s, %s)",
+              (usuario, nombre.strip(), _hash(clave), es_admin, email))
 
 
 def listar_usuarios() -> list:
-    return _ejecutar("SELECT id, usuario, nombre, es_admin, activo FROM usuarios ORDER BY id", leer=True)
+    return _ejecutar("SELECT id, usuario, nombre, es_admin, activo, email, plan, prueba_hasta "
+                     "FROM usuarios ORDER BY id", leer=True)
 
 
 def cambiar_activo(usuario_id: int, activo: bool):
@@ -116,15 +177,83 @@ def cambiar_activo(usuario_id: int, activo: bool):
         _ejecutar("DELETE FROM sesiones WHERE usuario_id = %s", (usuario_id,))
 
 
+def cambiar_plan(usuario_id: int, plan: str):
+    """Pasar a "prueba" vuelve a dar PRUEBA_DIAS días desde hoy."""
+    if plan not in PLANES:
+        raise ValueError(f"Plan desconocido: {plan}")
+    if plan == "prueba":
+        _ejecutar("UPDATE usuarios SET plan = %s, prueba_hasta = %s WHERE id = %s",
+                  (plan, int(time.time()) + DIAS_PRUEBA * 86400, usuario_id))
+    else:
+        _ejecutar("UPDATE usuarios SET plan = %s WHERE id = %s", (plan, usuario_id))
+    if plan == "vencido":
+        _ejecutar("DELETE FROM sesiones WHERE usuario_id = %s", (usuario_id,))
+
+
+def _validar_email(email: str) -> str:
+    email = email.strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[a-z]{2,}", email):
+        raise ValueError(f"«{email}» no parece un correo.")
+    return email
+
+
+def asignar_email(usuario_id: int, email: str):
+    """Enlaza un correo a una cuenta: con él puede entrar con Google a esa misma cuenta."""
+    email = _validar_email(email) if email.strip() else None
+    if email and _ejecutar("SELECT id FROM usuarios WHERE lower(email) = %s AND id <> %s",
+                           (email, usuario_id), leer=True):
+        raise ValueError(f"El correo {email} ya está en otra cuenta.")
+    _ejecutar("UPDATE usuarios SET email = %s WHERE id = %s", (email, usuario_id))
+
+
 def iniciar_sesion(usuario: str, clave: str):
     """Devuelve (usuario, token) si la clave es correcta; si no, None."""
     filas = _ejecutar("SELECT * FROM usuarios WHERE usuario = %s", (usuario.strip().lower(),), leer=True)
-    if not filas or not filas[0]["activo"] or not _verificar(clave, filas[0]["clave"]):
+    if not filas or _bloqueo(filas[0]) or not _verificar(clave, filas[0]["clave"]):
         return None
-    token = secrets.token_urlsafe(32)
-    _ejecutar("INSERT INTO sesiones (token, usuario_id, vence) VALUES (%s, %s, %s)",
-              (token, filas[0]["id"], int(time.time()) + DURACION_SESION))
-    return _limpio(filas[0]), token
+    return _limpio(filas[0]), _nueva_sesion(filas[0]["id"])
+
+
+def _usuario_libre(base: str) -> str:
+    base = re.sub(r"[^a-z0-9._-]", "", base.lower())[:30] or "usuario"
+    base = base if len(base) >= 3 else f"{base}-g"
+    nombre, n = base, 1
+    while _ejecutar("SELECT id FROM usuarios WHERE usuario = %s", (nombre,), leer=True):
+        n += 1
+        nombre = f"{base}{n}"
+    return nombre
+
+
+def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
+    """Entra con la cuenta de Google; la primera vez la registra en plan "prueba".
+    Devuelve (usuario, token); si no puede entrar, ValueError con el motivo."""
+    email = (email or "").strip().lower()
+    if not email or not verificado:
+        raise ValueError("Google no confirmó el correo de esta cuenta.")
+    filas = _ejecutar("SELECT * FROM usuarios WHERE lower(email) = %s", (email,), leer=True)
+    if not filas:
+        # clave vacía: estas cuentas no pueden entrar con contraseña, solo con Google
+        _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, email, plan, prueba_hasta) "
+                  "VALUES (%s, %s, %s, %s, %s, %s)",
+                  (_usuario_libre(email.split("@")[0]), (nombre or "").strip(), "", email, "prueba",
+                   int(time.time()) + DIAS_PRUEBA * 86400))
+        filas = _ejecutar("SELECT * FROM usuarios WHERE lower(email) = %s", (email,), leer=True)
+    motivo = _bloqueo(filas[0])
+    if motivo:
+        raise ValueError(motivo)
+    return _limpio(filas[0]), _nueva_sesion(filas[0]["id"])
+
+
+def registrar_pregunta(usuario_id: int, plan: str):
+    """Cuenta la pregunta del día. En plan "prueba" hay un máximo diario: ValueError si se pasa."""
+    dia = time.strftime("%Y-%m-%d")
+    if plan == "prueba":
+        filas = _ejecutar("SELECT preguntas FROM uso WHERE usuario_id = %s AND dia = %s", (usuario_id, dia), leer=True)
+        if filas and filas[0]["preguntas"] >= PREGUNTAS_PRUEBA:
+            raise ValueError(f"Llegó al máximo de {PREGUNTAS_PRUEBA} preguntas por día de la prueba gratis. "
+                             "Mañana puede seguir, o escríbanos para activar su cuenta.")
+    _ejecutar("INSERT INTO uso (usuario_id, dia, preguntas) VALUES (%s, %s, 1) "
+              "ON CONFLICT (usuario_id, dia) DO UPDATE SET preguntas = uso.preguntas + 1", (usuario_id, dia))
 
 
 def usuario_de_sesion(token: str):
@@ -132,9 +261,8 @@ def usuario_de_sesion(token: str):
         return None
     filas = _ejecutar(
         "SELECT u.* FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id "
-        "WHERE s.token = %s AND s.vence > %s AND u.activo = %s",
-        (token, int(time.time()), True), leer=True)
-    return _limpio(filas[0]) if filas else None
+        "WHERE s.token = %s AND s.vence > %s", (token, int(time.time())), leer=True)
+    return _limpio(filas[0]) if filas and not _bloqueo(filas[0]) else None
 
 
 def cerrar_sesion(token: str):

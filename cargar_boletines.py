@@ -67,10 +67,11 @@ def borrar_viejos(urls: list, desde: tuple) -> list:
 
 
 def elegir_base(orden: list, liberadas: list):
-    """Primera base que no pasó su límite; si todas están llenas, una que acaba de liberar espacio."""
+    """Primera base donde cabe un mes más contando los vectores que faltan; si todas están
+    llenas, una que acaba de liberar espacio."""
     for url in orden:
         with basedatos.conectar(url) as conn:
-            if basedatos.tamano_mb(conn) < basedatos.limite_mb(url):
+            if basedatos.tamano_final_mb(conn) + basedatos.MARGEN_MES_MB <= basedatos.limite_mb(url):
                 return url
     return liberadas.pop(0) if liberadas else None
 
@@ -95,7 +96,8 @@ def main():
     for i, url in enumerate(urls):
         with basedatos.conectar(url) as conn:
             tipo = basedatos.vector_tipo(conn)
-            print(f"Base {_nombre(i)}: {basedatos.tamano_mb(conn):.0f} MB de {basedatos.limite_mb(url):.0f}, "
+            print(f"Base {_nombre(i)}: {basedatos.tamano_mb(conn):.0f} MB "
+                  f"({basedatos.tamano_final_mb(conn):.0f} MB con todos los vectores) de {basedatos.limite_mb(url):.0f}, "
                   f"vectores {tipo or 'no disponibles'}"
                   + (" con índice binario" if basedatos.indice_binario(conn) else ""))
 
@@ -179,7 +181,8 @@ def main():
                             "SELECT COUNT(*), 0, 0, 0 FROM fragmentos")
                 total, con_vector, tierras, tierras_con = cur.fetchone()
                 print(f"Base {_nombre(i)}: {hechos[i]} vectores nuevos; {con_vector} de {total} fragmentos con "
-                      f"vector (Tierras e Inmobiliario: {tierras_con} de {tierras}), {basedatos.tamano_mb(conn):.0f} MB")
+                      f"vector (Tierras e Inmobiliario: {tierras_con} de {tierras}), {basedatos.tamano_mb(conn):.0f} MB "
+                      f"({basedatos.tamano_final_mb(conn):.0f} MB con todos los vectores)")
 
 
 if __name__ == "__main__":

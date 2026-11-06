@@ -94,6 +94,9 @@ En GitHub corre solo todos los días (`.github/workflows/boletines.yml`). Necesi
 | `CF_ACCOUNT_ID`, `CF_API_TOKEN` | Cloudflare Workers AI: vectores de significado y reemplazo de la IA cuando Groq se llena. Sin ellas la búsqueda es solo por palabras |
 | `EMB_MODELO`, `CF_MODELO_TEXTO` | Opcional: modelos de Cloudflare (por defecto `@cf/qwen/qwen3-embedding-0.6b` y `@cf/openai/gpt-oss-120b`) |
 | `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Opcional: botón "Continuar con Google". En Google Cloud, la URL de redirección es `<dirección de la app>/oauth_callback`. Quien entra por primera vez queda en plan de prueba |
+| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (14) y preguntas por día (20) |
+| `APP_URL` | Opcional: dirección pública de la app para Google (en Render se toma sola de `RENDER_EXTERNAL_URL`) |
 | `FLET_SECRET_KEY` | Opcional: firma de las subidas de archivos (si falta, se genera una al arrancar) |
 
 ## Inicio rápido
