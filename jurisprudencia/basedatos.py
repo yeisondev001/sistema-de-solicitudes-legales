@@ -25,7 +25,9 @@ JURIS_DATABASE_URL = _todas[0] if _todas else ""
 JURIS_ARCHIVO_URLS = _todas[1:]
 LIMITE_MB = int(os.environ.get("JURIS_LIMITE_MB", "850"))   # Neon gratis: 1 GB por proyecto
 RESERVA_MB = 200    # en la principal se deja lugar para los documentos que suben los usuarios
-VECTOR_KB = 2.5     # lo que ocupa cada vector cuando se calcule (halfvec de 1024 + su índice)
+# lo que ocupa cada vector cuando se calcule: halfvec de 1024 + su índice ≈ 2,5 KB, pero al guardarlo
+# se reescribe la fila y la vieja queda ocupando lugar hasta el VACUUM (medido en Neon: ~5 KB sin VACUUM)
+VECTOR_KB = 3.5
 MARGEN_MES_MB = 80  # un mes del Boletín con sus vectores ocupa hasta ~70 MB
 
 _DDL = [

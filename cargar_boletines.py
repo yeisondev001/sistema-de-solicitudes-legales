@@ -166,6 +166,11 @@ def main():
                     break
                 with basedatos.conectar(url) as conn:
                     r = vectorizar_pendientes(conn, max_neuronas=restantes, solo_prioritarios=solo_prioritarios)
+                    if r["fragmentos"]:
+                        # cada vector reescribe su fila: VACUUM deja reusable el lugar de las versiones viejas
+                        # (si no, la base crece el doble hasta que Postgres limpie por su cuenta)
+                        conn.autocommit = True
+                        conn.execute("VACUUM fragmentos")
                 restantes -= r["neuronas"]
                 hechos[i] += r["fragmentos"]
                 if r["agotado"]:
