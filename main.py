@@ -506,7 +506,10 @@ def nota_descarga():
 # ══════════════════════════════════════════════════
 def app_principal(page: ft.Page, usuario: dict, salir):
     hoy = date.today()
-    plantilla = {"actual": "informe"}
+    # las plantillas de solicitudes son solo para las cuentas que las tienen activadas; las demás
+    # (clientes que entran con Google) ven directamente la jurisprudencia
+    con_plantillas = usuario.get("plantillas", False)
+    plantilla = {"actual": "informe" if con_plantillas else "jurisprudencia"}
 
     # ── VALORES POR DEFECTO DE FORMULARIOS ───────
     form_informe = {
@@ -1707,15 +1710,17 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         def burbuja_asistente(turno):
             partes = [ft.Markdown(turno["texto"], selectable=True, md_style_sheet=texto_md,
                                   extension_set=ft.MarkdownExtensionSet.GITHUB_WEB)]
-            fuentes = turno.get("fuentes") or []
-            if fuentes:
-                citadas = set(turno.get("citadas", []))
+            citadas = set(turno.get("citadas", []))
+            # si respondió la IA se muestran solo las sentencias que citó; si no, todas las encontradas
+            lista = [(n, f) for n, f in enumerate(turno.get("fuentes") or [], start=1)
+                     if n in citadas or not turno.get("ia")]
+            if lista:
+                titulo = (("Ver la sentencia citada" if len(lista) == 1 else f"Ver las {len(lista)} sentencias citadas")
+                          if citadas else f"Ver las {len(lista)} sentencias encontradas")
                 partes.append(ft.ExpansionTile(
-                    title=ft.Text(f"Ver las {len(fuentes)} sentencias consultadas", size=13, weight=ft.FontWeight.W_600,
-                                  color=INK_SOFT, font_family=FONT_BODY),
+                    title=ft.Text(titulo, size=13, weight=ft.FontWeight.W_600, color=INK_SOFT, font_family=FONT_BODY),
                     leading=ft.Icon(ft.Icons.MENU_BOOK_OUTLINED, size=18, color=ACCENT),
-                    controls=[ft.Column(controls=[tarjeta_fuente(n, f, n in citadas)
-                                                  for n, f in enumerate(fuentes, start=1)], spacing=8)],
+                    controls=[ft.Column(controls=[tarjeta_fuente(n, f, n in citadas) for n, f in lista], spacing=8)],
                     tile_padding=ft.padding.all(0), icon_color=INK_SOFT, collapsed_icon_color=INK_SOFT,
                     shape=ft.RoundedRectangleBorder(radius=4), collapsed_shape=ft.RoundedRectangleBorder(radius=4)))
             return ft.Column(controls=[
@@ -1804,13 +1809,13 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                             avance("Analizando las sentencias…")
                             try:
                                 r = juris_ia.responder(q, fuentes, juris_buscar.referencia, historial)
-                                turno.update(texto=r["texto"], citadas=r["citadas"])
+                                turno.update(texto=r["texto"], citadas=r["citadas"], ia=True)
                             except juris_ia.LimiteAlcanzado:
                                 turno["texto"] = ("_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto. "
                                                   "Mientras tanto, abajo están las sentencias encontradas._")
                         else:
-                            turno["texto"] = ("_La IA no está configurada (IA_API_KEY): abajo están las sentencias "
-                                              "encontradas._")
+                            turno["texto"] = (f"_La IA no está disponible en el servidor (claves: {juris_ia.estado()}). "
+                                              "Abajo están las sentencias encontradas._")
                 except Exception as ex:
                     turno["texto"] = f"No pude completar la consulta: {ex}"
                 chat.append(turno)
@@ -1897,6 +1902,10 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                 snack("Correo guardado: con él puede entrar con Google a esta misma cuenta." if nuevo else "Correo quitado.")
                 pintar(); page.update()
 
+            def plantillas_cambiadas(e, uid=u["id"]):
+                cuentas.cambiar_plantillas(uid, e.control.value)
+                snack("Listo: se aplica cuando esa persona vuelva a entrar.")
+
             texto = ft.TextStyle(font_family=FONT_BODY, size=13, color=INK)
             return ft.Container(
                 padding=ft.padding.symmetric(vertical=10), border=ft.border.only(bottom=ft.BorderSide(1, RULE)),
@@ -1919,6 +1928,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                                   tooltip="Activo",
                                   on_change=lambda e, uid=u["id"]: cuentas.cambiar_activo(uid, e.control.value)),
                     ], spacing=8),
+                    ft.Checkbox(label="Ve las plantillas de solicitudes", value=bool(u.get("plantillas")),
+                                active_color=ACCENT, label_style=texto, on_change=plantillas_cambiadas),
                 ], spacing=6))
 
         def pintar():
@@ -1930,16 +1941,20 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
         tf_usuario, tf_nombre, tf_clave = campo_dialogo("Usuario"), campo_dialogo("Nombre"), campo_dialogo("Contraseña", True)
         tf_correo = campo_dialogo("Correo de Google (opcional)")
-        cb_admin = ft.Checkbox(label="Administrador", value=False, active_color=ACCENT)
+        estilo_casilla = ft.TextStyle(font_family=FONT_BODY, size=14, color=INK)
+        cb_admin = ft.Checkbox(label="Administrador", value=False, active_color=ACCENT, label_style=estilo_casilla)
+        cb_plantillas = ft.Checkbox(label="Ve las plantillas de solicitudes", value=False, active_color=ACCENT,
+                                    label_style=estilo_casilla)
 
         def crear(e):
             try:
                 cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", cb_admin.value,
-                                      email=tf_correo.value or "")
+                                      email=tf_correo.value or "", plantillas=cb_plantillas.value)
             except ValueError as ex:
                 snack(str(ex), ok=False); return
             snack(f"Usuario «{tf_usuario.value.strip().lower()}» creado.")
-            tf_usuario.value = tf_nombre.value = tf_clave.value = tf_correo.value = ""; cb_admin.value = False
+            tf_usuario.value = tf_nombre.value = tf_clave.value = tf_correo.value = ""
+            cb_admin.value = cb_plantillas.value = False
             pintar(); page.update()
 
         pintar()
@@ -1949,7 +1964,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             content=ft.Column(controls=[
                 lista, ft.Divider(color=RULE),
                 ft.Text("NUEVO USUARIO", size=12, weight=ft.FontWeight.W_600, color=INK_SOFT, font_family=FONT_BODY),
-                tf_usuario, tf_nombre, tf_clave, tf_correo, cb_admin,
+                tf_usuario, tf_nombre, tf_clave, tf_correo, cb_admin, cb_plantillas,
             ], tight=True, scroll=ft.ScrollMode.AUTO, width=420, spacing=8),
             actions=[ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK_SOFT)),
                      ft.ElevatedButton("Crear usuario", on_click=crear, style=ft.ButtonStyle(
@@ -1978,7 +1993,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
     tabs_row = ft.Row(controls=[], spacing=2, scroll=ft.ScrollMode.AUTO)
 
     def ir_a(key):
-        plantilla["actual"] = key
+        plantilla["actual"] = key if con_plantillas else "jurisprudencia"
         rebuild_form(); rebuild_tabs(); page.update()
 
     def on_arrow_click(e):
@@ -2046,9 +2061,9 @@ def app_principal(page: ft.Page, usuario: dict, salir):
     )
 
     def rebuild_tabs():
-        tabs_row.controls = [tab_btn(k) for k in KEYS]
+        tabs_row.controls = [tab_btn(k) for k in KEYS] if con_plantillas else []
         tabs_row.scroll   = None if pestanas_llenan["si"] else ft.ScrollMode.AUTO
-        scroll_hint.visible = not pestanas_llenan["si"] and plantilla["actual"] != KEYS[-1]
+        scroll_hint.visible = con_plantillas and not pestanas_llenan["si"] and plantilla["actual"] != KEYS[-1]
         for clave, boton in (("historial", historial_btn), ("jurisprudencia", juris_btn)):
             activo = plantilla["actual"] == clave
             boton.bgcolor = PAPER if activo else ACCENT
@@ -2118,12 +2133,13 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                     ft.Text("DEPARTAMENTO LEGAL", size=12, color=RULE, font_family=FONT_BODY),
                     titulo_app,
                 ], spacing=0, tight=True, expand=True),
-                ft.Row(controls=[juris_btn, historial_btn, menu_usuario], spacing=8, tight=True),
+                ft.Row(controls=[*([juris_btn, historial_btn] if con_plantillas else []), menu_usuario],
+                       spacing=8, tight=True),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Row(controls=[
                 ft.Container(content=tabs_row, expand=True),
                 scroll_hint,
-            ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.END),
+            ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.END, visible=con_plantillas),
         ], spacing=8),
         bgcolor=PANEL_INK,
         border=ft.border.only(bottom=ft.BorderSide(3, ACCENT)),
@@ -2155,7 +2171,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
     ajustar_ancho()
 
     page.add(ft.Column(controls=[topbar, contenido], spacing=0, expand=True))
-    actualizar_contador()
+    if con_plantillas:
+        actualizar_contador()
 
 
 # ══════════════════════════════════════════════════
@@ -2227,7 +2244,8 @@ def pantalla_login(page: ft.Page, al_entrar):
             avisar("Las contraseñas no coinciden."); return
         avisar("Creando la cuenta…", es_error=False)
         try:
-            cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", es_admin=True)
+            cuentas.crear_usuario(tf_usuario.value or "", tf_clave.value or "", tf_nombre.value or "", es_admin=True,
+                                  plantillas=True)
         except ValueError as ex:
             avisar(str(ex)); return
         except Exception as ex:
@@ -2399,4 +2417,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     os.environ.setdefault("FLET_SECRET_KEY", secrets.token_hex(32))   # firma las URLs de subida
     pathlib.Path(DIR_SUBIDAS).mkdir(exist_ok=True)
+    print(f"IA: {juris_ia.estado()}", flush=True)
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, assets_dir="assets", upload_dir=DIR_SUBIDAS)

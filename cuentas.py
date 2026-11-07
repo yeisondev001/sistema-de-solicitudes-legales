@@ -66,6 +66,9 @@ _MIGRACIONES = {
             dia TEXT NOT NULL,
             preguntas INT NOT NULL DEFAULT 0,
             PRIMARY KEY (usuario_id, dia))""",
+        # las plantillas quedan para las cuentas que ya las usaban; las nuevas las tienen apagadas
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS plantillas BOOLEAN",
+        "UPDATE usuarios SET plantillas = (plan = 'activo') WHERE plantillas IS NULL",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -77,6 +80,8 @@ _MIGRACIONES = {
             dia TEXT NOT NULL,
             preguntas INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (usuario_id, dia))""",
+        "ALTER TABLE usuarios ADD COLUMN plantillas INTEGER",
+        "UPDATE usuarios SET plantillas = (plan = 'activo') WHERE plantillas IS NULL",
     ],
 }
 _tablas_listas = False
@@ -128,7 +133,8 @@ def _verificar(clave: str, guardado: str) -> bool:
 
 def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
-            "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": u.get("plan") or "activo"}
+            "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": u.get("plan") or "activo",
+            "plantillas": bool(u.get("plantillas"))}
 
 
 def _bloqueo(u: dict):
@@ -153,7 +159,8 @@ def hay_usuarios() -> bool:
     return _ejecutar("SELECT COUNT(*) AS n FROM usuarios", leer=True)[0]["n"] > 0
 
 
-def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = False, email: str = ""):
+def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = False, email: str = "",
+                  plantillas: bool = False):
     usuario = usuario.strip().lower()
     if len(usuario) < 3:
         raise ValueError("El usuario debe tener al menos 3 caracteres.")
@@ -162,12 +169,12 @@ def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = F
     if _ejecutar("SELECT id FROM usuarios WHERE usuario = %s", (usuario,), leer=True):
         raise ValueError(f'El usuario "{usuario}" ya existe.')
     email = _validar_email(email) if email.strip() else None
-    _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, es_admin, email) VALUES (%s, %s, %s, %s, %s)",
-              (usuario, nombre.strip(), _hash(clave), es_admin, email))
+    _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, es_admin, email, plantillas) VALUES (%s, %s, %s, %s, %s, %s)",
+              (usuario, nombre.strip(), _hash(clave), es_admin, email, plantillas))
 
 
 def listar_usuarios() -> list:
-    return _ejecutar("SELECT id, usuario, nombre, es_admin, activo, email, plan, prueba_hasta "
+    return _ejecutar("SELECT id, usuario, nombre, es_admin, activo, email, plan, prueba_hasta, plantillas "
                      "FROM usuarios ORDER BY id", leer=True)
 
 
@@ -175,6 +182,11 @@ def cambiar_activo(usuario_id: int, activo: bool):
     _ejecutar("UPDATE usuarios SET activo = %s WHERE id = %s", (activo, usuario_id))
     if not activo:
         _ejecutar("DELETE FROM sesiones WHERE usuario_id = %s", (usuario_id,))
+
+
+def cambiar_plantillas(usuario_id: int, plantillas: bool):
+    """Las plantillas de solicitudes son solo para quien se le activen; los demás ven la jurisprudencia."""
+    _ejecutar("UPDATE usuarios SET plantillas = %s WHERE id = %s", (plantillas, usuario_id))
 
 
 def cambiar_plan(usuario_id: int, plan: str):
@@ -233,10 +245,10 @@ def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
     filas = _ejecutar("SELECT * FROM usuarios WHERE lower(email) = %s", (email,), leer=True)
     if not filas:
         # clave vacía: estas cuentas no pueden entrar con contraseña, solo con Google
-        _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, email, plan, prueba_hasta) "
-                  "VALUES (%s, %s, %s, %s, %s, %s)",
+        _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, email, plan, prueba_hasta, plantillas) "
+                  "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                   (_usuario_libre(email.split("@")[0]), (nombre or "").strip(), "", email, "prueba",
-                   int(time.time()) + DIAS_PRUEBA * 86400))
+                   int(time.time()) + DIAS_PRUEBA * 86400, False))
         filas = _ejecutar("SELECT * FROM usuarios WHERE lower(email) = %s", (email,), leer=True)
     motivo = _bloqueo(filas[0])
     if motivo:
