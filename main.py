@@ -1596,7 +1596,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
     # ── JURISPRUDENCIA ───────────────────────────
     MAX_MB_SUBIDA = 20
-    juris_estado  = {"pregunta": "", "respuesta": None, "fuentes": [], "subidas": {}}
+    juris_estado  = {"chat": [], "pendiente": None, "subidas": {}}
 
     def _sin_html(texto):
         return re.sub(r"</?b>", "", texto or "")
@@ -1670,80 +1670,152 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                             ft.Text("Agregue la variable JURIS_DATABASE_URL (Neon) para activar esta sección.",
                                     size=14, color=INK_SOFT, font_family=FONT_BODY))]
 
-        respuesta_col = ft.Column(spacing=10)
-        estado_txt = ft.Text("", size=13, italic=True, color=INK_SOFT, font_family=FONT_BODY)
-        pregunta_tf = ft.TextField(
-            value=juris_estado["pregunta"], multiline=True, min_lines=2, max_lines=5,
-            hint_text="Ej.: ¿Qué ha dicho la SCJ sobre la caducidad del recurso de casación?",
-            border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=PAPER,
+        # La consulta es una conversación: cada mensaje del abogado y cada respuesta del asistente
+        # (con las sentencias que usó) quedan en juris_estado["chat"] mientras dure la sesión.
+        chat = juris_estado["chat"]
+        texto_md = ft.MarkdownStyleSheet(
+            p_text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
+            list_bullet_text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
+            strong_text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, weight=ft.FontWeight.W_600))
+        # STRETCH: cada mensaje ocupa el ancho, así los del abogado se pueden alinear a la derecha
+        mensajes_col = ft.Column(spacing=16, scroll=ft.ScrollMode.AUTO, auto_scroll=True,
+                                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                                 height=max(360, int((page.height or 820) - 380)))
+        entrada = ft.TextField(
+            multiline=True, min_lines=1, max_lines=6, shift_enter=True, expand=True,
+            hint_text="Escriba su consulta…", on_submit=lambda e: enviar(entrada.value),
+            border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=PAPER, border_radius=22,
+            content_padding=ft.padding.symmetric(horizontal=18, vertical=12),
             text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
             hint_style=ft.TextStyle(font_family=FONT_BODY, size=14, color=HINT),
         )
+        boton_enviar = ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color=PAPER, bgcolor=PANEL_INK, icon_size=20,
+                                     tooltip="Enviar (Enter)", on_click=lambda e: enviar(entrada.value))
+        boton_nueva = ft.TextButton("Nueva conversación", icon=ft.Icons.ADD_COMMENT_OUTLINED,
+                                    on_click=lambda e: nueva_conversacion(), style=ft.ButtonStyle(color=INK_SOFT))
+        EJEMPLOS = ["¿Qué pasa si se aprobó un deslinde sin citar a los colindantes?",
+                    "¿Cuándo caduca el recurso de casación?",
+                    "Me despidieron sin pagarme las prestaciones, ¿qué dice la Suprema?"]
 
-        def pintar_respuesta():
-            r, fuentes = juris_estado["respuesta"], juris_estado["fuentes"]
-            respuesta_col.controls.clear()
-            if r:
-                respuesta_col.controls.append(ft.Container(
-                    content=ft.Markdown(r["texto"], selectable=True,
-                                        md_style_sheet=ft.MarkdownStyleSheet(p_text_style=ft.TextStyle(
-                                            font_family=FONT_BODY, size=15, color=INK))),
-                    bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=4,
-                    padding=ft.padding.all(16)))
+        def burbuja_usuario(texto):
+            return ft.Column(controls=[ft.Container(
+                content=ft.Text(texto, size=15, color=PAPER, font_family=FONT_BODY, selectable=True),
+                bgcolor=PANEL_INK, padding=ft.padding.symmetric(horizontal=16, vertical=12),
+                border_radius=ft.border_radius.only(top_left=16, top_right=16, bottom_left=16, bottom_right=4),
+                margin=ft.margin.only(left=48))], horizontal_alignment=ft.CrossAxisAlignment.END)
+
+        def burbuja_asistente(turno):
+            partes = [ft.Markdown(turno["texto"], selectable=True, md_style_sheet=texto_md,
+                                  extension_set=ft.MarkdownExtensionSet.GITHUB_WEB)]
+            fuentes = turno.get("fuentes") or []
             if fuentes:
-                respuesta_col.controls.append(ft.Text("FUENTES ENCONTRADAS", size=12, weight=ft.FontWeight.W_600,
-                                                      color=INK_SOFT, font_family=FONT_BODY))
-                citadas = set((r or {}).get("citadas", []))
-                respuesta_col.controls.extend(tarjeta_fuente(n, f, n in citadas)
-                                              for n, f in enumerate(fuentes, start=1))
+                citadas = set(turno.get("citadas", []))
+                partes.append(ft.ExpansionTile(
+                    title=ft.Text(f"Ver las {len(fuentes)} sentencias consultadas", size=13, weight=ft.FontWeight.W_600,
+                                  color=INK_SOFT, font_family=FONT_BODY),
+                    leading=ft.Icon(ft.Icons.MENU_BOOK_OUTLINED, size=18, color=ACCENT),
+                    controls=[ft.Column(controls=[tarjeta_fuente(n, f, n in citadas)
+                                                  for n, f in enumerate(fuentes, start=1)], spacing=8)],
+                    tile_padding=ft.padding.all(0), icon_color=INK_SOFT, collapsed_icon_color=INK_SOFT,
+                    shape=ft.RoundedRectangleBorder(radius=4), collapsed_shape=ft.RoundedRectangleBorder(radius=4)))
+            return ft.Column(controls=[
+                ft.Row(controls=[ft.Icon(ft.Icons.GAVEL, size=16, color=ACCENT),
+                                 ft.Text("Asistente", size=12, weight=ft.FontWeight.W_600, color=INK_SOFT,
+                                         font_family=FONT_BODY)], spacing=6),
+                ft.Container(content=ft.Column(controls=partes, spacing=8), bgcolor=PAPER,
+                             border=ft.border.all(1, PAPER_EDGE),
+                             border_radius=ft.border_radius.only(top_left=4, top_right=16, bottom_left=16, bottom_right=16),
+                             padding=ft.padding.symmetric(horizontal=18, vertical=14), margin=ft.margin.only(right=24)),
+            ], spacing=4)
 
-        def preguntar(e):
-            q = (pregunta_tf.value or "").strip()
-            if len(q) < 4:
-                snack("Escriba su pregunta.", ok=False); return
-            juris_estado["pregunta"] = q
+        def bienvenida():
+            return [
+                burbuja_asistente({"texto": "Hola. Soy su asistente de jurisprudencia: busco en las sentencias de la "
+                                            "Suprema Corte (Boletín Judicial) y en sus documentos, y le doy mi análisis "
+                                            "con las citas para que las verifique.\n\nPuede empezar con una de estas:"}),
+                ft.Row(controls=[ft.OutlinedButton(
+                    ejemplo, on_click=lambda e, t=ejemplo: enviar(t),
+                    style=ft.ButtonStyle(color=INK, side=ft.BorderSide(1, RULE), shape=ft.RoundedRectangleBorder(radius=16),
+                                         padding=ft.padding.symmetric(horizontal=14, vertical=10)))
+                    for ejemplo in EJEMPLOS], wrap=True, spacing=8, run_spacing=8),
+            ]
+
+        def pintar():
+            mensajes_col.controls = bienvenida() if not chat else [
+                burbuja_usuario(t["texto"]) if t["rol"] == "usuario" else burbuja_asistente(t) for t in chat]
+            if juris_estado["pendiente"]:
+                mensajes_col.controls.append(ft.Row(controls=[
+                    ft.ProgressRing(width=16, height=16, stroke_width=2, color=ACCENT),
+                    ft.Text(juris_estado["pendiente"], size=13, italic=True, color=INK_SOFT, font_family=FONT_BODY),
+                ], spacing=10))
+            boton_enviar.disabled = bool(juris_estado["pendiente"])
+            boton_nueva.disabled = not chat or bool(juris_estado["pendiente"])
+
+        def nueva_conversacion():
+            chat.clear()
+            pintar(); page.update()
+
+        def enviar(texto):
+            q = (texto or "").strip()
+            if len(q) < 2 or juris_estado["pendiente"]:
+                return
+            entrada.value = ""
+            historial = list(chat)
+            chat.append({"rol": "usuario", "texto": q})
             # un saludo o una prueba ("hola") no se busca: siempre saldría "lo más parecido"
             if not juris_ia.parece_consulta(q):
-                juris_estado.update(respuesta={"texto": juris_ia.no_es_consulta(q), "citadas": []}, fuentes=[])
-                pintar_respuesta(); page.update(); return
+                chat.append({"rol": "asistente", "texto": juris_ia.no_es_consulta(q)})
+                pintar(); page.update(); return
             # las cuentas de prueba tienen un máximo de preguntas por día
             try:
                 cuentas.registrar_pregunta(usuario["id"], usuario.get("plan", "activo"))
             except ValueError as ex:
-                juris_estado.update(respuesta={"texto": str(ex), "citadas": []}, fuentes=[])
-                pintar_respuesta(); page.update(); return
+                chat.append({"rol": "asistente", "texto": str(ex)})
+                pintar(); page.update(); return
             except Exception:
                 pass   # si no se puede contar, no se le niega la pregunta
-            estado_txt.value = "Buscando en las sentencias…"
-            page.update()
+            juris_estado["pendiente"] = "Pensando…"
+            pintar(); page.update()
+
+            def avance(texto):
+                juris_estado["pendiente"] = texto
+                pintar(); page.update()
 
             def tarea():
+                turno = {"rol": "asistente", "texto": "", "fuentes": [], "citadas": []}
                 try:
-                    busquedas = juris_ia.generar_busquedas(q) if juris_ia.disponible() else [q]
-                    fuentes = juris_buscar.buscar(busquedas, usuario["id"], limite=juris_ia.MAX_FUENTES) \
-                        if busquedas else []
-                    if not busquedas:
-                        respuesta = {"texto": juris_ia.no_es_consulta(q), "citadas": []}
-                    elif not fuentes:
-                        respuesta = {"texto": "No encontré sentencias relacionadas. Pruebe con otras palabras "
-                                              "o suba sus propios documentos.", "citadas": []}
-                    elif juris_ia.disponible():
-                        estado_txt.value = "Redactando la respuesta…"; page.update()
-                        try:
-                            respuesta = juris_ia.responder(q, fuentes, juris_buscar.referencia)
-                        except juris_ia.LimiteAlcanzado:
-                            respuesta = {"texto": "_Se alcanzó el límite gratis de la IA por ahora; intente en un "
-                                                  "minuto. Mientras tanto, estas son las sentencias encontradas._",
-                                         "citadas": []}
+                    plan = (juris_ia.preparar_busqueda(q, historial) if juris_ia.disponible()
+                            else {"tipo": "nueva", "consulta": q, "busquedas": [q]})
+                    anteriores = next((t["fuentes"] for t in reversed(historial) if t.get("fuentes")), [])
+                    if plan["tipo"] == "no_juridica":
+                        turno["texto"] = juris_ia.no_es_consulta(q)
                     else:
-                        respuesta = {"texto": "_La IA no está configurada (IA_API_KEY): se muestran solo los "
-                                              "fragmentos encontrados._", "citadas": []}
-                    juris_estado.update(respuesta=respuesta, fuentes=fuentes)
+                        if plan["tipo"] == "seguimiento" and anteriores:
+                            fuentes = anteriores   # "explíquelo más simple": las mismas sentencias
+                        else:
+                            avance("Buscando en las sentencias…")
+                            fuentes = juris_buscar.buscar(plan["busquedas"] or [plan["consulta"]], usuario["id"],
+                                                          limite=juris_ia.MAX_FUENTES, pregunta=plan["consulta"])
+                        turno["fuentes"] = fuentes
+                        if not fuentes:
+                            turno["texto"] = ("No encontré sentencias sobre eso. Pruebe a decirlo con otras palabras, "
+                                              "o suba sus propios documentos en «Mis documentos».")
+                        elif juris_ia.disponible():
+                            avance("Analizando las sentencias…")
+                            try:
+                                r = juris_ia.responder(q, fuentes, juris_buscar.referencia, historial)
+                                turno.update(texto=r["texto"], citadas=r["citadas"])
+                            except juris_ia.LimiteAlcanzado:
+                                turno["texto"] = ("_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto. "
+                                                  "Mientras tanto, abajo están las sentencias encontradas._")
+                        else:
+                            turno["texto"] = ("_La IA no está configurada (IA_API_KEY): abajo están las sentencias "
+                                              "encontradas._")
                 except Exception as ex:
-                    snack(f"No se pudo completar la consulta: {ex}", ok=False)
-                estado_txt.value = ""
-                pintar_respuesta()
-                page.update()
+                    turno["texto"] = f"No pude completar la consulta: {ex}"
+                chat.append(turno)
+                juris_estado["pendiente"] = None
+                pintar(); page.update()
             page.run_thread(tarea)
 
         def lista_documentos():
@@ -1778,22 +1850,16 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                 padding=ft.padding.symmetric(vertical=6, horizontal=4),
             ) for d in docs]
 
-        pintar_respuesta()
+        pintar()
         return [
-            tarjeta("I", "Pregunte", "Responde con sentencias reales y su página", ft.Column(controls=[
-                pregunta_tf,
-                ft.Row(controls=[
-                    ft.ElevatedButton("Buscar y responder", icon=ft.Icons.SEARCH, on_click=preguntar,
-                                      style=ft.ButtonStyle(bgcolor=PANEL_INK, color=PAPER,
-                                                           shape=ft.RoundedRectangleBorder(radius=4),
-                                                           padding=ft.padding.symmetric(horizontal=18, vertical=14))),
-                    estado_txt,
-                ], spacing=14, wrap=True),
+            tarjeta("I", "Consulta", "Converse con el asistente; cada respuesta cita sus sentencias", ft.Column(controls=[
+                ft.Row(controls=[boton_nueva], alignment=ft.MainAxisAlignment.END),
+                mensajes_col,
+                ft.Row(controls=[entrada, boton_enviar], vertical_alignment=ft.CrossAxisAlignment.END, spacing=8),
                 ft.Text("Herramienta de apoyo: verifique cada cita en la fuente antes de usarla. "
-                        "No escriba datos personales de clientes en la pregunta.",
+                        "No escriba datos personales de clientes en la consulta.",
                         size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY),
             ], spacing=12)),
-            respuesta_col,
             tarjeta("II", "Mis documentos", "Solo usted los ve; entran al mismo buscador", ft.Column(controls=[
                 ft.OutlinedButton("Subir PDF o Word", icon=ft.Icons.UPLOAD_FILE,
                                   on_click=lambda e: selector.pick_files(allow_multiple=True,

@@ -26,12 +26,26 @@ CF_MODELO_TEXTO  = os.environ.get("CF_MODELO_TEXTO", "@cf/openai/gpt-oss-120b")
 MAX_FUENTES = 6            # fragmentos que se le pasan a la IA
 CARACTERES_FUENTES = 7000  # texto total de las fuentes (~2.000 tokens)
 
+MAX_TOKENS_RESPUESTA = 1100   # deja lugar al análisis sin pasar de los 8.000 tokens por minuto de Groq
+TURNOS_DE_MEMORIA = 4         # mensajes anteriores de la conversación que se le recuerdan a la IA
+
 _SISTEMA = (
-    "Eres un asistente de investigación jurídica para abogados de República Dominicana. "
-    "Respondes en español, claro y preciso. Usa ÚNICAMENTE las fuentes numeradas que te doy; "
-    "no inventes sentencias, números, fechas ni criterios. Cita cada afirmación con el número "
-    "de la fuente entre corchetes, por ejemplo [2]. Si las fuentes no alcanzan para responder, "
-    "dilo claramente. No des asesoría definitiva: el abogado debe verificar en la fuente."
+    "Eres un abogado asistente de investigación para colegas de República Dominicana. Conversas en "
+    "español, tratando de usted, como un colega con experiencia: claro, práctico y honesto.\n\n"
+    "Cómo responder:\n"
+    "1. Empieza con la respuesta directa, en 1 a 3 oraciones.\n"
+    "2. **Lo que dice la jurisprudencia:** explica el criterio de las fuentes numeradas, citando cada "
+    "afirmación con su número entre corchetes, por ejemplo [2]. Si hay sentencias que dicen cosas "
+    "distintas, señálalo.\n"
+    "3. **Análisis:** da tu opinión profesional: cómo se aplica al caso, qué argumentos conviene usar, "
+    "qué riesgos o puntos débiles hay y qué conviene revisar o reunir (documentos, plazos, pruebas). "
+    "Aquí puedes razonar más allá de las fuentes, pero sin citarlas como si lo dijera una sentencia.\n"
+    "4. Si las fuentes no alcanzan para responder, dilo y sugiere cómo seguir (otra búsqueda o subir "
+    "sus propios documentos).\n\n"
+    "Reglas: nunca inventes sentencias, números, fechas, artículos ni citas; [n] solo para lo que está en "
+    "la fuente n. Si mencionas una ley o un artículo que no está en las fuentes, advierte que hay que "
+    "verificarlo. No repitas la pregunta. Usa negritas y listas cortas, sin tablas. Eres una herramienta "
+    "de apoyo: la decisión es del abogado."
 )
 
 
@@ -101,6 +115,8 @@ def no_es_consulta(texto: str) -> str:
     else:
         inicio = "¿En qué le puedo ayudar?"
     return f"{inicio} {_PRESENTACION}"
+
+
 _SALUDOS = {"hola", "buenas", "buenos", "buen", "dia", "dias", "días", "tardes", "noches", "gracias", "ok", "oki",
             "listo", "prueba", "probando", "test", "saludos", "hey", "que", "qué", "tal", "como", "cómo", "estas",
             "estás", "bien", "si", "sí", "no"}
@@ -114,34 +130,70 @@ def parece_consulta(texto: str) -> bool:
     return any(len(p) > 3 for p in palabras)
 
 
-def generar_busquedas(pregunta: str) -> list:
-    """Convierte la pregunta en 2–4 búsquedas con palabras clave y sinónimos jurídicos.
-    Devuelve [] si el texto no es una consulta jurídica (saludo, charla, texto sin sentido)."""
+def _memoria(historial: list) -> list:
+    """Últimos mensajes de la conversación, sin las citas [n] (cada respuesta numera sus fuentes)."""
+    return [{"role": "user" if t["rol"] == "usuario" else "assistant",
+             "content": re.sub(r"\s*\[\d+\]", "", t["texto"])[:900]}
+            for t in (historial or [])[-TURNOS_DE_MEMORIA:]]
+
+
+def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
+    """Decide qué hacer con el mensaje, teniendo en cuenta la conversación:
+      {"tipo": "nueva", "consulta": "...", "busquedas": [...]}   hay que buscar sentencias
+      {"tipo": "seguimiento", ...}   pide explicar o resumir lo ya respondido: se usan las mismas fuentes
+      {"tipo": "no_juridica", ...}   saludo, agradecimiento o charla: no se busca"""
+    plan = {"tipo": "nueva", "consulta": pregunta, "busquedas": [pregunta]}
     try:
+        contexto = "\n".join(f"{'Abogado' if m['role'] == 'user' else 'Asistente'}: {m['content'][:300]}"
+                             for m in _memoria(historial))
         salida = _chat_en_cadena([
             {"role": "system", "content":
-                "Convierte la pregunta de un abogado dominicano en búsquedas para un buscador de "
-                "palabras clave de sentencias. Devuelve JSON: {\"busquedas\": [\"...\", \"...\"]} "
-                "con 2 a 4 búsquedas cortas (3 a 8 palabras), con sinónimos y términos jurídicos. "
-                "Si el texto no es una consulta jurídica (un saludo, una charla, una prueba o algo sin "
-                "sentido), devuelve {\"busquedas\": []}. Un tema jurídico de una o dos palabras sí es consulta."},
-            {"role": "user", "content": pregunta}], para_busquedas=True, max_tokens=400, json_modo=True)
-        busquedas = [b for b in json.loads(salida).get("busquedas", []) if isinstance(b, str) and b.strip()]
-        if not busquedas and not re.search(r"\d", pregunta):
-            return []
-        return busquedas[:4] + [pregunta]
+                "Preparas las búsquedas de un asistente jurídico dominicano que busca en sentencias. "
+                "Recibes la conversación reciente y el último mensaje del abogado. Devuelve JSON: "
+                "{\"tipo\": \"...\", \"consulta\": \"...\", \"busquedas\": [\"...\"]}.\n"
+                "- tipo \"nueva\": pide información jurídica que hay que buscar (también una pregunta de "
+                "seguimiento que cambia o amplía el tema). \"consulta\": el mensaje reescrito para que se "
+                "entienda solo, sin pronombres, con el tema de la conversación. \"busquedas\": 2 a 4 búsquedas "
+                "cortas (3 a 8 palabras) con sinónimos y términos jurídicos.\n"
+                "- tipo \"seguimiento\": solo pide explicar, resumir, simplificar o aclarar lo ya respondido, "
+                "sin tema nuevo. \"busquedas\": [].\n"
+                "- tipo \"no_juridica\": un saludo, un agradecimiento, una charla o algo sin sentido. "
+                "\"busquedas\": [].\n"
+                "Un tema jurídico de una o dos palabras sí es una consulta nueva."},
+            {"role": "user", "content": (f"Conversación:\n{contexto}\n\n" if contexto else "")
+                                        + f"Último mensaje: {pregunta}"}],
+            para_busquedas=True, max_tokens=500, json_modo=True)
+        datos = json.loads(salida)
+        tipo = datos.get("tipo") if datos.get("tipo") in ("nueva", "seguimiento", "no_juridica") else "nueva"
+        busquedas = [b for b in datos.get("busquedas", []) if isinstance(b, str) and b.strip()][:4]
+        consulta = (datos.get("consulta") or "").strip() or pregunta
+        if tipo != "nueva" and re.search(r"\d", pregunta) and not historial:
+            tipo = "nueva"   # puede ser un número de sentencia o expediente
+        if tipo == "nueva":
+            # sin conversación previa, el mensaje mismo también sirve como búsqueda
+            busquedas = (busquedas or [consulta]) + ([] if historial else [pregunta])
+        plan = {"tipo": tipo, "consulta": consulta, "busquedas": busquedas}
     except Exception:
-        return [pregunta]
+        pass
+    return plan
 
 
-def responder(pregunta: str, fuentes: list, referencia) -> dict:
-    """Redacta la respuesta y quita cualquier cita a una fuente que no exista."""
+def generar_busquedas(pregunta: str) -> list:
+    """Búsquedas para una pregunta suelta; [] si no es una consulta jurídica."""
+    plan = preparar_busqueda(pregunta)
+    return plan["busquedas"] if plan["tipo"] == "nueva" else []
+
+
+def responder(pregunta: str, fuentes: list, referencia, historial: list = None) -> dict:
+    """Redacta la respuesta con análisis y quita cualquier cita a una fuente que no exista."""
     fuentes = fuentes[:MAX_FUENTES]
     por_fuente = CARACTERES_FUENTES // max(len(fuentes), 1)
     bloque = "\n\n".join(f"[{n}] {referencia(f)}\n{f['texto'][:por_fuente]}" for n, f in enumerate(fuentes, 1))
     texto = _chat_en_cadena([
         {"role": "system", "content": _SISTEMA},
-        {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\nPregunta: {pregunta}"}])
+        *_memoria(historial),
+        {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\nPregunta: {pregunta}"}],
+        max_tokens=MAX_TOKENS_RESPUESTA)
     # algunos modelos citan como 【1】 o 【1†fuente】: se pasan a [1]
     texto = re.sub(r"【\s*(\d+)[^】]*】", r"[\1]", texto)
     validas = set(range(1, len(fuentes) + 1))
