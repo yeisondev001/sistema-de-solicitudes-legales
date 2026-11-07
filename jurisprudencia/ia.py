@@ -32,16 +32,18 @@ TURNOS_DE_MEMORIA = 4         # mensajes anteriores de la conversación que se l
 _SISTEMA = (
     "Eres un abogado asistente de investigación para colegas de República Dominicana. Conversas en "
     "español, tratando de usted, como un colega con experiencia: claro, práctico y honesto.\n\n"
+    "Las fuentes salen de un buscador y no todas tienen que ver con la pregunta: usa solo las que la "
+    "responden y las demás ignóralas sin mencionarlas ni resumirlas.\n\n"
     "Cómo responder:\n"
-    "1. Empieza con la respuesta directa, en 1 a 3 oraciones.\n"
-    "2. **Lo que dice la jurisprudencia:** explica el criterio de las fuentes numeradas, citando cada "
+    "1. Empieza respondiendo directamente, en 1 a 3 oraciones, sin ponerle título.\n"
+    "2. **Lo que dice la jurisprudencia:** explica el criterio de las fuentes que sirven, citando cada "
     "afirmación con su número entre corchetes, por ejemplo [2]. Si hay sentencias que dicen cosas "
     "distintas, señálalo.\n"
     "3. **Análisis:** da tu opinión profesional: cómo se aplica al caso, qué argumentos conviene usar, "
     "qué riesgos o puntos débiles hay y qué conviene revisar o reunir (documentos, plazos, pruebas). "
     "Aquí puedes razonar más allá de las fuentes, pero sin citarlas como si lo dijera una sentencia.\n"
-    "4. Si las fuentes no alcanzan para responder, dilo y sugiere cómo seguir (otra búsqueda o subir "
-    "sus propios documentos).\n\n"
+    "4. Si ninguna fuente sirve, dilo en una o dos oraciones y sugiere cómo seguir (decirlo con otras "
+    "palabras o subir sus propios documentos), sin las secciones 2 y 3.\n\n"
     "Reglas: nunca inventes sentencias, números, fechas, artículos ni citas; [n] solo para lo que está en "
     "la fuente n. Si mencionas una ley o un artículo que no está en las fuentes, advierte que hay que "
     "verificarlo. No repitas la pregunta. Usa negritas y listas cortas, sin tablas. Eres una herramienta "
@@ -69,6 +71,12 @@ def _proveedores(para_busquedas: bool = False) -> list:
 
 def disponible() -> bool:
     return bool(_proveedores())
+
+
+def estado() -> str:
+    """Qué claves ve el servidor (sin mostrarlas), para revisar la configuración."""
+    return (f"Groq {'sí' if IA_API_KEY else 'no'}, "
+            f"Cloudflare {'sí' if CF_ACCOUNT_ID and CF_API_TOKEN else 'no'}")
 
 
 def _chat(mensajes: list, proveedor: tuple, max_tokens: int = 700, json_modo: bool = False) -> str:
@@ -112,6 +120,8 @@ def no_es_consulta(texto: str) -> str:
         inicio = "¡Con gusto! ¿En qué más le puedo ayudar?"
     elif re.search(r"\b(hola|buen[oa]s?|saludos|hey)\b", t):
         inicio = "¡Hola! ¿En qué le puedo ayudar?"
+    elif re.search(r"\b(pued|podr|funcion|est[aá]s?\b)", t):
+        inicio = "¡Claro! ¿Cuál es su consulta?"
     else:
         inicio = "¿En qué le puedo ayudar?"
     return f"{inicio} {_PRESENTACION}"
@@ -119,7 +129,11 @@ def no_es_consulta(texto: str) -> str:
 
 _SALUDOS = {"hola", "buenas", "buenos", "buen", "dia", "dias", "días", "tardes", "noches", "gracias", "ok", "oki",
             "listo", "prueba", "probando", "test", "saludos", "hey", "que", "qué", "tal", "como", "cómo", "estas",
-            "estás", "bien", "si", "sí", "no"}
+            "estás", "bien", "si", "sí", "no",
+            # preguntas sobre el asistente: «entonces puedes responderme», «ya funciona?»
+            "entonces", "ahora", "ya", "puedes", "puede", "podrias", "podrías", "responder", "responderme",
+            "contestar", "contestarme", "ayudar", "ayudarme", "ayuda", "funciona", "funcionas", "ahi", "ahí",
+            "estas", "esta", "está", "me", "usted", "tu", "tú"}
 
 
 def parece_consulta(texto: str) -> bool:
@@ -157,9 +171,11 @@ def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
                 "cortas (3 a 8 palabras) con sinónimos y términos jurídicos.\n"
                 "- tipo \"seguimiento\": solo pide explicar, resumir, simplificar o aclarar lo ya respondido, "
                 "sin tema nuevo. \"busquedas\": [].\n"
-                "- tipo \"no_juridica\": un saludo, un agradecimiento, una charla o algo sin sentido. "
-                "\"busquedas\": [].\n"
-                "Un tema jurídico de una o dos palabras sí es una consulta nueva."},
+                "- tipo \"no_juridica\": un saludo, un agradecimiento, una pregunta sobre el asistente o sobre "
+                "la conversación (por ejemplo «¿me puede responder?», «¿qué puede hacer?», «¿está ahí?», "
+                "«ya funciona?»), una charla o algo sin sentido. \"busquedas\": [].\n"
+                "Si el mensaje no nombra ningún tema jurídico y no se refiere a lo ya conversado, es "
+                "\"no_juridica\". Un tema jurídico de una o dos palabras sí es una consulta nueva."},
             {"role": "user", "content": (f"Conversación:\n{contexto}\n\n" if contexto else "")
                                         + f"Último mensaje: {pregunta}"}],
             para_busquedas=True, max_tokens=500, json_modo=True)
