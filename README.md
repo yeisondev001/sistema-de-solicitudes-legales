@@ -72,7 +72,7 @@ La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde c
 
 El Boletín sale con más de un año de atraso, así que los meses se cuentan desde el último publicado. La primera vez carga los últimos 60 meses publicados; después se van sumando los nuevos y no se borra nada (con `--conservar N` se pueden quitar los de más de N meses).
 
-El 1 GB gratis de un proyecto de Neon alcanza para unos 18 meses de Boletín. Para más, se crean otros proyectos en la misma cuenta y se ponen en `JURIS_ARCHIVO_URLS`: cada mes va a la primera base con espacio (la principal al final, con 200 MB libres para los documentos de los usuarios) y el buscador busca en todas a la vez.
+El 1 GB gratis de un proyecto de Neon alcanza para unos 15 meses de Boletín con sus vectores. Para más, se crean otros proyectos en la misma cuenta y se ponen en `JURIS_ARCHIVO_URLS`: cada mes va a la primera base con espacio (la principal al final, con 200 MB libres para los documentos de los usuarios) y el buscador busca en todas a la vez.
 
 ```bash
 python cargar_boletines.py                 # últimos 60 meses publicados que falten
@@ -81,6 +81,8 @@ python cargar_boletines.py --mes 2025-05   # un mes concreto
 
 En GitHub corre solo todos los días (`.github/workflows/boletines.yml`). Necesita los secretos `JURIS_DATABASE_URL`, `JURIS_ARCHIVO_URLS`, `CF_ACCOUNT_ID` y `CF_API_TOKEN` en *Settings → Secrets and variables → Actions*.
 
+Los vectores atrasados se pueden calcular de una vez con la GPU gratis de Kaggle: `kaggle/huellas.ipynb` usa el mismo modelo abierto que Cloudflare (Qwen3-Embedding-0.6B) y da vectores iguales. Los pasos están en el propio cuaderno y en `ESTADO_DEL_PROYECTO.md`.
+
 ### Variables de entorno
 
 | Variable | Para qué |
@@ -88,7 +90,7 @@ En GitHub corre solo todos los días (`.github/workflows/boletines.yml`). Necesi
 | `DATABASE_URL` | Historial, usuarios y sesiones (PostgreSQL / Neon). Sin ella se usa SQLite local |
 | `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
 | `JURIS_ARCHIVO_URLS` | Opcional: más bases para el Boletín cuando no cabe en una, separadas por espacios. También pueden ir todas en `JURIS_DATABASE_URL`: la primera es la principal |
-| `JURIS_LIMITE_MB` | Opcional: hasta cuántos MB se llena cada base (por defecto 870, del 1 GB gratis) |
+| `JURIS_LIMITE_MB` | Opcional: hasta cuántos MB se llena cada base (por defecto 850, del 1 GB gratis) |
 | `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
 | `IA_BASE_URL`, `IA_MODELO`, `IA_MODELO_RAPIDO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI). Por defecto `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` arma las búsquedas y lo reemplaza si llega al límite |
 | `CF_ACCOUNT_ID`, `CF_API_TOKEN` | Cloudflare Workers AI: vectores de significado y reemplazo de la IA cuando Groq se llena. Sin ellas la búsqueda es solo por palabras |
@@ -132,6 +134,7 @@ La aplicación estará disponible en `http://localhost:8080`.
 ├── cargar_boletines.py             # Cargar el Boletín Judicial y sus vectores
 ├── ESTADO_DEL_PROYECTO.md          # Por dónde va el trabajo y qué falta (leer primero)
 ├── jurisprudencia/                 # Buscador: procesar documentos, búsqueda e IA
+├── kaggle/huellas.ipynb            # Calcular con GPU (Kaggle) los vectores atrasados del Boletín
 ├── generators/
 │   ├── base.py                     # Utilidades compartidas para documentos Word
 │   ├── informe.py                  # Informe Técnico
