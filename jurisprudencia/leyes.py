@@ -124,7 +124,9 @@ def articulos(paginas: list, norma: dict) -> list:
 
 
 _REFERENCIAS = re.compile(r"^\s*REFERENCIAS\s*$")
-_CAPITULO_COMENTADO = re.compile(r"^\s*(?:ART[ÍI]CULOS|PRINCIPIOS) COMENTADOS\b")
+# el pdftotext de Linux (GitHub Actions) no siempre deja estos títulos solos en su línea
+_CAPITULO_COMENTADO = re.compile(r"(?:ART[ÍI]CULOS|PRINCIPIOS)\s+COMENTADOS\b", re.I)
+_EMPIEZA_COMENTARIO = re.compile(r"^\s*(?:Art[íi]culo\s+\d{1,3}\s*\.\s*-|PRINCIPIO\s+[IVX]+\b)")
 # cabeceras del libro: el título repetido, "Principios generales", "CAPÍTULO ÚNICO", el número de página
 _CABECERAS_OBRA = re.compile(r"^\s*(?:La Ley 108-05 de Registro Inmobiliario comentada.*|Principios generales"
                              r"|CAP[ÍI]TULO [ÚU]NICO|T[ÍI]TULO [IVXLC]+\..*|-?\d{1,3}-?)\s*$", re.I)
@@ -134,16 +136,19 @@ def comentarios(paginas: list, obra: dict) -> list:
     """El comentario de cada artículo, en orden: [{"articulo", "nombre", "pagina", "texto"}].
     Lo que va antes del artículo 1 (los principios generales) sale como artículo 0.
     Se saltan las listas de referencias bibliográficas del final de cada capítulo."""
+    import unicodedata
     texto, inicios, en_referencias = "", [], False
     for num, pagina in paginas:
         if num < obra["desde_pagina"]:
             continue
-        for linea in pagina.splitlines():
+        for linea in unicodedata.normalize("NFC", pagina).splitlines():
             if _REFERENCIAS.match(linea):
                 en_referencias = True
-            elif _CAPITULO_COMENTADO.match(linea):
+            elif _CAPITULO_COMENTADO.search(linea):
                 en_referencias = False
                 continue
+            elif _EMPIEZA_COMENTARIO.match(linea):
+                en_referencias = False
             if (en_referencias or not linea.strip() or _CABECERAS_OBRA.match(linea)
                     or _ENCABEZADO.match(linea) or re.match(r"^\s*Por [A-ZÁÉÍÓÚ]", linea)):
                 continue

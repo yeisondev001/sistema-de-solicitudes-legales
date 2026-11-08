@@ -54,6 +54,15 @@ def main():
             faltan = [n for n in range(1, max(nums, default=0) + 1) if n not in nums]
             print(f"{'Comentario ' if es_obra else ''}{norma['corto']}: {len(lista)} artículos"
                   + (f" (faltan {faltan})" if faltan else ""))
+            # si el lector falla (otro pdftotext, otro formato), mejor no reemplazar lo que hay
+            if es_obra and len(lista) < 10:
+                print(f"  salieron muy pocos comentarios: no se guarda nada de {norma['corto']}")
+                import re   # pistas para corregir el lector
+                for num, pag in paginas[99:102]:
+                    print(f"  pág. {num}:", [l[:60] for l in pag.splitlines() if l.strip()][:4])
+                print("  líneas con COMENTADOS:", sum(len(re.findall(r"COMENTADOS", p, re.I)) for _, p in paginas),
+                      "con REFERENCIAS:", sum(len(re.findall(r"REFERENCIAS", p)) for _, p in paginas))
+                continue
             if not a.probar:
                 with basedatos.conectar() as conn:
                     (leyes.guardar_obra if es_obra else leyes.guardar_norma)(conn, norma, lista)
