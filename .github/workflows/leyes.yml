@@ -1,6 +1,6 @@
 # Carga las leyes, reglamentos y libros comentados (jurisprudencia/leyes.py) en la base principal,
 # un documento por artículo, y calcula sus vectores. Se corre a mano: Actions → Cargar leyes → Run workflow.
-# Se puede repetir sin duplicar: cada norma reemplaza sus artículos.
+# Se puede repetir: lo que ya está igual no se toca, así solo se cargan las leyes nuevas.
 # Necesita los secretos del repo: JURIS_DATABASE_URL, CF_ACCOUNT_ID y CF_API_TOKEN.
 name: Cargar leyes
 
@@ -13,7 +13,7 @@ on:
       solo_comentarios:
         description: "Solo los libros comentados (no vuelve a cargar las leyes)"
         type: boolean
-        default: true
+        default: false
 
 # no se cruza con la carga del Boletín, que también calcula vectores
 concurrency:

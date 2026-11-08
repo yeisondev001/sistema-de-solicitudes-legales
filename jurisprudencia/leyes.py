@@ -55,6 +55,49 @@ NORMAS = [
 ]
 MATERIA = "Inmobiliario"
 
+# Las que no tienen un PDF oficial a mano van en la carpeta leyes/ del repositorio (son textos
+# oficiales, libres): "archivo" se usa al cargar y "url" (GitHub) para abrir la página en la app.
+# Sin "desde"/"hasta" se toma todo el PDF: el índice no trae encabezados de artículo y lo que va
+# después del último artículo se corta en "DADA en la Sala…" (_FIN_DE_LEY).
+# La Ley 64-00 (Medio Ambiente) no está: el PDF que se consiguió no trae los artículos 79 a 115.
+_REPO = "https://raw.githubusercontent.com/yeisondev001/sistema-de-solicitudes-legales/master/"
+for _archivo, _corto, _nombre, _materia, _alias in [
+    ("leyes/codigo-civil.pdf", "Código Civil", "Código Civil de la República Dominicana", "Civil",
+     r"c[óo]digo civil"),
+    ("leyes/codigo-procedimiento-civil.pdf", "Código de Procedimiento Civil",
+     "Código de Procedimiento Civil de la República Dominicana", "Civil", r"(?:c[óo]digo de )?procedimiento civil"),
+    ("leyes/codigo-de-trabajo.pdf", "Código de Trabajo", "Código de Trabajo de la República Dominicana (Ley núm. 16-92)",
+     "Laboral", r"c[óo]digo de(?:l)? trabajo|ley\s*(?:n[úu]m\.?|no\.?)?\s*16-92"),
+    ("leyes/ley-189-11.pdf", "Ley 189-11",
+     "Ley núm. 189-11 para el Desarrollo del Mercado Hipotecario y el Fideicomiso", "Inmobiliario",
+     r"189-11|ley de fideicomiso|mercado hipotecario"),
+    ("leyes/ley-338-21.pdf", "Ley 338-21", "Ley núm. 338-21, que modifica los artículos 129 y 131 de la Ley núm. 189-11",
+     "Inmobiliario", r"338-21"),
+    ("leyes/ley-82-25.pdf", "Ley 82-25", "Ley núm. 82-25 sobre Bien de Familia", "Inmobiliario",
+     r"82-25|bien de familia"),
+    ("leyes/ley-5038.pdf", "Ley 5038", "Ley núm. 5038 sobre Condominios (1958)", "Inmobiliario",
+     r"\b5038\b|ley de condominios?"),
+    ("leyes/ley-675.pdf", "Ley 675", "Ley núm. 675 sobre Urbanización, Ornato Público y Construcciones", "Inmobiliario",
+     r"ley\s*(?:n[úu]m\.?|no\.?)?\s*675\b|ornato p[úu]blico"),
+    ("leyes/ley-176-07.pdf", "Ley 176-07", "Ley núm. 176-07 del Distrito Nacional y los Municipios", "Municipal",
+     r"176-07|ley de (?:los )?municipios"),
+    ("leyes/ley-202-04.pdf", "Ley 202-04", "Ley núm. 202-04, Sectorial de Áreas Protegidas", "Ambiental",
+     r"202-04|[áa]reas protegidas"),
+    ("leyes/res-517-2007.pdf", "Reglamento de Constancias Anotadas",
+     "Reglamento para el Control y Reducción de Constancias Anotadas (Res. núm. 517-2007)", "Inmobiliario",
+     r"517-2007|constancias anotadas"),
+    ("leyes/res-82-2025.pdf", "Res. 82-2025",
+     "Resolución núm. 82-2025, que modifica el Reglamento para la Regularización Parcelaria y el Deslinde",
+     "Inmobiliario", r"82-2025"),
+    ("leyes/res-008-2020.pdf", "Reglamento del Registro Inmobiliario (CPJ)",
+     "Reglamento de Registro Inmobiliario del Consejo del Poder Judicial (Res. núm. 008-2020)", "Inmobiliario",
+     r"008-2020"),
+]:
+    NORMAS.append({"corto": _corto, "nombre": _nombre, "fecha": "", "materia": _materia, "alias": _alias,
+                   "archivo": _archivo, "url": _REPO + _archivo})
+# después del art. 738 el PDF del Código de Trabajo sigue con notas, índice y otras normas
+NORMAS[[n["corto"] for n in NORMAS].index("Código de Trabajo")]["fin"] = r"\b\d{1,2}\.- Con posterioridad a la promulgaci"
+
 # libros de leyes comentadas; desde_pagina: donde termina el índice y empieza el comentario
 OBRAS = [
     {"corto": "Ley 108-05",
@@ -69,7 +112,11 @@ OBRAS = [
 # párrafos, así que pueden venir a mitad de línea; se distinguen de las referencias ("el artículo 5
 # de la ley") por la mayúscula, el punto después del número y la mayúscula que sigue.
 # Los artículos de otras leyes que se citan entre comillas ("“Art. 1.- …") no cuentan.
-_ARTICULO = re.compile(r"(?<![“\"])\b(?:Art[íi]culo|ARTÍCULO|Art)\.?\s*(\d{1,3})(?:\s*[\.\-–:])+\s*(?=[A-ZÁÉÍÓÚÑ(])")
+# Los códigos llegan a 2.280 artículos; algunas leyes escriben "ARTICULO" sin tilde o "Art. 1o.-".
+_ARTICULO = re.compile(r"(?<![“\"«])\b(?:Art[íi]culo|ART[ÍI]CULO|Art|ART)\.?\s*(\d{1,4})\s*(?:[ºo°]\.?)?"
+                       r"(?:\s*[\.\-–:])+\s*(?=[A-ZÁÉÍÓÚÑ(“\"])")
+# lo que va después del último artículo (firmas del Congreso y del Poder Ejecutivo, anexos)
+_FIN_DE_LEY = re.compile(r"\bDADA en (?:la Sala|Santo Domingo)\b")
 # títulos, capítulos y secciones: van en su propia línea y se quitan del texto del artículo
 _ENCABEZADO = re.compile(r"^\s*(?:T[ÍI]TULO|CAP[ÍI]TULO|SECCI[ÓO]N|LIBRO)\s+[IVXLC\d]+\b.*$", re.M | re.I)
 # cabeceras y pies que se repiten en cada página
@@ -83,14 +130,14 @@ _NOMBRE = re.compile(r"^(?:\((?:Modificado|Agregado)[^)]*\)\s*)?([^.]{3,160}?)\.
 
 def _lineas(paginas: list, desde: str, hasta: str) -> list:
     """[(página, línea)] del articulado: desde la primera línea que cumple `desde`
-    hasta la primera que cumple `hasta` (sin incluirla)."""
-    lineas, dentro = [], False
+    hasta la primera que cumple `hasta` (sin incluirla). Sin `desde`, desde el principio."""
+    lineas, dentro = [], not desde
     for num, texto in paginas:
         for linea in texto.splitlines():
             if not dentro:
                 dentro = bool(re.search(desde, linea))
                 continue
-            if re.search(hasta, linea, re.I):
+            if hasta and re.search(hasta, linea, re.I):
                 return lineas
             lineas.append((num, linea))
     return lineas
@@ -100,7 +147,7 @@ def articulos(paginas: list, norma: dict) -> list:
     """[{"articulo", "nombre", "pagina", "texto"}] en orden. Un artículo empieza solo si su
     número sigue al anterior (así no se cuelan los números que aparecen dentro del texto)."""
     texto, inicios = "", []   # inicios: (posición en el texto, página)
-    for num, linea in _lineas(paginas, norma["desde"], norma["hasta"]):
+    for num, linea in _lineas(paginas, norma.get("desde"), norma.get("hasta")):
         if linea.strip() and not (_CABECERAS.match(linea) or _ENCABEZADO.match(linea)):
             inicios.append((len(texto), num))
             texto += linea.strip() + " "
@@ -112,6 +159,9 @@ def articulos(paginas: list, norma: dict) -> list:
     lista = []
     for i, (pos, n) in enumerate(cortes):
         fin = cortes[i + 1][0] if i + 1 < len(cortes) else len(texto)
+        cortes_fin = [m.start() for patron in (_FIN_DE_LEY, re.compile(norma.get("fin") or r"(?!)"))
+                      for m in [patron.search(texto, pos, fin)] if m]
+        fin = min(cortes_fin, default=fin)
         pagina = next(p for desde, p in reversed(inicios) if desde <= pos)
         lista.append({"articulo": n, "pagina": pagina, "texto": re.sub(r"\s+", " ", texto[pos:fin]).strip()})
     for a in lista:
@@ -182,6 +232,9 @@ def guardar_obra(conn, obra: dict, lista: list) -> int:
     recuerdan su página, para que el enlace abra el libro donde corresponde."""
     from .procesar import guardar
     with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM documentos WHERE origen = 'doctrina' AND fuente_url = %s", (obra["url"],))
+        if cur.fetchone()[0] == len(lista):   # ya está igual: no se recalculan sus vectores
+            return 0
         cur.execute("DELETE FROM documentos WHERE origen = 'doctrina' AND fuente_url = %s", (obra["url"],))
     conn.commit()
     for a in lista:
@@ -209,23 +262,27 @@ def leer(ruta: str, norma: dict) -> list:
     return articulos(extraer_paginas(ruta), norma)
 
 
-def guardar_norma(conn, norma: dict, lista: list) -> int:
-    """Reemplaza los artículos de la norma (se puede volver a cargar sin duplicar)."""
+def guardar_norma(conn, norma: dict, lista: list, forzar: bool = False) -> int:
+    """Reemplaza los artículos de la norma (se puede volver a cargar sin duplicar). Si ya está
+    con los mismos artículos no la toca, para no gastar neuronas recalculando sus vectores."""
     from .procesar import guardar
     with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM documentos WHERE origen = 'ley' AND fuente_url = %s", (norma["url"],))
+        if cur.fetchone()[0] == len(lista) and not forzar:
+            return 0
         cur.execute("DELETE FROM documentos WHERE origen = 'ley' AND fuente_url = %s", (norma["url"],))
     conn.commit()
     for a in lista:
         paginas = [(a["pagina"], a["texto"])]
-        ficha = {"numero": numero(norma, a["articulo"]), "sala": norma["nombre"], "materia": MATERIA,
-                 "fecha": norma["fecha"]}
+        ficha = {"numero": numero(norma, a["articulo"]), "sala": norma["nombre"],
+                 "materia": norma.get("materia", MATERIA), "fecha": norma["fecha"]}
         guardar(conn, ficha, fragmentar(paginas), "ley", titulo=a["nombre"], fuente_url=norma["url"],
                 pagina=a["pagina"])
     return len(lista)
 
 
 # "art. 81 de la Ley 108-05", "artículo 12 del Reglamento de Mensuras"
-_CITA = re.compile(r"\bart(?:[íi]culo|s?\.)?\s*(\d{1,3})\b(?=(.{0,80}))", re.I)
+_CITA = re.compile(r"\bart(?:[íi]culo|s?\.)?\s*(\d{1,4})\b(?=(.{0,80}))", re.I)
 
 
 def citas(texto: str) -> list:

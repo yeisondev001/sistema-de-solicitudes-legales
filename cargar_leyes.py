@@ -11,7 +11,7 @@ por artículo, y calcula sus vectores con Cloudflare (CF_ACCOUNT_ID, CF_API_TOKE
     python cargar_leyes.py --sin-vectores       # los vectores quedan para la carga diaria del Boletín
     python cargar_leyes.py --quitar-comentarios # borra los libros comentados (si el autor lo pide)
 
-Se puede volver a correr: cada norma reemplaza sus artículos, no se duplican.
+Se puede volver a correr: lo que ya está igual no se toca, y lo que cambió se reemplaza sin duplicar.
 Van en la principal porque ocupan poco (~6 MB las leyes y ~4 MB el libro, con vectores) y ahí hay lugar.
 """
 
@@ -45,6 +45,8 @@ def main():
             es_obra = norma in leyes.OBRAS
             nombre = norma["url"].rsplit("/", 1)[-1]
             ruta = Path(a.carpeta or tmp) / nombre
+            if norma.get("archivo") and Path(norma["archivo"]).exists():   # las de la carpeta leyes/
+                ruta = Path(norma["archivo"])
             if not ruta.exists() and not descargar(norma["url"], ruta):
                 print(f"{norma['corto']}: no se pudo descargar {norma['url']}")
                 continue
@@ -65,7 +67,8 @@ def main():
                 continue
             if not a.probar:
                 with basedatos.conectar() as conn:
-                    (leyes.guardar_obra if es_obra else leyes.guardar_norma)(conn, norma, lista)
+                    if not (leyes.guardar_obra if es_obra else leyes.guardar_norma)(conn, norma, lista):
+                        print("  ya estaba cargada igual: no se toca")
             total += len(lista)
     print(f"Listo: {total} artículos y comentarios.")
     if a.probar:
