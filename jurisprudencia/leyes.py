@@ -3,7 +3,11 @@ Leyes y reglamentos: cada artículo se guarda como un documento público (origen
 para que el chat pueda citar "Ley 108-05, art. 81" junto a las sentencias.
 
 Son textos oficiales: la Ley 65-00, art. 41, permite reutilizarlos citando la fuente.
-Los libros de leyes comentadas NO van aquí: tienen autores y hace falta su permiso.
+
+Libros de leyes comentadas (OBRAS, origen 'doctrina'): el comentario de cada artículo es un
+documento con el mismo número que el artículo, así sale junto a la ley. Tienen autores y
+licencia (CC BY-NC-ND): siempre se citan autores y obra, en pantalla solo salen extractos
+cortos, y se quitan con `python cargar_leyes.py --quitar-comentarios`.
 
 Cada norma dice dónde empieza y dónde termina su articulado dentro del PDF, porque los
 PDFs traen antes un índice con los mismos artículos y después otras cosas (el PDF de la
@@ -50,6 +54,16 @@ NORMAS = [
      "alias": r"790-2022|reglamento (?:para la |de )?(?:regularizaci[óo]n parcelaria|deslinde)"},
 ]
 MATERIA = "Inmobiliario"
+
+# libros de leyes comentadas; desde_pagina: donde termina el índice y empieza el comentario
+OBRAS = [
+    {"corto": "Ley 108-05",
+     "nombre": "La Ley 108-05 de Registro Inmobiliario comentada por Registradores de Títulos "
+               "(Escuela Nacional de la Judicatura, 2022)",
+     "fecha": "2022",
+     "url": "https://ri.gob.do/wp-content/uploads/2023/10/Libro-Ley-108-05-de-registro-inmobiliario.pdf",
+     "desde_pagina": 11},
+]
 
 # "Art. 81.- Plazo…" (Ley 108-05) o "Artículo 81. Plazo…" (reglamentos). pdftotext junta los
 # párrafos, así que pueden venir a mitad de línea; se distinguen de las referencias ("el artículo 5
@@ -107,6 +121,78 @@ def articulos(paginas: list, norma: dict) -> list:
         a["nombre"] = m.group(1).strip() if m else ""
         a["texto"] = texto
     return lista
+
+
+_REFERENCIAS = re.compile(r"^\s*REFERENCIAS\s*$")
+_CAPITULO_COMENTADO = re.compile(r"^\s*(?:ART[ÍI]CULOS|PRINCIPIOS) COMENTADOS\b")
+# cabeceras del libro: el título repetido, "Principios generales", "CAPÍTULO ÚNICO", el número de página
+_CABECERAS_OBRA = re.compile(r"^\s*(?:La Ley 108-05 de Registro Inmobiliario comentada.*|Principios generales"
+                             r"|CAP[ÍI]TULO [ÚU]NICO|T[ÍI]TULO [IVXLC]+\..*|-?\d{1,3}-?)\s*$", re.I)
+
+
+def comentarios(paginas: list, obra: dict) -> list:
+    """El comentario de cada artículo, en orden: [{"articulo", "nombre", "pagina", "texto"}].
+    Lo que va antes del artículo 1 (los principios generales) sale como artículo 0.
+    Se saltan las listas de referencias bibliográficas del final de cada capítulo."""
+    texto, inicios, en_referencias = "", [], False
+    for num, pagina in paginas:
+        if num < obra["desde_pagina"]:
+            continue
+        for linea in pagina.splitlines():
+            if _REFERENCIAS.match(linea):
+                en_referencias = True
+            elif _CAPITULO_COMENTADO.match(linea):
+                en_referencias = False
+                continue
+            if (en_referencias or not linea.strip() or _CABECERAS_OBRA.match(linea)
+                    or _ENCABEZADO.match(linea) or re.match(r"^\s*Por [A-ZÁÉÍÓÚ]", linea)):
+                continue
+            inicios.append((len(texto), num))
+            texto += linea.strip() + " "
+    # el comentario cita otros artículos: solo cuenta el que sigue exactamente al anterior
+    cortes = [(0, 0)]
+    for m in _ARTICULO.finditer(texto):
+        if int(m.group(1)) == cortes[-1][1] + 1:
+            cortes.append((m.start(), int(m.group(1))))
+    lista = []
+    for i, (pos, n) in enumerate(cortes):
+        fin = cortes[i + 1][0] if i + 1 < len(cortes) else len(texto)
+        trozo = re.sub(r"\s+", " ", texto[pos:fin]).strip()
+        if not trozo:
+            continue
+        # el texto de cada página, para que cada fragmento recuerde la suya
+        por_pagina = {}
+        for j, (desde, p) in enumerate(inicios):
+            hasta = inicios[j + 1][0] if j + 1 < len(inicios) else len(texto)
+            if hasta > pos and desde < fin:
+                por_pagina[p] = por_pagina.get(p, "") + texto[max(desde, pos):min(hasta, fin)]
+        m = _NOMBRE.match(_ARTICULO.sub("", trozo, count=1)) if n else None
+        lista.append({"articulo": n, "nombre": m.group(1).strip() if m else ("Principios generales" if not n else ""),
+                      "pagina": min(por_pagina), "texto": trozo, "paginas": sorted(por_pagina.items())})
+    return lista
+
+
+def guardar_obra(conn, obra: dict, lista: list) -> int:
+    """Reemplaza los comentarios de la obra. Un comentario largo se parte en fragmentos que
+    recuerdan su página, para que el enlace abra el libro donde corresponde."""
+    from .procesar import guardar
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM documentos WHERE origen = 'doctrina' AND fuente_url = %s", (obra["url"],))
+    conn.commit()
+    for a in lista:
+        ficha = {"numero": numero(obra, a["articulo"]) if a["articulo"] else f"{obra['corto']}, principios",
+                 "sala": obra["nombre"], "materia": MATERIA, "fecha": obra["fecha"]}
+        guardar(conn, ficha, fragmentar(a["paginas"]), "doctrina", titulo=a["nombre"],
+                fuente_url=obra["url"], pagina=a["pagina"])
+    return len(lista)
+
+
+def quitar_obras(conn) -> int:
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM documentos WHERE origen = 'doctrina'")
+        n = cur.rowcount
+    conn.commit()
+    return n
 
 
 def numero(norma: dict, articulo: int) -> str:

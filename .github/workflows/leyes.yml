@@ -1,5 +1,5 @@
-# Carga las leyes y reglamentos (jurisprudencia/leyes.py) en la base principal, un documento
-# por artículo, y calcula sus vectores. Se corre a mano: Actions → Cargar leyes → Run workflow.
+# Carga las leyes, reglamentos y libros comentados (jurisprudencia/leyes.py) en la base principal,
+# un documento por artículo, y calcula sus vectores. Se corre a mano: Actions → Cargar leyes → Run workflow.
 # Se puede repetir sin duplicar: cada norma reemplaza sus artículos.
 # Necesita los secretos del repo: JURIS_DATABASE_URL, CF_ACCOUNT_ID y CF_API_TOKEN.
 name: Cargar leyes
@@ -10,6 +10,10 @@ on:
       neuronas:
         description: "Neuronas de Cloudflare para los vectores (lo que falte lo sigue la carga diaria)"
         default: "3000"
+      solo_comentarios:
+        description: "Solo los libros comentados (no vuelve a cargar las leyes)"
+        type: boolean
+        default: true
 
 # no se cruza con la carga del Boletín, que también calcula vectores
 concurrency:
@@ -27,7 +31,7 @@ jobs:
           python-version: "3.11"
       - run: sudo apt-get install -y poppler-utils
       - run: pip install "psycopg[binary]==3.2.9" "pypdf==6.1.1" "httpx==0.28.1"
-      - run: python -u cargar_leyes.py --neuronas "${{ github.event.inputs.neuronas || '3000' }}"
+      - run: python -u cargar_leyes.py --neuronas "${{ github.event.inputs.neuronas || '3000' }}" ${{ github.event.inputs.solo_comentarios == 'true' && '--solo-comentarios' || '' }}
         env:
           JURIS_DATABASE_URL: ${{ secrets.JURIS_DATABASE_URL }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}

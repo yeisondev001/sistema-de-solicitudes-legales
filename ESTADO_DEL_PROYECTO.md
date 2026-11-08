@@ -12,7 +12,7 @@ App web en Flet para un departamento legal:
 - **Plantillas en Word/PDF:** informes, solicitudes y reportes de audiencia. **Solo las ven las cuentas que las tienen activadas** (hoy: Gregorio).
 - **Historial de expedientes**, que va con las plantillas.
 - **Inicio de sesión:** con Google para clientes (prueba gratis) y con usuario y contraseña para el administrador.
-- **Sección Jurisprudencia:** un chat RAG que responde preguntas con sentencias reales de la Suprema Corte de Justicia (Boletín Judicial), con los artículos de la Ley 108-05 y sus reglamentos (cuando se carguen) y con los documentos que sube cada usuario, con citas y un análisis.
+- **Sección Jurisprudencia:** un chat RAG que responde preguntas con sentencias reales de la Suprema Corte de Justicia (Boletín Judicial), con los artículos de la Ley 108-05 y sus reglamentos y con los documentos que sube cada usuario, con citas y un análisis.
 
 El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que es el "cliente beta", pero el buscador cubre **todas las materias**.
 
@@ -92,7 +92,8 @@ Los archivos están en `jurisprudencia/`.
 - **El lector:** cada norma dice dónde empieza y termina su articulado en el PDF (`desde` / `hasta`), porque los PDFs traen antes un índice y el de la ley trae además la Ley 51-07 y los reglamentos viejos de 2009. Un artículo empieza solo si su número sigue al anterior, así no se cuelan las referencias del texto. Probado con los 5 PDFs: no falta ningún artículo.
 - **En la búsqueda:** "art. 81 de la Ley 108-05" o "artículo 12 del reglamento de mensuras" se buscan como número exacto (`leyes.citas`). Se guardan hasta 2 lugares para artículos de ley entre las fuentes, solo si vienen al caso. El chat agrega la sección **Lo que dice la ley**.
 - **No se recalculan las palabras comunes de la principal** al cargar leyes: con solo leyes saldrían comunes "registro" o "inmueble".
-- **Leyes comentadas:** NO se cargan para todos. Los comentarios tienen autores (derechos de autor); la Ley 65-00 solo libera los textos oficiales. El libro de la Ley 108-05 comentada (Escuela Nacional de la Judicatura) lo puede subir el abogado como documento propio, o cargarse para todos si la Escuela da permiso por escrito.
+- **Leyes comentadas (`OBRAS`, origen `doctrina`):** el dueño decidió cargar *La Ley 108-05 comentada por Registradores de Títulos* (Escuela Nacional de la Judicatura, 2022): 133 comentarios (principios + arts. 1–132), ~435 fragmentos, ~4 MB. Cada comentario tiene el mismo `numero` que su artículo ("Ley 108-05, art. 81"), así sale junto a la ley. **Licencia CC BY-NC-ND 4.0** (no comercial, sin derivadas): siempre se citan obra y autores, en pantalla solo salen extractos cortos y la IA lo resume sin copiar párrafos. Si la Escuela lo pide, se quita con `python cargar_leyes.py --quitar-comentarios`. Conviene pedirle permiso por escrito antes de cobrar. El *Código Penal Comentado* (ENJ, 2026, misma licencia) **no** se cargó: no hay clientes de penal y ocuparía ~8 MB.
+- **Para cargar solo los libros:** *Actions → Cargar leyes* con la casilla "Solo los libros comentados" (viene marcada) o `python cargar_leyes.py --solo-comentarios`.
 - **Para agregar otra ley:** sumar una entrada en `NORMAS` (URL, `desde`, `hasta`, `alias`) y probar con `python cargar_leyes.py --probar`.
 
 ## Huellas con Kaggle (`kaggle/huellas.ipynb`)
@@ -137,7 +138,7 @@ Los archivos están en `jurisprudencia/`.
 10. **Detalles del lector:**
     - `detectar_ficha` no reconoce el número viejo ("NÚM. 10") en documentos subidos.
     - En enero 2025 algunos anexos traen otro número arriba y salen como sentencia aparte (pocos casos).
-11. **Leyes:** el código para la Ley 108-05 y sus 4 reglamentos está listo. Falta: subirlo a `master`, correr *Actions → Cargar leyes*, hacer *Deploy latest commit* en Render y probar «¿qué dice el art. 81 de la Ley 108-05?». Preguntarle al abogado si la Ley 108-05 tuvo cambios después de 2007 (el texto cargado es de 2011). Después, los códigos: Civil, Procedimiento Civil, Trabajo, Penal, Procesal Penal, Comercio, Sociedades (479-08), Constitución y Ley 137-11.
+11. **Leyes: cargadas** (8 nov, *Actions → Cargar leyes*): 820 artículos, 858 fragmentos, todos con vector; la base principal quedó en 14 MB. Falta: *Deploy latest commit* en Render y probar «¿qué dice el art. 81 de la Ley 108-05?». Preguntarle al abogado si la Ley 108-05 tuvo cambios después de 2007 (el texto cargado es de 2011). Después, los códigos: Civil, Procedimiento Civil, Trabajo, Penal, Procesal Penal, Comercio, Sociedades (479-08), Constitución y Ley 137-11.
 12. **Fuentes futuras, públicas:**
     - Tribunal Constitucional: revisar sus condiciones de uso.
     - Decretos y normas de la DGII o la Junta Monetaria.

@@ -1615,7 +1615,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                 ], vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Text(f"«…{_sin_html(f['extracto'])}…»", size=13, italic=True, color=INK_SOFT,
                         font_family=FONT_BODY, selectable=True),
-                *([ft.TextButton("Abrir el texto oficial" if f["origen"] == "ley" else "Abrir en el Boletín Judicial",
+                *([ft.TextButton({"ley": "Abrir el texto oficial", "doctrina": "Abrir el libro"}.get(
+                                     f["origen"], "Abrir en el Boletín Judicial"),
                                  icon=ft.Icons.OPEN_IN_NEW,
                                  url=f"{f['fuente_url']}#page={f['pagina']}", url_target="_blank",
                                  style=ft.ButtonStyle(color=INK_SOFT))] if f["fuente_url"] else []),

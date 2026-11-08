@@ -3,7 +3,7 @@ Búsqueda híbrida sobre los fragmentos:
   - por palabras (búsqueda de texto de PostgreSQL en español) y
   - por significado (vectores de Cloudflare guardados con pgvector).
 Las dos listas se mezclan con RRF: lo que sale arriba en ambas queda primero.
-Cada usuario busca en lo público (el Boletín Judicial y las leyes) y en sus propios
+Cada usuario busca en lo público (el Boletín Judicial, las leyes y los libros comentados) y en sus propios
 documentos, en todas las bases a la vez (ver basedatos.bases()).
 """
 
@@ -25,7 +25,7 @@ _PERMISO = "(d.usuario_id IS NULL OR d.usuario_id = %(usuario)s)"
 # números de sentencia o expediente: SCJ-TS-25-1451, 001-022-2025-SRES-00121, TC/0001/24…
 _NUMERO = re.compile(r"\b(?=[\w/-]*\d)[0-9A-Z]+(?:[-/][0-9A-Z]+){2,}\b", re.I)
 MAX_PALABRAS = 7
-MAX_ARTICULOS = 2   # lugares que se guardan para artículos de ley entre las fuentes
+MAX_ARTICULOS = 3   # lugares que se guardan para artículos de ley y sus comentarios entre las fuentes
 _comunes = {}     # base -> (palabras, hora en que se leyeron)
 
 
@@ -189,10 +189,10 @@ def buscar(consultas, usuario_id: int, limite: int = 8, pregunta: str = None) ->
             puntos[k] = puntos.get(k, 0.0) + peso / (RRF_K + pos + 1)
             filas.setdefault(k, f)
     ordenados = sorted(filas, key=lambda k: puntos[k], reverse=True)
-    # los artículos de ley compiten con 28.000 sentencias: los mejores van adelante si de verdad
+    # los artículos de ley y sus comentarios compiten con 28.000 sentencias: los mejores van adelante si de verdad
     # vienen al caso (por número, por palabras o entre los más parecidos de todas las fuentes)
     al_caso = {(f["base"], f["id"]) for f in por_numero + por_palabras + por_significado[:limite * 2]}
-    articulos = [k for k in ordenados if filas[k]["origen"] == "ley" and k in al_caso][:MAX_ARTICULOS]
+    articulos = [k for k in ordenados if filas[k]["origen"] in ("ley", "doctrina") and k in al_caso][:MAX_ARTICULOS]
     ordenados = articulos + [k for k in ordenados if k not in articulos]
     # como máximo 2 fragmentos por documento, para variar las fuentes
     por_doc, final = {}, []
@@ -211,6 +211,8 @@ def referencia(f: dict) -> str:
     """Cómo se cita una fuente: número, sala, origen y página."""
     if f["origen"] == "ley":
         return f'{f["numero"]}' + (f' ({f["titulo"]})' if f["titulo"] else "") + f' — {f["sala"]}'
+    if f["origen"] == "doctrina":
+        return f'Comentario: {f["numero"]} — {f["sala"]}, pág. {f["pagina"]}'
     partes = [f["numero"] or f["titulo"] or "Documento", f["sala"], f["materia"]]
     origen = "Boletín Judicial" if f["origen"] == "boletin" else "Documento propio"
     return f'{" · ".join(p for p in partes if p)} — {origen}, pág. {f["pagina"]}'
