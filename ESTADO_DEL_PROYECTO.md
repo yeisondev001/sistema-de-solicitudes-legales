@@ -96,6 +96,12 @@ Los archivos están en `jurisprudencia/`.
 - **Para cargar solo los libros:** *Actions → Cargar leyes* con la casilla "Solo los libros comentados" (viene marcada) o `python cargar_leyes.py --solo-comentarios`.
 - **Para agregar otra ley:** sumar una entrada en `NORMAS` (URL, `desde`, `hasta`, `alias`) y probar con `python cargar_leyes.py --probar`.
 
+## Ver la página dentro de la app (`jurisprudencia/visor.py`)
+
+- El botón **"Ver la página aquí"** de cada fuente abre una ventana con la página del PDF oficial tal como es (imagen), con flechas para pasar de página. Sirve para sentencias, leyes y comentarios; los documentos subidos por el usuario muestran su texto ("Leer aquí").
+- Los PDFs del Boletín pesan cientos de MB y **no se descargan**: pikepdf (qpdf) lee a pedazos con HTTP Range solo el índice y los objetos de esa página, se arma un PDF de una página y pypdfium2 lo dibuja. Medido: ~2–3 s y ~3 MB la primera página de un mes, casi al instante las siguientes.
+- Trampas medidas: pdfium solo, o qpdf con `inherit_page_attributes=True`, `pages.append` o `copy_foreign`, recorren todas las páginas y bajan el PDF entero (~100 s).
+
 ## Huellas con Kaggle (`kaggle/huellas.ipynb`)
 
 - Calcula las huellas que faltan con el **mismo modelo abierto** que usa Cloudflare (Qwen/Qwen3-Embedding-0.6B) en la GPU gratis de Kaggle (30 horas por semana).

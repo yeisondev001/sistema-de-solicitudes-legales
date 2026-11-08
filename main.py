@@ -12,6 +12,7 @@ import flet as ft
 import cuentas
 import historial
 from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
+from jurisprudencia import visor as juris_visor
 from generators import (
     generar_informe_tecnico,
     generar_copia_certificada,
@@ -1604,6 +1605,75 @@ def app_principal(page: ft.Page, usuario: dict, salir):
     def _sin_html(texto):
         return re.sub(r"</?b>", "", texto or "")
 
+    def ver_pagina(f):
+        """Abre dentro de la app la página del PDF que cita la fuente (sentencia, ley o comentario),
+        tal como es, con botones para pasar de página (ver jurisprudencia/visor.py)."""
+        estado = {"pagina": f["pagina"], "total": None}
+        imagen = ft.Image(src_base64="", visible=False, fit=ft.ImageFit.FIT_WIDTH)
+        cargando = ft.Column(controls=[ft.ProgressRing(color=ACCENT), ft.Text(
+            "Abriendo la página…", size=13, color=INK_SOFT, font_family=FONT_BODY)],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        numero = ft.Text("", size=13, color=INK_SOFT, font_family=FONT_BODY)
+        anterior = ft.IconButton(ft.Icons.CHEVRON_LEFT, tooltip="Página anterior", on_click=lambda e: ir(-1))
+        siguiente = ft.IconButton(ft.Icons.CHEVRON_RIGHT, tooltip="Página siguiente", on_click=lambda e: ir(1))
+
+        def dibujar():
+            try:
+                png, estado["total"] = juris_visor.pagina_png(f["fuente_url"], estado["pagina"])
+                imagen.src_base64, imagen.visible, cargando.visible = base64.b64encode(png).decode(), True, False
+            except Exception:
+                cargando.controls = [ft.Text("No se pudo abrir la página. Use «Abrir el PDF oficial».",
+                                             size=13, color=INK_SOFT, font_family=FONT_BODY)]
+            numero.value = f"Página {estado['pagina']}" + (f" de {estado['total']}" if estado["total"] else "")
+            anterior.disabled = estado["pagina"] <= 1
+            siguiente.disabled = bool(estado["total"]) and estado["pagina"] >= estado["total"]
+            page.update()
+
+        def ir(paso):
+            estado["pagina"] += paso
+            imagen.visible, cargando.visible = False, True
+            page.update()
+            page.run_thread(dibujar)
+
+        dlg = ft.AlertDialog(
+            bgcolor=PAPER, inset_padding=ft.padding.all(16),
+            title=ft.Text(juris_buscar.referencia(f), font_family=FONT_DISPLAY, color=INK, size=16),
+            content=ft.Container(width=820, height=int((page.height or 820) * 0.72), content=ft.Column(
+                controls=[cargando, imagen], scroll=ft.ScrollMode.AUTO,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER)),
+            actions=[
+                ft.Row(controls=[anterior, numero, siguiente], spacing=0, tight=True),
+                ft.TextButton("Abrir el PDF oficial", icon=ft.Icons.OPEN_IN_NEW,
+                              url=f"{f['fuente_url']}#page={estado['pagina']}", url_target="_blank",
+                              style=ft.ButtonStyle(color=INK_SOFT)),
+                ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK)),
+            ],
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
+        page.open(dlg)
+        page.run_thread(dibujar)
+
+    def leer_fuente(f):
+        """Muestra el texto encontrado de un documento subido por el usuario (no tiene PDF público)."""
+        dlg = ft.AlertDialog(
+            bgcolor=PAPER,
+            title=ft.Text(juris_buscar.referencia(f), font_family=FONT_DISPLAY, color=INK, size=18),
+            content=ft.Container(width=760, height=min(520, int((page.height or 820) * 0.6)), content=ft.Column(
+                controls=[ft.Text(f["texto"], size=15, color=INK, font_family=FONT_BODY, selectable=True),
+                          ft.Text("Es la parte del documento que encontró el buscador; el documento completo "
+                                  "está en el PDF oficial.", size=12, italic=True, color=INK_SOFT,
+                                  font_family=FONT_BODY)],
+                scroll=ft.ScrollMode.AUTO, spacing=12)),
+            actions=[
+                *([ft.TextButton("Abrir el PDF oficial", icon=ft.Icons.OPEN_IN_NEW,
+                                 url=f"{f['fuente_url']}#page={f['pagina']}", url_target="_blank",
+                                 style=ft.ButtonStyle(color=INK_SOFT))] if f["fuente_url"] else []),
+                ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK)),
+            ],
+            actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
+        page.open(dlg)
+
     def tarjeta_fuente(n, f, citada):
         return ft.Container(
             content=ft.Column(controls=[
@@ -1615,11 +1685,18 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                 ], vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Text(f"«…{_sin_html(f['extracto'])}…»", size=13, italic=True, color=INK_SOFT,
                         font_family=FONT_BODY, selectable=True),
-                *([ft.TextButton({"ley": "Abrir el texto oficial", "doctrina": "Abrir el libro"}.get(
-                                     f["origen"], "Abrir en el Boletín Judicial"),
-                                 icon=ft.Icons.OPEN_IN_NEW,
-                                 url=f"{f['fuente_url']}#page={f['pagina']}", url_target="_blank",
-                                 style=ft.ButtonStyle(color=INK_SOFT))] if f["fuente_url"] else []),
+                ft.Row(controls=[
+                    *([ft.TextButton("Ver la página aquí", icon=ft.Icons.ARTICLE_OUTLINED,
+                                     on_click=lambda e: ver_pagina(f), style=ft.ButtonStyle(color=INK))]
+                      if f["fuente_url"] else
+                      [ft.TextButton("Leer aquí", icon=ft.Icons.ARTICLE_OUTLINED, on_click=lambda e: leer_fuente(f),
+                                     style=ft.ButtonStyle(color=INK))]),
+                    *([ft.TextButton({"ley": "Abrir el texto oficial", "doctrina": "Abrir el libro"}.get(
+                                         f["origen"], "Abrir en el Boletín Judicial"),
+                                     icon=ft.Icons.OPEN_IN_NEW,
+                                     url=f"{f['fuente_url']}#page={f['pagina']}", url_target="_blank",
+                                     style=ft.ButtonStyle(color=INK_SOFT))] if f["fuente_url"] else []),
+                ], wrap=True, spacing=4),
             ], spacing=4),
             bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=4,
             padding=ft.padding.all(12),
@@ -1717,8 +1794,9 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             lista = [(n, f) for n, f in enumerate(turno.get("fuentes") or [], start=1)
                      if n in citadas or not turno.get("ia")]
             if lista:
-                titulo = (("Ver la sentencia citada" if len(lista) == 1 else f"Ver las {len(lista)} sentencias citadas")
-                          if citadas else f"Ver las {len(lista)} sentencias encontradas")
+                # "fuentes" porque además de sentencias pueden ser artículos de ley o comentarios
+                titulo = (("Ver la fuente citada" if len(lista) == 1 else f"Ver las {len(lista)} fuentes citadas")
+                          if citadas else f"Ver las {len(lista)} fuentes encontradas")
                 partes.append(ft.ExpansionTile(
                     title=ft.Text(titulo, size=13, weight=ft.FontWeight.W_600, color=INK_SOFT, font_family=FONT_BODY),
                     leading=ft.Icon(ft.Icons.MENU_BOOK_OUTLINED, size=18, color=ACCENT),
@@ -1860,7 +1938,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
         pintar()
         return [
-            tarjeta("I", "Consulta", "Converse con el asistente; cada respuesta cita sus sentencias", ft.Column(controls=[
+            tarjeta("I", "Consulta", "Converse con el asistente; cada respuesta cita sus fuentes", ft.Column(controls=[
                 ft.Row(controls=[boton_nueva], alignment=ft.MainAxisAlignment.END),
                 mensajes_col,
                 ft.Row(controls=[entrada, boton_enviar], vertical_alignment=ft.CrossAxisAlignment.END, spacing=8),

@@ -3,4 +3,6 @@ fastapi==0.115.12
 python-docx==1.1.2
 fpdf2==2.7.9
 psycopg[binary]==3.2.9
+pikepdf==10.18.0
 pypdf==6.1.1
+pypdfium2==5.15.1
