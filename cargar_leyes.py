@@ -39,6 +39,14 @@ def main():
         with basedatos.conectar() as conn:
             print(f"Se borraron {leyes.quitar_obras(conn)} comentarios.")
         return
+    if not a.probar and not a.solo_comentarios:
+        # artículos de normas que ya no están en la lista (o que cambiaron de enlace): se borran
+        with basedatos.conectar() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM documentos WHERE origen = 'ley' AND NOT (fuente_url = ANY(%s))",
+                        ([n["url"] for n in leyes.NORMAS],))
+            if cur.rowcount:
+                print(f"Se borraron {cur.rowcount} artículos de normas que ya no están en la lista.")
+            conn.commit()
     total = 0
     with tempfile.TemporaryDirectory() as tmp:
         for norma in ([] if a.solo_comentarios else leyes.NORMAS) + leyes.OBRAS:

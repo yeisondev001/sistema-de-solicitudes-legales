@@ -56,11 +56,12 @@ NORMAS = [
 MATERIA = "Inmobiliario"
 
 # Las que no tienen un PDF oficial a mano van en la carpeta leyes/ del repositorio (son textos
-# oficiales, libres): "archivo" se usa al cargar y "url" (GitHub) para abrir la página en la app.
+# oficiales, libres): "archivo" se usa al cargar y "url" (jsDelivr) para abrir la página en la app.
 # Sin "desde"/"hasta" se toma todo el PDF: el índice no trae encabezados de artículo y lo que va
 # después del último artículo se corta en "DADA en la Sala…" (_FIN_DE_LEY).
 # La Ley 64-00 (Medio Ambiente) no está: el PDF que se consiguió no trae los artículos 79 a 115.
-_REPO = "https://raw.githubusercontent.com/yeisondev001/sistema-de-solicitudes-legales/master/"
+# jsDelivr sirve los archivos del repo como application/pdf y acepta "Range" (raw.githubusercontent no)
+_REPO = "https://cdn.jsdelivr.net/gh/yeisondev001/sistema-de-solicitudes-legales@master/"
 for _archivo, _corto, _nombre, _materia, _alias in [
     ("leyes/codigo-civil.pdf", "Código Civil", "Código Civil de la República Dominicana", "Civil",
      r"c[óo]digo civil"),
