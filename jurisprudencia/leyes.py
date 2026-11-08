@@ -59,7 +59,7 @@ MATERIA = "Inmobiliario"
 # oficiales, libres): "archivo" se usa al cargar y "url" (jsDelivr) para abrir la página en la app.
 # Sin "desde"/"hasta" se toma todo el PDF: el índice no trae encabezados de artículo y lo que va
 # después del último artículo se corta en "DADA en la Sala…" (_FIN_DE_LEY).
-# La Ley 64-00 (Medio Ambiente) no está: el PDF que se consiguió no trae los artículos 79 a 115.
+# El PDF de la Ley 64-00 (Medio Ambiente) no trae los artículos 79 a 115 y tiene páginas repetidas.
 # jsDelivr sirve los archivos del repo como application/pdf y acepta "Range" (raw.githubusercontent no)
 _REPO = "https://cdn.jsdelivr.net/gh/yeisondev001/sistema-de-solicitudes-legales@master/"
 for _archivo, _corto, _nombre, _materia, _alias in [
@@ -84,6 +84,8 @@ for _archivo, _corto, _nombre, _materia, _alias in [
      r"176-07|ley de (?:los )?municipios"),
     ("leyes/ley-202-04.pdf", "Ley 202-04", "Ley núm. 202-04, Sectorial de Áreas Protegidas", "Ambiental",
      r"202-04|[áa]reas protegidas"),
+    ("leyes/ley-64-00.pdf", "Ley 64-00", "Ley núm. 64-00 General sobre Medio Ambiente y Recursos Naturales", "Ambiental",
+     r"64-00|ley (?:general )?(?:de|sobre) medio ambiente"),
     ("leyes/res-517-2007.pdf", "Reglamento de Constancias Anotadas",
      "Reglamento para el Control y Reducción de Constancias Anotadas (Res. núm. 517-2007)", "Inmobiliario",
      r"517-2007|constancias anotadas"),
@@ -97,6 +99,7 @@ for _archivo, _corto, _nombre, _materia, _alias in [
     NORMAS.append({"corto": _corto, "nombre": _nombre, "fecha": "", "materia": _materia, "alias": _alias,
                    "archivo": _archivo, "url": _REPO + _archivo})
 # después del art. 738 el PDF del Código de Trabajo sigue con notas, índice y otras normas
+NORMAS[[n["corto"] for n in NORMAS].index("Ley 64-00")]["orden_libre"] = True
 NORMAS[[n["corto"] for n in NORMAS].index("Código de Trabajo")]["fin"] = r"\b\d{1,2}\.- Con posterioridad a la promulgaci"
 
 # libros de leyes comentadas; desde_pagina: donde termina el índice y empieza el comentario
@@ -152,13 +155,18 @@ def articulos(paginas: list, norma: dict) -> list:
         if linea.strip() and not (_CABECERAS.match(linea) or _ENCABEZADO.match(linea)):
             inicios.append((len(texto), num))
             texto += linea.strip() + " "
-    cortes = []
+    cortes = []   # (posición, número; 0 = página repetida que se descarta)
     for m in _ARTICULO.finditer(texto):
-        n, ultimo = int(m.group(1)), cortes[-1][1] if cortes else 0
-        if ultimo < n <= ultimo + 3:
+        n, ultimo = int(m.group(1)), max((c[1] for c in cortes), default=0)
+        if norma.get("orden_libre"):
+            # PDF con páginas fuera de orden o repetidas: vale cualquier número la primera vez
+            cortes.append((m.start(), 0 if any(c[1] == n for c in cortes) else n))
+        elif ultimo < n <= ultimo + 3:
             cortes.append((m.start(), n))
     lista = []
     for i, (pos, n) in enumerate(cortes):
+        if not n:
+            continue
         fin = cortes[i + 1][0] if i + 1 < len(cortes) else len(texto)
         cortes_fin = [m.start() for patron in (_FIN_DE_LEY, re.compile(norma.get("fin") or r"(?!)"))
                       for m in [patron.search(texto, pos, fin)] if m]
