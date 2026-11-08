@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Resumen para retomar el trabajo (personas o agentes). Actualizado: **7 de noviembre de 2026**.
+Resumen para retomar el trabajo (personas o agentes). Actualizado: **8 de noviembre de 2026**.
 
 > **El repositorio es público.** Nunca escribir aquí claves, tokens, cadenas de conexión ni IDs de cuenta.
 > Solo se nombran las variables y dónde están guardadas.
@@ -12,7 +12,7 @@ App web en Flet para un departamento legal:
 - **Plantillas en Word/PDF:** informes, solicitudes y reportes de audiencia. **Solo las ven las cuentas que las tienen activadas** (hoy: Gregorio).
 - **Historial de expedientes**, que va con las plantillas.
 - **Inicio de sesión:** con Google para clientes (prueba gratis) y con usuario y contraseña para el administrador.
-- **Sección Jurisprudencia:** un chat RAG que responde preguntas con sentencias reales de la Suprema Corte de Justicia (Boletín Judicial) y con los documentos que sube cada usuario, con citas y un análisis.
+- **Sección Jurisprudencia:** un chat RAG que responde preguntas con sentencias reales de la Suprema Corte de Justicia (Boletín Judicial), con los artículos de la Ley 108-05 y sus reglamentos (cuando se carguen) y con los documentos que sube cada usuario, con citas y un análisis.
 
 El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que es el "cliente beta", pero el buscador cubre **todas las materias**.
 
@@ -26,6 +26,7 @@ El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que e
 | Usuarios, sesiones e historial | **Neon**, proyecto `solicitudes-legales` | Variable `DATABASE_URL`. No tocar |
 | Jurisprudencia | **Neon**, 5 proyectos en AWS US East 2 (Ohio) | `jurisprudencia-rd` (principal: solo documentos de usuarios) y `jurisprudencia-archivo-1` a `-4` (Boletín) |
 | Carga del Boletín | **GitHub Actions**, `.github/workflows/boletines.yml` | Todos los días a las 5:00 a. m. (RD); GitHub la atrasa a veces varias horas. También a mano: *Actions → Cargar boletines → Run workflow* |
+| Carga de leyes | **GitHub Actions**, `.github/workflows/leyes.yml` | Solo a mano: *Actions → Cargar leyes → Run workflow*. Se puede repetir sin duplicar |
 | Huellas atrasadas | **Kaggle**, GPU gratis | Una sola vez: `kaggle/huellas.ipynb` (ver abajo) |
 | Respuestas de la IA | **Groq** | `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` prepara las búsquedas |
 | Huellas (vectores), y respaldo de la IA | **Cloudflare Workers AI** | `@cf/qwen/qwen3-embedding-0.6b` (1024 dimensiones). Si Groq llega a su límite, responde `@cf/openai/gpt-oss-120b`. Plan gratis: 10.000 neuronas por día |
@@ -83,6 +84,17 @@ Los archivos están en `jurisprudencia/`.
   - Las huellas gastan como máximo 7.000 neuronas por día; después de calcularlas hace `VACUUM`, porque cada huella reescribe su fila.
 - **Fuente:** `https://consultaglobal.blob.core.windows.net/boletines/Boletines/{AÑO}/{MES}.pdf`. Es público; la Ley 65-00, art. 41, permite reutilizar textos judiciales citando la fuente.
 
+## Leyes y reglamentos (`jurisprudencia/leyes.py`, `cargar_leyes.py`)
+
+- **Qué se carga:** la Ley 108-05 (texto de la recopilación de 2011, con los cambios de la Ley 51-07) y los 4 reglamentos de 2022: Tribunales (Res. 787-2022), Registro de Títulos (788), Mensuras Catastrales (789) y Regularización Parcelaria y Deslinde (790). **820 artículos, ~840 fragmentos**, unos 10–15 MB con vectores.
+- **Fuentes oficiales:** ri.gob.do (la ley) y transparencia.poderjudicial.gob.do (los reglamentos). Las URL están en `NORMAS`.
+- **Cómo se guarda:** cada artículo es un documento público (`origen = 'ley'`) en la **base principal**. `numero` = cómo se cita ("Ley 108-05, art. 81"), `titulo` = nombre del artículo, `sala` = nombre completo de la norma, `materia` = Inmobiliario (por eso sus vectores salen antes que el resto).
+- **El lector:** cada norma dice dónde empieza y termina su articulado en el PDF (`desde` / `hasta`), porque los PDFs traen antes un índice y el de la ley trae además la Ley 51-07 y los reglamentos viejos de 2009. Un artículo empieza solo si su número sigue al anterior, así no se cuelan las referencias del texto. Probado con los 5 PDFs: no falta ningún artículo.
+- **En la búsqueda:** "art. 81 de la Ley 108-05" o "artículo 12 del reglamento de mensuras" se buscan como número exacto (`leyes.citas`). Se guardan hasta 2 lugares para artículos de ley entre las fuentes, solo si vienen al caso. El chat agrega la sección **Lo que dice la ley**.
+- **No se recalculan las palabras comunes de la principal** al cargar leyes: con solo leyes saldrían comunes "registro" o "inmueble".
+- **Leyes comentadas:** NO se cargan para todos. Los comentarios tienen autores (derechos de autor); la Ley 65-00 solo libera los textos oficiales. El libro de la Ley 108-05 comentada (Escuela Nacional de la Judicatura) lo puede subir el abogado como documento propio, o cargarse para todos si la Escuela da permiso por escrito.
+- **Para agregar otra ley:** sumar una entrada en `NORMAS` (URL, `desde`, `hasta`, `alias`) y probar con `python cargar_leyes.py --probar`.
+
 ## Huellas con Kaggle (`kaggle/huellas.ipynb`)
 
 - Calcula las huellas que faltan con el **mismo modelo abierto** que usa Cloudflare (Qwen/Qwen3-Embedding-0.6B) en la GPU gratis de Kaggle (30 horas por semana).
@@ -90,30 +102,31 @@ Los archivos están en `jurisprudencia/`.
 - Sin GPU no sirve: en un procesador tarda 8,6 s por fragmento (~860 horas para todo). Por eso no se hace en GitHub Actions.
 - Antes de guardar, compara 64 huellas con las de Cloudflare y se detiene si no salen iguales. Solo toca el Boletín: los documentos de los usuarios no salen de Cloudflare.
 - Guarda por tandas de 2.048 con `VACUUM` cada 5 tandas. **Si una base pasa de 990 MB, la deja ahí y sigue con la siguiente.** Si se corta, se vuelve a correr y sigue donde quedó.
+- **Ya se corrió (8 nov 2026):** 352.178 huellas en 4 h 49 min con GPU T4 x2. Solo hace falta volver a correrlo si se carga mucho de golpe sin huellas.
 - **Cómo correrlo:** crear un cuaderno en Kaggle → *File → Import Notebook* → `huellas.ipynb`. En *Session options*: **GPU T4 x2** e **Internet On** (la cuenta debe tener el teléfono verificado). En *Add-ons → Secrets*: `JURIS_URLS`. Después: **Save Version → Save & Run All (Commit)**.
 - `kaggle/huellas.py` es el mismo código en forma de script; el `.ipynb` se genera desde ahí.
 
-## Por dónde vamos (7 nov 2026)
+## Por dónde vamos (8 nov 2026)
 
 - **En GitHub:** `master` tiene el chat, las plantillas por cuenta y el cuaderno de Kaggle. **En Render puede seguir la versión anterior** hasta que se haga *Deploy latest commit*.
-- **Boletín cargado:** los 5 años, **58 meses (noviembre 2020 a agosto 2025), 28.493 sentencias y 360.595 fragmentos.** Ya se buscan por palabras.
+- **Boletín cargado:** los 5 años, **58 meses (noviembre 2020 a agosto 2025), 28.493 sentencias y 360.595 fragmentos.** Ya se buscan por palabras y por significado.
 
-  | Base | Meses | Sentencias | Fragmentos | Con huella | Tamaño (7 nov) | Calculado con todas las huellas |
-  |---|---|---|---|---|---|---|
-  | principal | — (documentos de usuarios) | — | 0 | — | 8 MB | — |
-  | archivo 1 | 2024-05 → 2025-08 | 8.564 | 97.131 | 7.137 | 523 MB | ~830 MB |
-  | archivo 2 | 2023-02 → 2024-04 | 8.131 | 93.582 | 1.280 | 475 MB | ~790 MB |
-  | archivo 3 | 2022-01 → 2023-01 | 5.732 | 90.536 | 0 | 462 MB | ~770 MB |
-  | archivo 4 | 2020-11 → 2021-12 | 6.066 | 79.346 | 0 | 406 MB | ~680 MB |
+  | Base | Meses | Sentencias | Fragmentos | Con huella | Tamaño (8 nov) |
+  |---|---|---|---|---|---|
+  | principal | — (documentos de usuarios) | — | 0 | — | 8 MB |
+  | archivo 1 | 2024-05 → 2025-08 | 8.564 | 97.131 | todos | 825 MB |
+  | archivo 2 | 2023-02 → 2024-04 | 8.131 | 93.582 | todos | 789 MB |
+  | archivo 3 | 2022-01 → 2023-01 | 5.732 | 90.536 | todos | 773 MB |
+  | archivo 4 | 2020-11 → 2021-12 | 6.066 | 79.346 | todos | 681 MB |
 
-- **Huellas:** hechas 8.417 (todo Tierras e Inmobiliario del archivo 1). **El cuaderno de Kaggle se estaba preparando para correr** cuando se escribió esto.
-- **Espacio:** en la primera tanda se midieron ~5,6 KB por huella, más que los 3,5 KB calculados (puede bajar al reusar el lugar con `VACUUM`). **El archivo 1 podría quedar cerca del límite de 1 GB**; el cuaderno lo protege deteniéndose en 990 MB.
+- **Huellas: todas hechas.** El cuaderno de Kaggle terminó bien el 8 nov: 352.178 huellas nuevas (más las 8.417 de antes), todas iguales a las de Cloudflare (similitud 1,0000 en 64 de 64). Ninguna base llegó a 990 MB.
+- **Espacio:** quedaron en ~3,4 KB por huella, como se había calculado. El archivo 1 (825 MB) está casi en su tope de 850 MB; los meses nuevos irán a las bases con más lugar (el archivo 4 tiene ~170 MB libres). Cuando ya no quepan, toca el pendiente de crear otra base.
 - **Faltan dos meses:** septiembre y octubre de 2020 no se encontraron con ninguna de las tres formas del nombre. Julio 2025 trae solo 6 sentencias porque el PDF publicado tiene 31 páginas.
 
 ## Pendientes
 
-1. **Correr el cuaderno de Kaggle** y, al terminar, revisar en su log cuántas huellas quedaron por base y los MB. Actualizar la tabla de arriba.
-2. **Si una base se detuvo en 990 MB:** crear `jurisprudencia-archivo-5` en Neon, mover a esa base los meses más viejos de la base llena (hace falta un script que todavía no existe) y agregarla en Render, GitHub y Kaggle.
+1. **Kaggle: hecho** (8 nov). Ninguna base se detuvo; no hace falta `jurisprudencia-archivo-5` por ahora.
+2. **Probar la búsqueda por significado** con preguntas de materias fuera de Tierras, que antes no tenían huella.
 3. **Render:** hacer *Deploy latest commit* y, en el panel Usuarios, dejar la casilla de plantillas **solo en la cuenta de Gregorio**.
 4. **Probar el chat en producción:** `¿ya funciona?` no debe buscar; `deslinde aprobado sin citar a los colindantes` debe responder con citas y análisis; `explíquelo más simple` debe usar las mismas sentencias.
 5. **El abogado (cliente beta):** ponerle su Gmail a su cuenta y el plan `beta`.
@@ -124,13 +137,13 @@ Los archivos están en `jurisprudencia/`.
 10. **Detalles del lector:**
     - `detectar_ficha` no reconoce el número viejo ("NÚM. 10") en documentos subidos.
     - En enero 2025 algunos anexos traen otro número arriba y salen como sentencia aparte (pocos casos).
-11. **Fuentes futuras, públicas:**
-    - Leyes (primero la **Ley 108-05 de Registro Inmobiliario** y sus reglamentos).
+11. **Leyes:** el código para la Ley 108-05 y sus 4 reglamentos está listo. Falta: subirlo a `master`, correr *Actions → Cargar leyes*, hacer *Deploy latest commit* en Render y probar «¿qué dice el art. 81 de la Ley 108-05?». Preguntarle al abogado si la Ley 108-05 tuvo cambios después de 2007 (el texto cargado es de 2011). Después, los códigos: Civil, Procedimiento Civil, Trabajo, Penal, Procesal Penal, Comercio, Sociedades (479-08), Constitución y Ley 137-11.
+12. **Fuentes futuras, públicas:**
     - Tribunal Constitucional: revisar sus condiciones de uso.
     - Decretos y normas de la DGII o la Junta Monetaria.
     - **No** usar el depósito del Poder Judicial (`sjdeposito`), que tiene el acceso bloqueado.
-12. **Cuando las bases se llenen:** crear otro proyecto en Neon y agregarlo al final de las variables. El plan gratis permite 100 proyectos y 20 GB por cuenta.
-13. **Cuando haya clientes:** pasar a Neon Launch (se paga por GB) y juntar todo en una sola base. El código funciona igual con una base.
+13. **Cuando las bases se llenen:** crear otro proyecto en Neon y agregarlo al final de las variables. El plan gratis permite 100 proyectos y 20 GB por cuenta.
+14. **Cuando haya clientes:** pasar a Neon Launch (se paga por GB) y juntar todo en una sola base. El código funciona igual con una base.
 
 ## Reglas para trabajar en este repo
 

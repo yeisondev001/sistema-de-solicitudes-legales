@@ -3,13 +3,13 @@ Búsqueda híbrida sobre los fragmentos:
   - por palabras (búsqueda de texto de PostgreSQL en español) y
   - por significado (vectores de Cloudflare guardados con pgvector).
 Las dos listas se mezclan con RRF: lo que sale arriba en ambas queda primero.
-Cada usuario busca en el Boletín Judicial (público) y en sus propios documentos,
-en todas las bases a la vez (ver basedatos.bases()).
+Cada usuario busca en lo público (el Boletín Judicial y las leyes) y en sus propios
+documentos, en todas las bases a la vez (ver basedatos.bases()).
 """
 
 import re
 
-from . import basedatos, vectores
+from . import basedatos, leyes, vectores
 
 _PALABRA = re.compile(r"[0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ][0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ\-/]*")
 RRF_K = 60               # constante habitual de RRF
@@ -25,6 +25,7 @@ _PERMISO = "(d.usuario_id IS NULL OR d.usuario_id = %(usuario)s)"
 # números de sentencia o expediente: SCJ-TS-25-1451, 001-022-2025-SRES-00121, TC/0001/24…
 _NUMERO = re.compile(r"\b(?=[\w/-]*\d)[0-9A-Z]+(?:[-/][0-9A-Z]+){2,}\b", re.I)
 MAX_PALABRAS = 7
+MAX_ARTICULOS = 2   # lugares que se guardan para artículos de ley entre las fuentes
 _comunes = {}     # base -> (palabras, hora en que se leyeron)
 
 
@@ -84,8 +85,10 @@ _NUMERO_VIEJO = re.compile(r"n[úu]m(?:ero)?\.?\s*(\d{1,4}),?\s+(?:del?\s+)?(\d{
 
 
 def _numeros(consultas: list) -> list:
-    """Números de sentencia o expediente que trae la pregunta, y patrones para los viejos."""
+    """Números de sentencia, expediente o artículo de ley que trae la pregunta, y patrones para
+    las sentencias viejas."""
     nuevos = list(dict.fromkeys(m.upper() for q in consultas for m in _NUMERO.findall(q)))[:3]
+    nuevos += list(dict.fromkeys(c for q in consultas for c in leyes.citas(q)))[:3]
     viejos = list(dict.fromkeys(f"%núm. {n} del {d} de {mes.lower()} de {a}"
                                 for q in consultas for n, d, mes, a in _NUMERO_VIEJO.findall(q)))[:3]
     return nuevos, viejos
@@ -100,7 +103,7 @@ def _por_numero(conn, numeros: tuple, usuario_id: int) -> list:
         conn,
         f"""SELECT {_COLUMNAS}, 1.0 AS puntaje, left(f.texto, 400) AS extracto
             FROM documentos d JOIN fragmentos f ON f.documento_id = d.id AND f.orden < 2
-            WHERE (upper(d.numero) = ANY(%(nums)s) OR upper(d.expediente) LIKE ANY(%(pats)s)
+            WHERE (upper(f_unaccent(d.numero)) = ANY(%(nums)s) OR upper(d.expediente) LIKE ANY(%(pats)s)
                    OR d.numero LIKE ANY(%(viejos)s)) AND {_PERMISO}
             ORDER BY d.id DESC, f.orden LIMIT 6""",
         {"nums": nuevos, "pats": [f"%{x}%" for x in nuevos], "viejos": viejos, "usuario": usuario_id})
@@ -186,6 +189,11 @@ def buscar(consultas, usuario_id: int, limite: int = 8, pregunta: str = None) ->
             puntos[k] = puntos.get(k, 0.0) + peso / (RRF_K + pos + 1)
             filas.setdefault(k, f)
     ordenados = sorted(filas, key=lambda k: puntos[k], reverse=True)
+    # los artículos de ley compiten con 28.000 sentencias: los mejores van adelante si de verdad
+    # vienen al caso (por número, por palabras o entre los más parecidos de todas las fuentes)
+    al_caso = {(f["base"], f["id"]) for f in por_numero + por_palabras + por_significado[:limite * 2]}
+    articulos = [k for k in ordenados if filas[k]["origen"] == "ley" and k in al_caso][:MAX_ARTICULOS]
+    ordenados = articulos + [k for k in ordenados if k not in articulos]
     # como máximo 2 fragmentos por documento, para variar las fuentes
     por_doc, final = {}, []
     for k in ordenados:
@@ -201,6 +209,8 @@ def buscar(consultas, usuario_id: int, limite: int = 8, pregunta: str = None) ->
 
 def referencia(f: dict) -> str:
     """Cómo se cita una fuente: número, sala, origen y página."""
+    if f["origen"] == "ley":
+        return f'{f["numero"]}' + (f' ({f["titulo"]})' if f["titulo"] else "") + f' — {f["sala"]}'
     partes = [f["numero"] or f["titulo"] or "Documento", f["sala"], f["materia"]]
     origen = "Boletín Judicial" if f["origen"] == "boletin" else "Documento propio"
     return f'{" · ".join(p for p in partes if p)} — {origen}, pág. {f["pagina"]}'

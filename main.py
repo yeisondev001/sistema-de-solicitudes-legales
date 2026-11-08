@@ -1615,7 +1615,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                 ], vertical_alignment=ft.CrossAxisAlignment.START),
                 ft.Text(f"«…{_sin_html(f['extracto'])}…»", size=13, italic=True, color=INK_SOFT,
                         font_family=FONT_BODY, selectable=True),
-                *([ft.TextButton("Abrir en el Boletín Judicial", icon=ft.Icons.OPEN_IN_NEW,
+                *([ft.TextButton("Abrir el texto oficial" if f["origen"] == "ley" else "Abrir en el Boletín Judicial",
+                                 icon=ft.Icons.OPEN_IN_NEW,
                                  url=f"{f['fuente_url']}#page={f['pagina']}", url_target="_blank",
                                  style=ft.ButtonStyle(color=INK_SOFT))] if f["fuente_url"] else []),
             ], spacing=4),
@@ -1736,7 +1737,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         def bienvenida():
             return [
                 burbuja_asistente({"texto": "Hola. Soy su asistente de jurisprudencia: busco en las sentencias de la "
-                                            "Suprema Corte (Boletín Judicial) y en sus documentos, y le doy mi análisis "
+                                            "Suprema Corte (Boletín Judicial), en la Ley 108-05 de Registro Inmobiliario "
+                                            "y sus reglamentos, y en sus documentos, y le doy mi análisis "
                                             "con las citas para que las verifique.\n\nPuede empezar con una de estas:"}),
                 ft.Row(controls=[ft.OutlinedButton(
                     ejemplo, on_click=lambda e, t=ejemplo: enviar(t),
@@ -2092,7 +2094,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         "audiencia_provincial": ("Informe de Audiencia Provincial", "Registre el traslado y la audiencia conforme al modelo suministrado."),
         "conclusiones_saneamiento": ("Conclusiones de Saneamiento", "Cambie expediente, reclamante e inmueble; el resto del modelo se conserva."),
         "historial": ("Historial de expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
-        "jurisprudencia": ("Jurisprudencia", "Pregunte en lenguaje normal; la respuesta cita sentencias del Boletín Judicial y sus documentos."),
+        "jurisprudencia": ("Jurisprudencia", "Pregunte en lenguaje normal; la respuesta cita sentencias del Boletín Judicial, leyes y sus documentos."),
     }
 
     BUILDERS = {

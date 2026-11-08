@@ -1,5 +1,5 @@
 """
-IA para responder con las sentencias encontradas.
+IA para responder con las sentencias y los artículos de ley encontrados.
 Usa proveedores compatibles con la API de OpenAI, en cadena: si uno llega a su
 límite gratis (o falla), contesta el siguiente.
 
@@ -36,14 +36,17 @@ _SISTEMA = (
     "responden y las demás ignóralas sin mencionarlas ni resumirlas.\n\n"
     "Cómo responder:\n"
     "1. Empieza respondiendo directamente, en 1 a 3 oraciones, sin ponerle título.\n"
-    "2. **Lo que dice la jurisprudencia:** explica el criterio de las fuentes que sirven, citando cada "
+    "2. **Lo que dice la ley:** solo si entre las fuentes que sirven hay artículos de una ley o un "
+    "reglamento: di qué dispone cada uno, nombrando el artículo y citándolo con su número entre "
+    "corchetes, por ejemplo [1]. Si no hay ninguno, omite esta sección.\n"
+    "3. **Lo que dice la jurisprudencia:** explica el criterio de las sentencias que sirven, citando cada "
     "afirmación con su número entre corchetes, por ejemplo [2]. Si hay sentencias que dicen cosas "
-    "distintas, señálalo.\n"
-    "3. **Análisis:** da tu opinión profesional: cómo se aplica al caso, qué argumentos conviene usar, "
+    "distintas, señálalo. Si ninguna sentencia sirve, omite esta sección.\n"
+    "4. **Análisis:** da tu opinión profesional: cómo se aplica al caso, qué argumentos conviene usar, "
     "qué riesgos o puntos débiles hay y qué conviene revisar o reunir (documentos, plazos, pruebas). "
-    "Aquí puedes razonar más allá de las fuentes, pero sin citarlas como si lo dijera una sentencia.\n"
-    "4. Si ninguna fuente sirve, dilo en una o dos oraciones y sugiere cómo seguir (decirlo con otras "
-    "palabras o subir sus propios documentos), sin las secciones 2 y 3.\n\n"
+    "Aquí puedes razonar más allá de las fuentes, pero sin citarlas como si lo dijera una sentencia o una ley.\n"
+    "5. Si ninguna fuente sirve, dilo en una o dos oraciones y sugiere cómo seguir (decirlo con otras "
+    "palabras o subir sus propios documentos), sin las secciones 2, 3 y 4.\n\n"
     "Reglas: nunca inventes sentencias, números, fechas, artículos ni citas; [n] solo para lo que está en "
     "la fuente n. Si mencionas una ley o un artículo que no está en las fuentes, advierte que hay que "
     "verificarlo. No repitas la pregunta. Usa negritas y listas cortas, sin tablas. Eres una herramienta "
@@ -108,9 +111,10 @@ def _chat_en_cadena(mensajes: list, para_busquedas: bool = False, **kw) -> str:
     raise ultimo if isinstance(ultimo, LimiteAlcanzado) else LimiteAlcanzado(str(ultimo))
 
 
-_PRESENTACION = ("Busco en las sentencias de la Suprema Corte y en sus documentos. Puede preguntarme, por "
-                 "ejemplo, por «deslinde aprobado sin citar a los colindantes» o por un número de sentencia "
-                 "como SCJ-TS-25-1451.")
+_PRESENTACION = ("Busco en las sentencias de la Suprema Corte, en la Ley 108-05 de Registro Inmobiliario y sus "
+                 "reglamentos, y en sus documentos. Puede preguntarme, por ejemplo, por «deslinde aprobado sin "
+                 "citar a los colindantes», por un número de sentencia como SCJ-TS-25-1451 o por un artículo "
+                 "como «art. 81 de la Ley 108-05».")
 
 
 def no_es_consulta(texto: str) -> str:
@@ -162,7 +166,7 @@ def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
                              for m in _memoria(historial))
         salida = _chat_en_cadena([
             {"role": "system", "content":
-                "Preparas las búsquedas de un asistente jurídico dominicano que busca en sentencias. "
+                "Preparas las búsquedas de un asistente jurídico dominicano que busca en sentencias y en leyes. "
                 "Recibes la conversación reciente y el último mensaje del abogado. Devuelve JSON: "
                 "{\"tipo\": \"...\", \"consulta\": \"...\", \"busquedas\": [\"...\"]}.\n"
                 "- tipo \"nueva\": pide información jurídica que hay que buscar (también una pregunta de "
