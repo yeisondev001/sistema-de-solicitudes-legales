@@ -114,6 +114,15 @@ OBRAS = [
      "fecha": "2022",
      "url": "https://ri.gob.do/wp-content/uploads/2023/10/Libro-Ley-108-05-de-registro-inmobiliario.pdf",
      "desde_pagina": 11},
+    # trae el texto de cada artículo del nuevo Código Penal y después su comentario
+    {"corto": "Código Penal",
+     "nombre": "Código Penal Comentado (Ley núm. 74-25), Escuela Nacional de la Judicatura, 2026",
+     "fecha": "2026", "materia": "Penal", "archivo": "leyes/codigo-penal-comentado.pdf",
+     "url": _REPO + "leyes/codigo-penal-comentado.pdf", "desde_pagina": 31, "saltos": 3,
+     "alias": r"74-25|c[óo]digo penal(?! (?:anterior|derogado|viejo|de 1884))",
+     # cabecera de cada página, "COMENTARIOS A LOS ARTÍCULOS 1 AL 7", "Comentario" y las notas al pie
+     "cabeceras": r"C[ÓO]DIGO PENAL COMENTADO|COMENTARIOS? A(?:L| LOS) ART[ÍI]CULOS?.*|Comentarios?"
+                  r"|\d{1,3} [A-ZÁÉÍÓÚ][^.]{1,80}\(\d{4}\)\..*"},
 ]
 
 # "Art. 81.- Plazo…" (Ley 108-05) o "Artículo 81. Plazo…" (reglamentos). pdftotext junta los
@@ -205,6 +214,10 @@ def comentarios(paginas: list, obra: dict) -> list:
         if num < obra["desde_pagina"]:
             continue
         for linea in unicodedata.normalize("NFC", pagina).splitlines():
+            # "SECCIÓN III DEL PRONUNCIAMIENTO DE LAS PENAS Artículo 55.- …": el título se va, el artículo no
+            m = _ENCABEZADO.match(linea) and re.search(r"\bArt[íi]culo\s+\d{1,4}\s*\.\s*-", linea)
+            if m:
+                linea = linea[m.start():]
             if _REFERENCIAS.match(linea):
                 en_referencias = True
             elif _CAPITULO_COMENTADO.search(linea):
@@ -213,14 +226,18 @@ def comentarios(paginas: list, obra: dict) -> list:
             elif _EMPIEZA_COMENTARIO.match(linea):
                 en_referencias = False
             if (en_referencias or not linea.strip() or _CABECERAS_OBRA.match(linea)
+                    or (obra.get("cabeceras") and re.fullmatch(r"\s*(?:%s)\s*" % obra["cabeceras"], linea))
                     or _ENCABEZADO.match(linea) or re.match(r"^\s*Por [A-ZÁÉÍÓÚ]", linea)):
                 continue
             inicios.append((len(texto), num))
             texto += linea.strip() + " "
-    # el comentario cita otros artículos: solo cuenta el que sigue exactamente al anterior
+    # erratas del libro del Código Penal: "Artículo 148,- …"
+    texto = re.sub(r"(\bArt[íi]culo \d{1,4}),-", r"\1.-", texto)
+    # el comentario cita otros artículos: solo cuenta el que sigue al anterior (con "saltos" el libro
+    # puede no comentar alguno, o escribirlo de otra forma: se admiten hasta 2 que falten)
     cortes = [(0, 0)]
     for m in _ARTICULO.finditer(texto):
-        if int(m.group(1)) == cortes[-1][1] + 1:
+        if cortes[-1][1] < int(m.group(1)) <= cortes[-1][1] + obra.get("saltos", 1):
             cortes.append((m.start(), int(m.group(1))))
     lista = []
     for i, (pos, n) in enumerate(cortes):
@@ -252,7 +269,7 @@ def guardar_obra(conn, obra: dict, lista: list) -> int:
     conn.commit()
     for a in lista:
         ficha = {"numero": numero(obra, a["articulo"]) if a["articulo"] else f"{obra['corto']}, principios",
-                 "sala": obra["nombre"], "materia": MATERIA, "fecha": obra["fecha"]}
+                 "sala": obra["nombre"], "materia": obra.get("materia", MATERIA), "fecha": obra["fecha"]}
         guardar(conn, ficha, fragmentar(a["paginas"]), "doctrina", titulo=a["nombre"],
                 fuente_url=obra["url"], pagina=a["pagina"])
     return len(lista)
@@ -304,7 +321,8 @@ def citas(texto: str) -> list:
     salida = []
     for art, resto in _CITA.findall(texto):
         # la norma que se nombra más cerca del número ("art. 12 del reglamento de mensuras y art. 81 de la ley")
-        nombradas = [(m.start(), norma) for norma in NORMAS for m in [re.search(norma["alias"], resto, re.I)] if m]
+        nombradas = [(m.start(), norma) for norma in NORMAS + OBRAS if norma.get("alias")
+                     for m in [re.search(norma["alias"], resto, re.I)] if m]
         if nombradas:
             cita = numero(min(nombradas, key=lambda x: x[0])[1], int(art)).upper()
             salida.append(cita.translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU")))
