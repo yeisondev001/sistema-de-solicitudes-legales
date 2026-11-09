@@ -95,11 +95,15 @@ for _archivo, _corto, _nombre, _materia, _alias in [
     ("leyes/res-008-2020.pdf", "Reglamento del Registro Inmobiliario (CPJ)",
      "Reglamento de Registro Inmobiliario del Consejo del Poder Judicial (Res. núm. 008-2020)", "Inmobiliario",
      r"008-2020"),
+    ("leyes/codigo-penal-anterior.pdf", "Código Penal (derogado)",
+     "Código Penal de la República Dominicana de 1884, derogado por la Ley núm. 74-25 (rige para hechos anteriores a su "
+     "entrada en vigor, agosto de 2026)", "Penal", r"c[óo]digo penal (?:anterior|derogado|viejo|de 1884)"),
 ]:
     NORMAS.append({"corto": _corto, "nombre": _nombre, "fecha": "", "materia": _materia, "alias": _alias,
                    "archivo": _archivo, "url": _REPO + _archivo})
+for _c in ("Ley 64-00", "Código Penal (derogado)"):   # páginas fuera de orden o artículos derogados (362-366)
+    NORMAS[[n["corto"] for n in NORMAS].index(_c)]["orden_libre"] = True
 # después del art. 738 el PDF del Código de Trabajo sigue con notas, índice y otras normas
-NORMAS[[n["corto"] for n in NORMAS].index("Ley 64-00")]["orden_libre"] = True
 NORMAS[[n["corto"] for n in NORMAS].index("Código de Trabajo")]["fin"] = r"\b\d{1,2}\.- Con posterioridad a la promulgaci"
 
 # libros de leyes comentadas; desde_pagina: donde termina el índice y empieza el comentario
