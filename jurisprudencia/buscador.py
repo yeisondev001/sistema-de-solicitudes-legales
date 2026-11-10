@@ -25,7 +25,9 @@ _PERMISO = "(d.usuario_id IS NULL OR d.usuario_id = %(usuario)s)"
 # números de sentencia o expediente: SCJ-TS-25-1451, 001-022-2025-SRES-00121, TC/0001/24…
 _NUMERO = re.compile(r"\b(?=[\w/-]*\d)[0-9A-Z]+(?:[-/][0-9A-Z]+){2,}\b", re.I)
 MAX_PALABRAS = 7
+_SOLO_CITA = re.compile(r"\s*art(?:[íi]culo|s?\.)?\s*\d{1,4}\s+(?:del?|de la)\s+[^,;]{3,80}", re.I)
 MAX_ARTICULOS = 3   # lugares que se guardan para artículos de ley y sus comentarios entre las fuentes
+LEYES_CANDIDATOS = 12   # de la búsqueda solo en leyes: artículos que se consideran por palabras y por significado
 _comunes = {}     # base -> (palabras, hora en que se leyeron)
 
 
@@ -60,8 +62,9 @@ def _consulta_minimo_dos(conn, texto: str):
     return lex[0] if lex else None
 
 
-def _por_palabras(conn, consultas: list, usuario_id: int, n: int) -> list:
+def _por_palabras(conn, consultas: list, usuario_id: int, n: int, solo_leyes: bool = False) -> list:
     mejores = {}
+    filtro = " AND d.origen IN ('ley', 'doctrina')" if solo_leyes else ""
     for q in consultas:
         tq = _consulta_minimo_dos(conn, q)
         if not tq:
@@ -70,7 +73,7 @@ def _por_palabras(conn, consultas: list, usuario_id: int, n: int) -> list:
             conn,
             f"""SELECT {_COLUMNAS}, ts_rank_cd(f.tsv, to_tsquery('simple', %(q)s)) AS puntaje, {_EXTRACTO}
                 FROM fragmentos f JOIN documentos d ON d.id = f.documento_id
-                WHERE f.tsv @@ to_tsquery('simple', %(q)s) AND {_PERMISO}
+                WHERE f.tsv @@ to_tsquery('simple', %(q)s) AND {_PERMISO}{filtro}
                 ORDER BY puntaje DESC LIMIT %(n)s""",
             {"q": tq, "tq": _tsquery(q) or "sentencia", "usuario": usuario_id, "n": n})
         for f in filas:
@@ -134,12 +137,34 @@ def _por_significado(conn, vector: str, pregunta: str, usuario_id: int, n: int) 
     return basedatos.filas(conn, sql, params)
 
 
+def _leyes_por_significado(conn, vector: str, pregunta: str, n: int) -> list:
+    """Los artículos de ley y comentarios más parecidos a la pregunta (son pocos miles: se recorren todos)."""
+    tipo = basedatos.vector_tipo(conn)
+    if not (vector and tipo):
+        return []
+    return basedatos.filas(
+        conn,
+        f"""SELECT {_COLUMNAS}, f.emb <=> %(v)s::{tipo} AS distancia, {_EXTRACTO}
+            FROM fragmentos f JOIN documentos d ON d.id = f.documento_id
+            WHERE f.emb IS NOT NULL AND d.origen IN ('ley', 'doctrina') AND d.usuario_id IS NULL
+            ORDER BY distancia LIMIT %(n)s""",
+        {"v": vector, "n": n, "tq": _tsquery(pregunta) or "ley"})
+
+
 def _en_base(indice: int, url: str, consultas, numeros, vector, pregunta, usuario_id, n):
-    """Las tres listas (número, palabras, significado) de una base."""
+    """Las listas de una base: número, palabras y significado, y en la principal (donde están las
+    leyes) también palabras y significado buscando solo en leyes y comentarios."""
     with basedatos.conectar(url) as conn:
         listas = [_por_numero(conn, numeros, usuario_id), _por_palabras(conn, consultas, usuario_id, n)]
         try:
             listas.append(_por_significado(conn, vector, pregunta, usuario_id, n))
+        except Exception:
+            conn.rollback()
+            listas.append([])
+        listas.append(_por_palabras(conn, consultas, usuario_id, LEYES_CANDIDATOS, solo_leyes=True)
+                      if indice == 0 else [])
+        try:
+            listas.append(_leyes_por_significado(conn, vector, pregunta, LEYES_CANDIDATOS) if indice == 0 else [])
         except Exception:
             conn.rollback()
             listas.append([])
@@ -164,6 +189,9 @@ def buscar(consultas, usuario_id: int, limite: int = 8, pregunta: str = None) ->
     urls, numeros = basedatos.bases(), _numeros(consultas)
     if not urls:
         return []
+    # "art. 76 del Código de Trabajo" (los que pide la IA que prepara la búsqueda) se buscan por número;
+    # por palabras solo meterían ruido ("código", "trabajo")
+    consultas = [q for q in consultas if not _SOLO_CITA.fullmatch(q)] or consultas
 
     def una(par):
         try:
@@ -189,10 +217,24 @@ def buscar(consultas, usuario_id: int, limite: int = 8, pregunta: str = None) ->
             puntos[k] = puntos.get(k, 0.0) + peso / (RRF_K + pos + 1)
             filas.setdefault(k, f)
     ordenados = sorted(filas, key=lambda k: puntos[k], reverse=True)
-    # los artículos de ley y sus comentarios compiten con 28.000 sentencias: los mejores van adelante si de verdad
-    # vienen al caso (por número, por palabras o entre los más parecidos de todas las fuentes)
-    al_caso = {(f["base"], f["id"]) for f in por_numero + por_palabras + por_significado[:limite * 2]}
-    articulos = [k for k in ordenados if filas[k]["origen"] in ("ley", "doctrina") and k in al_caso][:MAX_ARTICULOS]
+    # los artículos de ley compiten con 28.000 sentencias y casi nunca llegaban arriba: por eso se buscan
+    # también solo entre leyes y comentarios. Un artículo va adelante si lo pidieron por número, o si sale
+    # por palabras entre las leyes (usa los términos de la pregunta: "preaviso", "cesantía"), ordenado por
+    # cuánto se parece además por significado. Solo por significado no alcanza: sin palabras en común
+    # salían artículos que no venían al caso.
+    leyes_palabras = sorted((f for r in buenos for f in r[3]), key=lambda f: f["puntaje"], reverse=True)
+    leyes_significado = sorted((f for r in buenos for f in r[4]), key=lambda f: f["distancia"])
+    puntos_ley = {}
+    for lista in (leyes_palabras, leyes_significado):
+        for pos, f in enumerate(lista):
+            k = (f["base"], f["id"])
+            puntos_ley[k] = puntos_ley.get(k, 0.0) + 1.0 / (RRF_K + pos + 1)
+            filas.setdefault(k, f)
+            puntos.setdefault(k, 0.0)
+    con_palabras = {(f["base"], f["id"]) for f in leyes_palabras}
+    pedidos = [k for k in ((f["base"], f["id"]) for f in por_numero) if filas[k]["origen"] in ("ley", "doctrina")]
+    articulos = list(dict.fromkeys(pedidos + sorted(con_palabras, key=lambda k: puntos_ley[k], reverse=True)))
+    articulos = articulos[:MAX_ARTICULOS]
     ordenados = articulos + [k for k in ordenados if k not in articulos]
     # como máximo 2 fragmentos por documento, para variar las fuentes
     por_doc, final = {}, []

@@ -165,6 +165,20 @@ def _memoria(historial: list) -> list:
             for t in (historial or [])[-TURNOS_DE_MEMORIA:]]
 
 
+def _normas_disponibles() -> str:
+    """Las leyes y códigos cargados, para que la IA que prepara la búsqueda pida artículos que existen."""
+    try:
+        from .leyes import NORMAS, OBRAS
+        nombres = [n["corto"] for n in NORMAS] + [o["corto"] + " (nuevo, Ley 74-25)" for o in OBRAS
+                                                  if o["corto"] == "Código Penal"]
+        return ", ".join(dict.fromkeys(nombres))
+    except Exception:
+        return "Código Civil, Código de Trabajo, Código Penal, Ley 108-05"
+
+
+_NORMAS_DISPONIBLES = _normas_disponibles()
+
+
 def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
     """Decide qué hacer con el mensaje, teniendo en cuenta la conversación:
       {"tipo": "nueva", "consulta": "...", "busquedas": [...]}   hay que buscar sentencias
@@ -182,7 +196,10 @@ def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
                 "- tipo \"nueva\": pide información jurídica que hay que buscar (también una pregunta de "
                 "seguimiento que cambia o amplía el tema). \"consulta\": el mensaje reescrito para que se "
                 "entienda solo, sin pronombres, con el tema de la conversación. \"busquedas\": 2 a 4 búsquedas "
-                "cortas (3 a 8 palabras) con sinónimos y términos jurídicos.\n"
+                "cortas (3 a 8 palabras) con sinónimos y términos jurídicos. Además, si sabes qué artículos "
+                "regulan el tema, agrega hasta 3 búsquedas más, cada una con un solo artículo, escritas así: "
+                "«art. 76 del Código de Trabajo». Solo de estas normas: " + _NORMAS_DISPONIBLES + ". Si no "
+                "estás seguro del número, no lo agregues.\n"
                 "- tipo \"seguimiento\": solo pide explicar, resumir, simplificar o aclarar lo ya respondido, "
                 "sin tema nuevo. \"busquedas\": [].\n"
                 "- tipo \"no_juridica\": un saludo, un agradecimiento, una pregunta sobre el asistente o sobre "
@@ -195,7 +212,7 @@ def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
             para_busquedas=True, max_tokens=500, json_modo=True)
         datos = json.loads(salida)
         tipo = datos.get("tipo") if datos.get("tipo") in ("nueva", "seguimiento", "no_juridica") else "nueva"
-        busquedas = [b for b in datos.get("busquedas", []) if isinstance(b, str) and b.strip()][:4]
+        busquedas = [b for b in datos.get("busquedas", []) if isinstance(b, str) and b.strip()][:7]
         consulta = (datos.get("consulta") or "").strip() or pregunta
         if tipo != "nueva" and re.search(r"\d", pregunta) and not historial:
             tipo = "nueva"   # puede ser un número de sentencia o expediente
@@ -214,16 +231,85 @@ def generar_busquedas(pregunta: str) -> list:
     return plan["busquedas"] if plan["tipo"] == "nueva" else []
 
 
+# ── Cifras que no salen de las fuentes ─────────────
+# La IA a veces pone plazos de memoria ("30 días de preaviso") que no dicen las fuentes. Se revisa cada
+# "N días / meses / años…" de la respuesta: el número tiene que estar en las fuentes, en la pregunta o en la
+# conversación, escrito con cifras o con letras (las leyes dicen "catorce días").
+_UNIDADES = {"un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7,
+             "ocho": 8, "nueve": 9, "diez": 10, "once": 11, "doce": 12, "trece": 13, "catorce": 14, "quince": 15,
+             "dieciseis": 16, "diecisiete": 17, "dieciocho": 18, "diecinueve": 19, "veinte": 20, "veintiun": 21,
+             "veintiuno": 21, "veintidos": 22, "veintitres": 23, "veinticuatro": 24, "veinticinco": 25,
+             "veintiseis": 26, "veintisiete": 27, "veintiocho": 28, "veintinueve": 29, "treinta": 30,
+             "cuarenta": 40, "cincuenta": 50, "sesenta": 60, "setenta": 70, "ochenta": 80, "noventa": 90,
+             "cien": 100, "ciento": 100, "doscientos": 200, "doscientas": 200, "trescientos": 300,
+             "trescientas": 300, "cuatrocientos": 400, "quinientos": 500, "seiscientos": 600}
+_PALABRA_NUM = r"(?:%s)" % "|".join(sorted(_UNIDADES, key=len, reverse=True))
+_NUMERO_LETRAS = re.compile(r"\b%s(?:\s+(?:y\s+)?%s)*\b" % (_PALABRA_NUM, _PALABRA_NUM))
+_CIFRA = re.compile(r"\b(\d{1,4}|%s(?:\s+(?:y\s+)?%s)*)\s*(?:\(\s*\d{1,4}\s*\)\s*)?"
+                    r"(d[ií]as?|mes(?:es)?|a[ñn]os?|semanas?|horas?)\b" % (_PALABRA_NUM, _PALABRA_NUM), re.I)
+
+
+def _sin_tildes(texto: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", texto.lower()) if unicodedata.category(c) != "Mn")
+
+
+def _valor(numero: str) -> int:
+    numero = _sin_tildes(numero)
+    if numero.isdigit():
+        return int(numero)
+    return sum(_UNIDADES.get(p, 0) for p in numero.split() if p != "y")
+
+
+def _numeros(texto: str) -> set:
+    """Todos los números de un texto, escritos con cifras ("14", "1,500") o con letras ("catorce")."""
+    texto = _sin_tildes(texto)
+    nums = {int(n.replace(",", "").replace(".", "")) for n in re.findall(r"\d{1,3}(?:[.,]\d{3})+|\d+", texto)}
+    return nums | {_valor(m.group(0)) for m in _NUMERO_LETRAS.finditer(texto)}
+
+
+def cifras_sin_respaldo(respuesta: str, textos: list) -> list:
+    """Las cifras con plazo ("30 días", "tres meses") de la respuesta que no salen de ningún texto dado."""
+    validos = set().union(*(_numeros(t) for t in textos)) if textos else set()
+    salida = []
+    import unicodedata
+    respuesta = unicodedata.normalize("NFC", respuesta)   # así quitar tildes no cambia las posiciones
+    for m in _CIFRA.finditer(_sin_tildes(respuesta)):
+        if _valor(m.group(1)) > 1 and _valor(m.group(1)) not in validos:
+            salida.append(respuesta[m.start():m.end()].strip())
+    return list(dict.fromkeys(salida))
+
+
 def responder(pregunta: str, fuentes: list, referencia, historial: list = None) -> dict:
-    """Redacta la respuesta con análisis y quita cualquier cita a una fuente que no exista."""
+    """Redacta la respuesta con análisis y quita cualquier cita a una fuente que no exista.
+    Si pone plazos que no salen de las fuentes, se le pide una vez que los corrija; si insiste, se avisa."""
     fuentes = fuentes[:MAX_FUENTES]
     por_fuente = CARACTERES_FUENTES // max(len(fuentes), 1)
     bloque = "\n\n".join(f"[{n}] {referencia(f)}\n{f['texto'][:por_fuente]}" for n, f in enumerate(fuentes, 1))
-    texto = _chat_en_cadena([
-        {"role": "system", "content": _SISTEMA},
-        *_memoria(historial),
-        {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\nPregunta: {pregunta}"}],
-        max_tokens=MAX_TOKENS_RESPUESTA)
+    mensajes = [{"role": "system", "content": _SISTEMA},
+                *_memoria(historial),
+                {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\nPregunta: {pregunta}"}]
+    texto = _chat_en_cadena(mensajes, max_tokens=MAX_TOKENS_RESPUESTA)
+    respaldo = [bloque, pregunta] + [m["content"] for m in _memoria(historial)]
+    dudosas = cifras_sin_respaldo(texto, respaldo)
+    if dudosas:
+        try:
+            corregido = _chat_en_cadena(mensajes + [
+                {"role": "assistant", "content": texto},
+                {"role": "user", "content":
+                    "Revisión: estas cifras de tu respuesta no aparecen en ninguna de las fuentes: "
+                    + ", ".join(f"«{d}»" for d in dudosas) + ". Reescribe la respuesta completa usando solo "
+                    "los plazos y cantidades que dicen las fuentes, con la operación paso a paso. Si el dato "
+                    "que hace falta no está en las fuentes, no lo pongas: di qué artículo hay que verificar."}],
+                max_tokens=MAX_TOKENS_RESPUESTA)
+            if len(cifras_sin_respaldo(corregido, respaldo)) < len(dudosas):
+                texto = corregido
+        except Exception:
+            pass   # sin cuota para corregir: queda la primera respuesta con el aviso
+        dudosas = cifras_sin_respaldo(texto, respaldo)
+        if dudosas:
+            texto += ("\n\n> ⚠️ **Verifique estas cifras:** " + ", ".join(dudosas)
+                      + ". No aparecen en las fuentes encontradas; pueden ser un error.")
     # algunos modelos citan como 【1】 o 【1†fuente】: se pasan a [1]
     texto = re.sub(r"【\s*(\d+)[^】]*】", r"[\1]", texto)
     validas = set(range(1, len(fuentes) + 1))
