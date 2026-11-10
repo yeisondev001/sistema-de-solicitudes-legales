@@ -1600,7 +1600,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
     # ── JURISPRUDENCIA ───────────────────────────
     MAX_MB_SUBIDA = 20
-    juris_estado  = {"chat": [], "pendiente": None, "subidas": {}}
+    # conv_id: la conversación abierta, guardada en la base (cuentas.guardar_conversacion)
+    juris_estado  = {"chat": [], "pendiente": None, "subidas": {}, "conv_id": None}
 
     def _sin_html(texto):
         return re.sub(r"</?b>", "", texto or "")
@@ -1753,7 +1754,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                                     size=14, color=INK_SOFT, font_family=FONT_BODY))]
 
         # La consulta es una conversación: cada mensaje del abogado y cada respuesta del asistente
-        # (con las sentencias que usó) quedan en juris_estado["chat"] mientras dure la sesión.
+        # (con las sentencias que usó) quedan en juris_estado["chat"] y se guardan en la base, así el
+        # abogado las vuelve a abrir desde la lista de conversaciones (como en ChatGPT).
         chat = juris_estado["chat"]
         # todos los estilos con color propio: los que quedan sin definir salen con el color del tema
         # (casi blanco sobre el papel) y no se leen, como las tablas y los títulos que a veces pone la IA
@@ -1855,8 +1857,113 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             boton_enviar.disabled = bool(juris_estado["pendiente"])
             boton_nueva.disabled = not chat or bool(juris_estado["pendiente"])
 
+        lista_conv = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, expand=True)
+        lateral = (page.width or 1280) >= 900   # en pantallas chicas la lista se abre con un botón
+
+        def conversaciones():
+            try:
+                return cuentas.listar_conversaciones(usuario["id"])
+            except Exception:
+                return []
+
+        def fila_conversacion(c, al_abrir=None):
+            abierta = c["id"] == juris_estado["conv_id"]
+
+            def abrir(e):
+                if al_abrir:
+                    al_abrir()
+                abrir_conversacion(c["id"])
+
+            return ft.Container(
+                content=ft.Row(controls=[
+                    ft.Text(c["titulo"], size=13, color=INK, font_family=FONT_BODY, expand=True,
+                            weight=ft.FontWeight.W_600 if abierta else None,
+                            max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
+                    ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=16, icon_color=INK_SOFT,
+                                  tooltip="Borrar conversación", on_click=lambda e: confirmar_borrar_conv(c)),
+                ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                bgcolor=PAPER_EDGE if abierta else None, border_radius=8,
+                padding=ft.padding.only(left=10, top=2, bottom=2), on_click=abrir, ink=True)
+
+        def pintar_conversaciones():
+            filas = conversaciones()
+            lista_conv.controls = [fila_conversacion(c) for c in filas] or [ft.Text(
+                "Aquí aparecerán sus conversaciones.", size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY)]
+
+        def guardar_chat():
+            """Guarda la conversación abierta en segundo plano y refresca la lista."""
+            mensajes = list(chat)
+
+            def tarea():
+                try:
+                    juris_estado["conv_id"] = cuentas.guardar_conversacion(
+                        usuario["id"], juris_estado["conv_id"], mensajes)
+                except Exception:
+                    return   # si no se puede guardar, el chat sigue funcionando igual
+                if lateral:
+                    pintar_conversaciones(); page.update()
+            page.run_thread(tarea)
+
+        def abrir_conversacion(conv_id):
+            if juris_estado["pendiente"]:
+                return
+            try:
+                mensajes = cuentas.abrir_conversacion(usuario["id"], conv_id)
+            except Exception as ex:
+                snack(f"No se pudo abrir la conversación: {ex}", ok=False); return
+            chat[:] = mensajes
+            juris_estado["conv_id"] = conv_id
+            if lateral:
+                pintar_conversaciones()
+            pintar(); page.update()
+
+        def confirmar_borrar_conv(c):
+            def on_borrar(e):
+                page.close(dlg)
+                try:
+                    cuentas.borrar_conversacion(usuario["id"], c["id"])
+                except Exception as ex:
+                    snack(f"No se pudo borrar: {ex}", ok=False); return
+                if juris_estado["conv_id"] == c["id"]:
+                    chat.clear(); juris_estado["conv_id"] = None
+                if lateral:
+                    pintar_conversaciones()
+                pintar(); page.update()
+                snack("Conversación borrada.")
+
+            dlg = ft.AlertDialog(
+                modal=True, bgcolor=PAPER,
+                title=ft.Text("¿Borrar la conversación?", font_family=FONT_DISPLAY, color=INK, size=22),
+                content=ft.Text(f"«{c['titulo']}»\n\nEsta acción no se puede deshacer.",
+                                font_family=FONT_BODY, color=INK_SOFT, size=14),
+                actions=[
+                    ft.TextButton("Cancelar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK_SOFT)),
+                    ft.ElevatedButton("Borrar", on_click=on_borrar, style=ft.ButtonStyle(
+                        bgcolor=PDF_COLOR, color=PAPER, shape=ft.RoundedRectangleBorder(radius=2))),
+                ],
+                actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+            page.open(dlg)
+
+        def ver_conversaciones():
+            """En el celular: la lista en una ventana."""
+            def cerrar():
+                page.close(dlg)
+            filas = conversaciones()
+            dlg = ft.AlertDialog(
+                bgcolor=PAPER,
+                title=ft.Text("Conversaciones", font_family=FONT_DISPLAY, color=INK, size=22),
+                content=ft.Container(width=420, height=420, content=ft.Column(
+                    controls=[fila_conversacion(c, cerrar) for c in filas] or [ft.Text(
+                        "Todavía no tiene conversaciones guardadas.", size=13, color=INK_SOFT, font_family=FONT_BODY)],
+                    spacing=2, scroll=ft.ScrollMode.AUTO)),
+                actions=[ft.TextButton("Cerrar", on_click=lambda e: cerrar(), style=ft.ButtonStyle(color=INK))])
+            page.open(dlg)
+
         def nueva_conversacion():
             chat.clear()
+            juris_estado["conv_id"] = None
+            if lateral:
+                pintar_conversaciones()
             pintar(); page.update()
 
         def enviar(texto):
@@ -1869,7 +1976,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             # un saludo o una prueba ("hola") no se busca: siempre saldría "lo más parecido"
             if not juris_ia.parece_consulta(q):
                 chat.append({"rol": "asistente", "texto": juris_ia.no_es_consulta(q)})
-                pintar(); page.update(); return
+                pintar(); page.update(); guardar_chat(); return
             # las cuentas de prueba tienen un máximo de preguntas por día
             try:
                 cuentas.registrar_pregunta(usuario["id"], usuario.get("plan", "activo"))
@@ -1920,6 +2027,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                 chat.append(turno)
                 juris_estado["pendiente"] = None
                 pintar(); page.update()
+                guardar_chat()
             page.run_thread(tarea)
 
         def lista_documentos():
@@ -1955,15 +2063,30 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             ) for d in docs]
 
         pintar()
+        arriba = [boton_nueva] if lateral else [ft.TextButton(
+            "Conversaciones", icon=ft.Icons.HISTORY, on_click=lambda e: ver_conversaciones(),
+            style=ft.ButtonStyle(color=INK_SOFT)), boton_nueva]
+        chat_col = ft.Column(controls=[
+            ft.Row(controls=arriba, alignment=ft.MainAxisAlignment.END if lateral
+                   else ft.MainAxisAlignment.SPACE_BETWEEN),
+            mensajes_col,
+            ft.Row(controls=[entrada, boton_enviar], vertical_alignment=ft.CrossAxisAlignment.END, spacing=8),
+            ft.Text("Herramienta de apoyo: verifique cada cita en la fuente antes de usarla. "
+                    "No escriba datos personales de clientes en la consulta.",
+                    size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY),
+        ], spacing=12, expand=True)
+        consulta = chat_col
+        if lateral:
+            pintar_conversaciones()
+            consulta = ft.Row(controls=[
+                ft.Container(width=240, height=mensajes_col.height + 120, content=ft.Column(controls=[
+                    ft.Text("Conversaciones", size=13, weight=ft.FontWeight.W_600, color=INK_SOFT,
+                            font_family=FONT_BODY),
+                    lista_conv], spacing=8),
+                    padding=ft.padding.only(right=12), border=ft.border.only(right=ft.BorderSide(1, PAPER_EDGE))),
+                chat_col], vertical_alignment=ft.CrossAxisAlignment.START, spacing=16)
         return [
-            tarjeta("I", "Consulta", "Converse con el asistente; cada respuesta cita sus fuentes", ft.Column(controls=[
-                ft.Row(controls=[boton_nueva], alignment=ft.MainAxisAlignment.END),
-                mensajes_col,
-                ft.Row(controls=[entrada, boton_enviar], vertical_alignment=ft.CrossAxisAlignment.END, spacing=8),
-                ft.Text("Herramienta de apoyo: verifique cada cita en la fuente antes de usarla. "
-                        "No escriba datos personales de clientes en la consulta.",
-                        size=12, italic=True, color=INK_SOFT, font_family=FONT_BODY),
-            ], spacing=12)),
+            tarjeta("I", "Consulta", "Converse con el asistente; cada respuesta cita sus fuentes", consulta),
             tarjeta("II", "Mis documentos", "Solo usted los ve; entran al mismo buscador", ft.Column(controls=[
                 ft.OutlinedButton("Subir PDF o Word", icon=ft.Icons.UPLOAD_FILE,
                                   on_click=lambda e: selector.pick_files(allow_multiple=True,

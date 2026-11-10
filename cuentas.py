@@ -69,6 +69,14 @@ _MIGRACIONES = {
         # las plantillas quedan para las cuentas que ya las usaban; las nuevas las tienen apagadas
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS plantillas BOOLEAN",
         "UPDATE usuarios SET plantillas = (plan = 'activo') WHERE plantillas IS NULL",
+        # conversaciones del asistente de jurisprudencia (los mensajes y sus fuentes, en JSON)
+        """CREATE TABLE IF NOT EXISTS conversaciones (
+            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            titulo TEXT NOT NULL,
+            actualizada BIGINT NOT NULL,
+            mensajes TEXT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -82,6 +90,13 @@ _MIGRACIONES = {
             PRIMARY KEY (usuario_id, dia))""",
         "ALTER TABLE usuarios ADD COLUMN plantillas INTEGER",
         "UPDATE usuarios SET plantillas = (plan = 'activo') WHERE plantillas IS NULL",
+        """CREATE TABLE IF NOT EXISTS conversaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            titulo TEXT NOT NULL,
+            actualizada INTEGER NOT NULL,
+            mensajes TEXT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
     ],
 }
 _tablas_listas = False
@@ -280,3 +295,50 @@ def usuario_de_sesion(token: str):
 def cerrar_sesion(token: str):
     if token:
         _ejecutar("DELETE FROM sesiones WHERE token = %s", (token,))
+
+
+# ── Conversaciones del asistente ─────────────────
+MAX_CONVERSACIONES = 100   # por usuario; las más viejas se borran solas (la base gratis es chica)
+MAX_TEXTO_FUENTE = 2000    # de cada fuente se guarda lo que la IA necesita para seguir la conversación
+
+
+def _titulo(mensajes: list) -> str:
+    primera = next((m["texto"] for m in mensajes if m.get("rol") == "usuario"), "Conversación")
+    primera = " ".join(primera.split())
+    return primera if len(primera) <= 60 else primera[:57].rsplit(" ", 1)[0] + "…"
+
+
+def guardar_conversacion(usuario_id: int, conv_id, mensajes: list):
+    """Guarda la conversación (nueva si conv_id es None) y devuelve su id."""
+    import json
+    livianos = [{**m, "fuentes": [{**f, "texto": (f.get("texto") or "")[:MAX_TEXTO_FUENTE]}
+                                  for f in m.get("fuentes") or []]} for m in mensajes]
+    datos = json.dumps(livianos, ensure_ascii=False, default=str)
+    ahora = int(time.time())
+    if conv_id:
+        _ejecutar("UPDATE conversaciones SET mensajes = %s, actualizada = %s WHERE id = %s AND usuario_id = %s",
+                  (datos, ahora, conv_id, usuario_id))
+        return conv_id
+    fila = _ejecutar("INSERT INTO conversaciones (usuario_id, titulo, actualizada, mensajes) "
+                     "VALUES (%s, %s, %s, %s) RETURNING id",
+                     (usuario_id, _titulo(mensajes), ahora, datos), leer=True)
+    _ejecutar("""DELETE FROM conversaciones WHERE usuario_id = %s AND id NOT IN (
+                     SELECT id FROM conversaciones WHERE usuario_id = %s ORDER BY actualizada DESC LIMIT %s)""",
+              (usuario_id, usuario_id, MAX_CONVERSACIONES))
+    return fila[0]["id"]
+
+
+def listar_conversaciones(usuario_id: int) -> list:
+    return _ejecutar("SELECT id, titulo, actualizada FROM conversaciones WHERE usuario_id = %s "
+                     "ORDER BY actualizada DESC", (usuario_id,), leer=True)
+
+
+def abrir_conversacion(usuario_id: int, conv_id: int) -> list:
+    import json
+    filas = _ejecutar("SELECT mensajes FROM conversaciones WHERE id = %s AND usuario_id = %s",
+                      (conv_id, usuario_id), leer=True)
+    return json.loads(filas[0]["mensajes"]) if filas else []
+
+
+def borrar_conversacion(usuario_id: int, conv_id: int):
+    _ejecutar("DELETE FROM conversaciones WHERE id = %s AND usuario_id = %s", (conv_id, usuario_id))
