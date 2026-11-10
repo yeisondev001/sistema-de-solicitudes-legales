@@ -114,6 +114,7 @@ Los archivos están en `jurisprudencia/`.
 - **Ya se corrió (8 nov 2026):** 352.178 huellas en 4 h 49 min con GPU T4 x2. Solo hace falta volver a correrlo si se carga mucho de golpe sin huellas.
 - **Cómo correrlo:** crear un cuaderno en Kaggle → *File → Import Notebook* → `huellas.ipynb`. En *Session options*: **GPU T4 x2** e **Internet On** (la cuenta debe tener el teléfono verificado). En *Add-ons → Secrets*: `JURIS_URLS`. Después: **Save Version → Save & Run All (Commit)**.
 - `kaggle/huellas.py` es el mismo código en forma de script; el `.ipynb` se genera desde ahí.
+- **Si *Import Notebook* se queda en "Loading file…"** (pasó la primera vez): crear el cuaderno vacío, abrir `huellas.py` en el Bloc de notas y pegar todo en una sola celda de código. Funciona igual.
 
 ## Por dónde vamos (8 nov 2026)
 
