@@ -1823,10 +1823,22 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                     controls=[ft.Column(controls=[tarjeta_fuente(n, f, n in citadas) for n, f in lista], spacing=8)],
                     tile_padding=ft.padding.all(0), icon_color=INK_SOFT, collapsed_icon_color=INK_SOFT,
                     shape=ft.RoundedRectangleBorder(radius=4), collapsed_shape=ft.RoundedRectangleBorder(radius=4)))
+            def copiar(e):
+                # el texto se copia sin las marcas de Markdown (** y >), para pegarlo en un escrito o un correo
+                limpio = re.sub(r"\*\*|__|^>\s?", "", turno["texto"], flags=re.M)
+                page.set_clipboard(limpio)
+                snack("Respuesta copiada.")
+
+            # la respuesta tiene varios bloques y no se puede seleccionar toda de una vez: botón para copiarla
+            copiar_btn = [ft.TextButton("Copiar", icon=ft.Icons.CONTENT_COPY, on_click=copiar,
+                                        tooltip="Copiar la respuesta completa",
+                                        style=ft.ButtonStyle(color=INK_SOFT, padding=ft.padding.symmetric(horizontal=8)))
+                          ] if "fuentes" in turno or turno.get("ia") else []
             return ft.Column(controls=[
                 ft.Row(controls=[ft.Icon(ft.Icons.GAVEL, size=16, color=ACCENT),
                                  ft.Text("Asistente", size=12, weight=ft.FontWeight.W_600, color=INK_SOFT,
-                                         font_family=FONT_BODY)], spacing=6),
+                                         font_family=FONT_BODY, expand=True), *copiar_btn], spacing=6,
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Container(content=ft.Column(controls=partes, spacing=8), bgcolor=PAPER,
                              border=ft.border.all(1, PAPER_EDGE),
                              border_radius=ft.border_radius.only(top_left=4, top_right=16, bottom_left=16, bottom_right=16),

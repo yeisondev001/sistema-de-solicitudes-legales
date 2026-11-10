@@ -135,7 +135,7 @@ def calcular(texto: str, hoy: date = None):
     total = sum(f[3] for f in filas)
     tiempo = (f"{anios} año{'s' if anios != 1 else ''} y " if anios else "") + f"{resto:.1f}".rstrip("0").rstrip(".") + " meses"
     lineas = [
-        "CÁLCULO DE LA APP (fórmulas fijas del Código de Trabajo; úsalo tal cual, no lo rehagas):",
+        "CÁLCULO DE PRESTACIONES (fórmulas fijas del Código de Trabajo; úsalo tal cual, no lo rehagas):",
         f"Datos: salario mensual {_dinero(salario)}; tiempo trabajado {tiempo}; terminación por desahucio o "
         f"despido sin causa, contrato por tiempo indefinido.",
         "",
@@ -157,6 +157,14 @@ def calcular(texto: str, hoy: date = None):
         f"además se le pagan los salarios desde la demanda hasta la sentencia, hasta un máximo de 6 meses "
         f"({_dinero(6 * salario)}).",
     ]
+    # art. 180 dice "más de N meses": con N meses justos se toma la escala de abajo; casi siempre hay unos días
+    # más, y entonces toca un día más de vacaciones
+    base_vac = meses if meses < 12 else resto
+    if 5 <= base_vac < 12 and abs(base_vac - round(base_vac)) < 0.01:
+        extra = _escala_vacaciones(base_vac + 0.1)
+        lineas.append(f"- Vacaciones: el art. 180 dice «más de {round(base_vac)} meses». Con {round(base_vac)} meses "
+                      f"justos son {vacaciones} días; si trabajó aunque sea unos días más, son {extra} días "
+                      f"({_dinero(extra * diario)}), y el total sube a {_dinero(total + (extra - vacaciones) * diario)}.")
     if meses >= 12:
         lineas.append(f"- Si no disfrutó las vacaciones del último año cumplido, se suman {18 if anios >= 5 else 14} "
                       f"días más ({_dinero((18 if anios >= 5 else 14) * diario)}) (arts. 177 y 182); la tabla solo "
@@ -168,4 +176,4 @@ def calcular(texto: str, hoy: date = None):
 
 def para_mostrar(calculo: str) -> str:
     """El cálculo tal cual para el abogado, sin la instrucción que lleva para la IA."""
-    return re.sub(r"^CÁLCULO DE LA APP.*\n", "**Cálculo de prestaciones (Código de Trabajo)**\n\n", calculo)
+    return re.sub(r"^CÁLCULO DE PRESTACIONES.*\n", "**Cálculo de prestaciones (Código de Trabajo)**\n\n", calculo)
