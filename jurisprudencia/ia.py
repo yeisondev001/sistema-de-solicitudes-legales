@@ -54,7 +54,12 @@ _SISTEMA = (
     "palabras o subir sus propios documentos), sin las secciones 2, 3 y 4.\n\n"
     "Reglas: nunca inventes sentencias, números, fechas, artículos ni citas; [n] solo para lo que está en "
     "la fuente n. Si mencionas una ley o un artículo que no está en las fuentes, advierte que hay que "
-    "verificarlo. No repitas la pregunta. Usa negritas y listas cortas, sin tablas. Eres una herramienta "
+    "verificarlo. Cálculos (prestaciones, plazos, montos): usa solo los días, escalas y fórmulas que dice "
+    "el artículo de las fuentes según el tiempo y los datos del caso, muestra la operación paso a paso y cita "
+    "el artículo [n]; si el artículo no está en las fuentes no pongas cifras de memoria: di qué artículo hay "
+    "que revisar. No sumes conceptos que dependen de otra cosa (por ejemplo, una indemnización que solo da "
+    "el tribunal) sin advertirlo. No repitas la pregunta. Usa negritas y listas cortas, nunca tablas ni "
+    "títulos con #. Eres una herramienta "
     "de apoyo: la decisión es del abogado."
 )
 

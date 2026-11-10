@@ -1755,10 +1755,28 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         # La consulta es una conversación: cada mensaje del abogado y cada respuesta del asistente
         # (con las sentencias que usó) quedan en juris_estado["chat"] mientras dure la sesión.
         chat = juris_estado["chat"]
+        # todos los estilos con color propio: los que quedan sin definir salen con el color del tema
+        # (casi blanco sobre el papel) y no se leen, como las tablas y los títulos que a veces pone la IA
+        def _estilo(size=15, color=INK, **kw):
+            return ft.TextStyle(font_family=FONT_BODY, size=size, color=color, **kw)
         texto_md = ft.MarkdownStyleSheet(
-            p_text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
-            list_bullet_text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
-            strong_text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK, weight=ft.FontWeight.W_600))
+            p_text_style=_estilo(),
+            list_bullet_text_style=_estilo(),
+            strong_text_style=_estilo(weight=ft.FontWeight.W_600),
+            em_text_style=_estilo(italic=True),
+            del_text_style=_estilo(decoration=ft.TextDecoration.LINE_THROUGH),
+            a_text_style=_estilo(color=ACCENT_TEXT, decoration=ft.TextDecoration.UNDERLINE),
+            code_text_style=_estilo(size=14),
+            blockquote_text_style=_estilo(color=INK_SOFT, italic=True),
+            h1_text_style=_estilo(size=19, weight=ft.FontWeight.W_700),
+            h2_text_style=_estilo(size=17, weight=ft.FontWeight.W_700),
+            h3_text_style=_estilo(size=16, weight=ft.FontWeight.W_600),
+            h4_text_style=_estilo(weight=ft.FontWeight.W_600),
+            h5_text_style=_estilo(weight=ft.FontWeight.W_600),
+            h6_text_style=_estilo(weight=ft.FontWeight.W_600),
+            table_head_text_style=_estilo(size=14, weight=ft.FontWeight.W_600),
+            table_body_text_style=_estilo(size=14),
+            table_cells_padding=ft.padding.symmetric(horizontal=12, vertical=8))
         # STRETCH: cada mensaje ocupa el ancho, así los del abogado se pueden alinear a la derecha
         mensajes_col = ft.Column(spacing=16, scroll=ft.ScrollMode.AUTO, auto_scroll=True,
                                  horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
