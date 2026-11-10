@@ -4,13 +4,14 @@ Automatización de Solicitudes Legales
 UI principal — generación de documentos en generators/
 """
 
-import os, base64, copy, platform, pathlib, re, secrets, uuid, time, threading
+import os, base64, copy, functools, platform, pathlib, re, secrets, uuid, time, threading
 from datetime import date, datetime
 
 import flet as ft
 
 import cuentas
 import historial
+import temas
 from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
 from jurisprudencia import visor as juris_visor, prestaciones as juris_prestaciones
 from generators import (
@@ -33,24 +34,18 @@ from generators import (
 )
 
 # ── PALETA ───────────────────────────────────────
-INK        = "#0F2A3F"
-INK_SOFT   = "#2C4A63"
-ACCENT     = "#B8860B"
-PAPER      = "#FBF7EE"
-PAPER_EDGE = "#EFE7D2"
-RULE       = "#D9C998"
-SURFACE    = "#F7F2E6"
-PANEL_INK  = "#0F2A3F"
+# La de la marca («Vino y madera»), que se ve en la entrada. Por dentro app_principal usa
+# el tema que eligió cada usuario (temas.py); qué es cada color está explicado allí.
+(INK, INK_SOFT, ACCENT, ACCENT_TEXT, PAPER, PAPER_EDGE, RULE, SURFACE, PANEL_INK, ON_PANEL, NAV_TEXT, NAV_SUB,
+ BAR_BTN, BAR_BTN_TEXT, BOTON, ON_BOTON, NAV_LINEA, HINT, PDF_COLOR, AVISO_BG, AVISO_TEXT) = temas.colores()
 
-ACCENT_TEXT = "#8A6508"   # dorado oscuro: legible como texto sobre papel
-HINT        = "#6E6E6E"
-NAV_TEXT    = "#C9D3DC"
-NAV_SUB     = "#93A8BA"   # subtítulo de pestaña inactiva (6:1 sobre PANEL_INK)
-
-FONT_DISPLAY = "EB Garamond"
-FONT_BODY    = "Lato"
+FONT_DISPLAY = "Literata"                 # títulos: serif de libro, hecha para leer en pantalla
+FONT_BODY    = "Atkinson Hyperlegible"    # texto: letras que no se confunden (I l 1, O 0)
+FUENTES = {
+    FONT_DISPLAY: "https://cdn.jsdelivr.net/fontsource/fonts/literata@5.3.0/latin-500-normal.ttf",
+    FONT_BODY:    "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@5.3.0/latin-400-normal.ttf",
+}
 ANCHO_MAX    = 1200       # ancho máximo del contenido en pantallas grandes
-PDF_COLOR    = "#6B1A1A"
 
 KT_NUM    = ft.KeyboardType.NUMBER
 RE_FECHA  = re.compile(r"[^0-9/]")
@@ -133,7 +128,8 @@ RECLAMANTES_SANEAMIENTO = [
 
 
 # ── DESCARGA ─────────────────────────────────────
-def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
+def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn, t=None):
+    INK, INK_SOFT, PAPER, BOTON, ON_BOTON = temas.elegir(t, "INK INK_SOFT PAPER BOTON ON_BOTON")
     if platform.system() == "Windows":
         descargas = pathlib.Path.home() / "Downloads"
         descargas.mkdir(exist_ok=True)
@@ -195,8 +191,7 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
                     url=f"/dl/{fname}",
                     url_target="_blank",
                     style=ft.ButtonStyle(
-                        bgcolor=PANEL_INK, color=PAPER,
-                        side={ft.ControlState.DEFAULT: ft.BorderSide(1, ACCENT)},
+                        bgcolor=BOTON, color=ON_BOTON,
                         shape=ft.RoundedRectangleBorder(radius=2),
                     ),
                 ),
@@ -206,13 +201,13 @@ def _descargar(page, contenido: bytes, nombre: str, mime: str, snack_fn):
         page.open(dlg)
 
 
-def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn):
+def _guardar_y_abrir(page, contenido: bytes, nombre: str, snack_fn, t=None):
     mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    _descargar(page, contenido, nombre, mime, snack_fn)
+    _descargar(page, contenido, nombre, mime, snack_fn, t)
 
 
-def _guardar_pdf(page, contenido: bytes, nombre: str, snack_fn):
-    _descargar(page, contenido, nombre, "application/pdf", snack_fn)
+def _guardar_pdf(page, contenido: bytes, nombre: str, snack_fn, t=None):
+    _descargar(page, contenido, nombre, "application/pdf", snack_fn, t)
 
 
 # ── HELPERS UI ───────────────────────────────────
@@ -225,7 +220,8 @@ def fila_campos(*controles):
 
 
 def campo(label, form, key, on_change, hint=None, multiline=False, required=False, expand=True,
-          keyboard_type=None, char_filter=None, date_format=False):
+          keyboard_type=None, char_filter=None, date_format=False, t=None):
+    INK, INK_SOFT, ACCENT, ACCENT_TEXT, RULE, HINT = temas.elegir(t, "INK INK_SOFT ACCENT ACCENT_TEXT RULE HINT")
 
     def _on_change(e, k=key):
         val = e.control.value
@@ -270,8 +266,10 @@ def campo(label, form, key, on_change, hint=None, multiline=False, required=Fals
 
 
 def combobox_campo(label, form, key, options, update_fn, required=False, expand=True, hint=None,
-                   filter_on_type=True):
+                   filter_on_type=True, t=None):
     """Campo con lista desplegable. Si filter_on_type=False, la lista siempre muestra todas las opciones."""
+    INK, INK_SOFT, ACCENT, ACCENT_TEXT, PAPER, PAPER_EDGE, RULE, HINT = temas.elegir(
+        t, "INK INK_SOFT ACCENT ACCENT_TEXT PAPER PAPER_EDGE RULE HINT")
 
     opts_col = ft.Column(spacing=0, scroll=ft.ScrollMode.AUTO)
     opts_container = ft.Container(
@@ -370,8 +368,9 @@ def combobox_campo(label, form, key, options, update_fn, required=False, expand=
     )
 
 
-def materia_selector(page, form, key, on_materia_change):
+def materia_selector(page, form, key, on_materia_change, t=None):
     """Selector de dos opciones con lista en los colores de la plantilla."""
+    INK, INK_SOFT, PAPER, PAPER_EDGE, RULE, HINT = temas.elegir(t, "INK INK_SOFT PAPER PAPER_EDGE RULE HINT")
     opciones = ["MATERIA INMOBILIARIA", "MATERIA CIVIL"]
 
     valor_text = ft.Text(
@@ -435,7 +434,9 @@ def materia_selector(page, form, key, on_materia_change):
     ], spacing=4)
 
 
-def tarjeta(romano, titulo, subtitulo, contenido):
+def tarjeta(romano, titulo, subtitulo, contenido, t=None):
+    INK, INK_SOFT, ACCENT, ACCENT_TEXT, PAPER, PAPER_EDGE, RULE = temas.elegir(
+        t, "INK INK_SOFT ACCENT ACCENT_TEXT PAPER PAPER_EDGE RULE")
     return ft.Container(
         content=ft.Column(controls=[
             ft.Row(controls=[
@@ -461,37 +462,36 @@ def tarjeta(romano, titulo, subtitulo, contenido):
     )
 
 
-def boton_generar(on_click, texto="GENERAR DOCUMENTO WORD"):
+def boton_generar(on_click, texto="GENERAR DOCUMENTO WORD", t=None):
+    BOTON, ON_BOTON = temas.elegir(t, "BOTON ON_BOTON")
     return ft.Container(
         content=ft.Row(controls=[
-            ft.Icon(ft.Icons.DOWNLOAD, color=PAPER, size=18),
+            ft.Icon(ft.Icons.DOWNLOAD, color=ON_BOTON, size=18),
             ft.Text(texto, size=14,
-                    weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY),
-            ft.Text("·", size=22, color=ACCENT),
+                    weight=ft.FontWeight.W_500, color=ON_BOTON, font_family=FONT_DISPLAY),
         ], spacing=14, alignment=ft.MainAxisAlignment.CENTER),
-        bgcolor=PANEL_INK,
+        bgcolor=BOTON,
         padding=ft.padding.symmetric(vertical=16, horizontal=34),
-        border=ft.border.all(1, ACCENT),
         on_click=on_click, ink=True, border_radius=2,
     )
 
 
-def boton_pdf(on_click):
+def boton_pdf(on_click, t=None):
+    PAPER, PDF_COLOR = temas.elegir(t, "PAPER PDF_COLOR")
     return ft.Container(
         content=ft.Row(controls=[
             ft.Icon(ft.Icons.PICTURE_AS_PDF, color=PAPER, size=18),
             ft.Text("GENERAR DOCUMENTO PDF", size=14,
                     weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY),
-            ft.Text("·", size=22, color=ACCENT),
         ], spacing=14, alignment=ft.MainAxisAlignment.CENTER),
         bgcolor=PDF_COLOR,
         padding=ft.padding.symmetric(vertical=16, horizontal=34),
-        border=ft.border.all(1, ACCENT),
         on_click=on_click, ink=True, border_radius=2,
     )
 
 
-def nota_descarga():
+def nota_descarga(t=None):
+    INK_SOFT, = temas.elegir(t, "INK_SOFT")
     return ft.Container(
         content=ft.Text(
             "El archivo .docx se guardará en Descargas con el formato oficial.",
@@ -505,12 +505,35 @@ def nota_descarga():
 # ══════════════════════════════════════════════════
 #  APP PRINCIPAL
 # ══════════════════════════════════════════════════
-def app_principal(page: ft.Page, usuario: dict, salir):
+def aplicar_tema(page: ft.Page, t=None):
+    """Fondo, modo claro u oscuro y colores de los controles propios de Flet (menús, casillas, diálogos)."""
+    t = t if isinstance(t, dict) else temas.tema(t)
+    page.bgcolor = t["SURFACE"]
+    page.theme_mode = ft.ThemeMode.DARK if t["oscuro"] else ft.ThemeMode.LIGHT
+    page.theme = page.dark_theme = ft.Theme(
+        font_family=FONT_BODY, color_scheme_seed=t["ACCENT"],
+        color_scheme=ft.ColorScheme(primary=t["ACCENT"], on_primary=t["PAPER"],
+                                    surface=t["PAPER"], on_surface=t["INK"]),
+    )
+
+
+def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
     hoy = date.today()
+    # Los colores son los del tema que eligió en Mi cuenta → Apariencia: estas variables tapan a
+    # las de la marca, y las ayudas de afuera (campo, tarjeta, …) reciben el tema con t=.
+    tema = temas.tema(usuario.get("tema"))
+    (INK, INK_SOFT, ACCENT, ACCENT_TEXT, PAPER, PAPER_EDGE, RULE, SURFACE, PANEL_INK, ON_PANEL, NAV_TEXT, NAV_SUB,
+     BAR_BTN, BAR_BTN_TEXT, BOTON, ON_BOTON, NAV_LINEA, HINT, PDF_COLOR, AVISO_BG, AVISO_TEXT) = temas.colores(tema)
+    (_guardar_y_abrir, _guardar_pdf, campo, combobox_campo, materia_selector, tarjeta, boton_generar, boton_pdf,
+     nota_descarga) = (functools.partial(globals()[n], t=tema) for n in (
+        "_guardar_y_abrir", "_guardar_pdf", "campo", "combobox_campo", "materia_selector", "tarjeta",
+        "boton_generar", "boton_pdf", "nota_descarga"))
+    aplicar_tema(page, tema)
+
     # las plantillas de solicitudes son solo para las cuentas que las tienen activadas; las demás
     # (clientes que entran con Google) ven directamente la jurisprudencia
     con_plantillas = usuario.get("plantillas", False)
-    plantilla = {"actual": "informe" if con_plantillas else "jurisprudencia"}
+    plantilla = {"actual": seccion or ("informe" if con_plantillas else "jurisprudencia")}
 
     # ── VALORES POR DEFECTO DE FORMULARIOS ───────
     form_informe = {
@@ -631,7 +654,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
     def snack(msg, ok=True):
         page.open(ft.SnackBar(
-            content=ft.Text(msg, color=PAPER, font_family=FONT_BODY),
+            content=ft.Text(msg, color="#FFFFFF", font_family=FONT_BODY),
             bgcolor="#2E7D32" if ok else "#B71C1C",
         ))
 
@@ -1387,7 +1410,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                     col={"xs": 12, "md": 3}, alignment=ft.alignment.center_right,
                 ),
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            bgcolor="#FAEEDA", border=ft.border.all(1, RULE), border_radius=4,
+            bgcolor=AVISO_BG, border=ft.border.all(1, RULE), border_radius=4,
             padding=ft.padding.symmetric(horizontal=16, vertical=10),
         )]
 
@@ -1513,8 +1536,8 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
             prox = etiqueta_proxima(ent["fecha_proxima"])
             prox_ctrl = (ft.Container(content=ft.Text(prox, size=12, weight=ft.FontWeight.W_600,
-                                                      color="#633806", font_family=FONT_BODY),
-                                      bgcolor="#FAEEDA", border_radius=10,
+                                                      color=AVISO_TEXT, font_family=FONT_BODY),
+                                      bgcolor=AVISO_BG, border_radius=10,
                                       padding=ft.padding.symmetric(horizontal=8, vertical=2), width=110)
                          if prox else celda(ent["fecha_proxima"], 110))
             flecha = ft.Icon(ft.Icons.EXPAND_MORE, color=INK_SOFT, size=20)
@@ -1791,7 +1814,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK),
             hint_style=ft.TextStyle(font_family=FONT_BODY, size=14, color=HINT),
         )
-        boton_enviar = ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color=PAPER, bgcolor=PANEL_INK, icon_size=20,
+        boton_enviar = ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color=ON_BOTON, bgcolor=BOTON, icon_size=20,
                                      tooltip="Enviar (Enter)", on_click=lambda e: enviar(entrada.value))
         boton_nueva = ft.TextButton("Nueva conversación", icon=ft.Icons.ADD_COMMENT_OUTLINED,
                                     on_click=lambda e: nueva_conversacion(), style=ft.ButtonStyle(color=INK_SOFT))
@@ -1801,7 +1824,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
         def burbuja_usuario(texto):
             return ft.Column(controls=[ft.Container(
-                content=ft.Text(texto, size=15, color=PAPER, font_family=FONT_BODY, selectable=True),
+                content=ft.Text(texto, size=15, color=ON_PANEL, font_family=FONT_BODY, selectable=True),
                 bgcolor=PANEL_INK, padding=ft.padding.symmetric(horizontal=16, vertical=12),
                 border_radius=ft.border_radius.only(top_left=16, top_right=16, bottom_left=16, bottom_right=4),
                 margin=ft.margin.only(left=48))], horizontal_alignment=ft.CrossAxisAlignment.END)
@@ -2206,7 +2229,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             ], tight=True, scroll=ft.ScrollMode.AUTO, width=420, spacing=8),
             actions=[ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK_SOFT)),
                      ft.ElevatedButton("Crear usuario", on_click=crear, style=ft.ButtonStyle(
-                         bgcolor=PANEL_INK, color=PAPER, shape=ft.RoundedRectangleBorder(radius=4)))],
+                         bgcolor=BOTON, color=ON_BOTON, shape=ft.RoundedRectangleBorder(radius=4)))],
             actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
         page.open(dlg)
@@ -2240,7 +2263,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         ir_a(KEYS[idx + 1] if idx < len(KEYS) - 1 else KEYS[0])
 
     scroll_hint = ft.Container(
-        content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ACCENT, size=26),
+        content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=NAV_TEXT, size=26),
         padding=ft.padding.symmetric(horizontal=6, vertical=10),
         tooltip="Siguiente plantilla",
         on_click=on_arrow_click, ink=True, border_radius=4,
@@ -2248,7 +2271,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
     # En pantallas anchas las pestañas se reparten el ancho (sin cortes);
     # en las angostas se desliza la fila con la flecha.
-    pestanas_llenan = {"si": True, "alto": 78}
+    pestanas_llenan = {"si": True, "alto": 80}
 
     def tab_btn(key):
         activa = plantilla["actual"] == key
@@ -2256,42 +2279,115 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         return ft.Container(
             content=ft.Column(controls=[
                 ft.Text(PESTANAS[key], size=14, weight=ft.FontWeight.W_600 if activa else ft.FontWeight.W_400,
-                        color=PAPER if activa else NAV_TEXT, font_family=FONT_BODY),
+                        color=ON_PANEL if activa else NAV_TEXT, font_family=FONT_BODY,
+                        max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
                 ft.Text(SUB_PESTANAS[key], size=12, italic=True,
-                        color=RULE if activa else NAV_SUB, font_family=FONT_BODY),
+                        color=NAV_TEXT if activa else NAV_SUB, font_family=FONT_BODY,
+                        max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
             ], spacing=2, tight=True),
-            bgcolor=INK_SOFT if activa else "transparent",
+            # un velo del color del texto: aclara la barra oscura y oscurece la clara
+            bgcolor=ft.Colors.with_opacity(0.14, ON_PANEL) if activa else "transparent",
             padding=ft.padding.symmetric(vertical=10, horizontal=12 if llenar else 16),
             expand=llenar, height=pestanas_llenan["alto"] if llenar else None,
-            border=ft.border.only(bottom=ft.BorderSide(3, ACCENT if activa else "transparent")),
+            border=ft.border.only(bottom=ft.BorderSide(3, NAV_LINEA if activa else "transparent")),
             on_click=lambda e, k=key: ir_a(k), ink=True,
             border_radius=ft.border_radius.only(top_left=4, top_right=4),
         )
 
     contador = ft.Container(
-        content=ft.Text("", size=12, weight=ft.FontWeight.W_600, color=PAPER, font_family=FONT_BODY),
+        content=ft.Text("", size=12, weight=ft.FontWeight.W_600, color=ON_PANEL, font_family=FONT_BODY),
         bgcolor=PANEL_INK, border_radius=10, padding=ft.padding.symmetric(horizontal=7, vertical=1),
         visible=False,
     )
-    historial_txt = ft.Text("Historial", size=14, weight=ft.FontWeight.W_600, color=PANEL_INK, font_family=FONT_BODY)
+    historial_txt = ft.Text("Historial", size=14, weight=ft.FontWeight.W_600, color=BAR_BTN_TEXT, font_family=FONT_BODY)
     historial_btn = ft.Container(
-        content=ft.Row(controls=[ft.Icon(ft.Icons.HISTORY, color=PANEL_INK, size=18), historial_txt, contador],
+        content=ft.Row(controls=[ft.Icon(ft.Icons.HISTORY, color=BAR_BTN_TEXT, size=18), historial_txt, contador],
                        spacing=6, tight=True),
-        bgcolor=ACCENT, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
+        bgcolor=BAR_BTN, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
         on_click=lambda e: ir_a("historial"), ink=True, tooltip="Ver expedientes generados",
     )
 
     juris_btn = ft.Container(
-        content=ft.Row(controls=[ft.Icon(ft.Icons.GAVEL, color=PANEL_INK, size=18),
+        content=ft.Row(controls=[ft.Icon(ft.Icons.GAVEL, color=BAR_BTN_TEXT, size=18),
                                  ft.Text("Jurisprudencia", size=14, weight=ft.FontWeight.W_600,
-                                         color=PANEL_INK, font_family=FONT_BODY)], spacing=6, tight=True),
-        bgcolor=ACCENT, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
+                                         color=BAR_BTN_TEXT, font_family=FONT_BODY)], spacing=6, tight=True),
+        bgcolor=BAR_BTN, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
         on_click=lambda e: ir_a("jurisprudencia"), ink=True, tooltip="Buscar sentencias y consultar sus documentos",
     )
+
+    # ── MI CUENTA → APARIENCIA ───────────────────
+    def abrir_apariencia():
+        def elegir(clave):
+            page.close(dlg)
+            if clave == (usuario.get("tema") or temas.MARCA):
+                return
+            try:
+                cuentas.cambiar_tema(usuario["id"], clave)
+            except Exception:
+                snack("No se pudo guardar el tema. Intente de nuevo.", ok=False); return
+            usuario["tema"] = clave
+            # se vuelve a armar la pantalla con los colores nuevos, en la misma sección; antes se
+            # espera a que el diálogo termine de cerrarse (si no, el cambio de tema lo deja pegado)
+            time.sleep(0.4)
+            page.controls.clear(); page.overlay.clear(); page.on_resized = None
+            app_principal(page, usuario, salir, seccion=plantilla["actual"])
+            page.update()
+
+        def muestra(clave, t):
+            """Tarjeta con la barra, una hoja y el botón del tema, como se verá."""
+            elegido = clave == tema_actual
+            return ft.Container(
+                content=ft.Column(controls=[
+                    ft.Container(
+                        content=ft.Column(controls=[
+                            ft.Container(height=14, bgcolor=t["PANEL_INK"],
+                                         border=ft.border.only(bottom=ft.BorderSide(2, t["NAV_LINEA"]))),
+                            ft.Container(
+                                content=ft.Column(controls=[
+                                    ft.Text("Sentencia", size=14, color=t["INK"], font_family=FONT_DISPLAY),
+                                    ft.Text("Texto de la consulta", size=11, color=t["INK_SOFT"], font_family=FONT_BODY),
+                                    ft.Container(content=ft.Text("Botón", size=10, color=t["ON_BOTON"],
+                                                                 font_family=FONT_BODY),
+                                                 bgcolor=t["BOTON"], border_radius=3,
+                                                 padding=ft.padding.symmetric(horizontal=8, vertical=2)),
+                                ], spacing=4, tight=True),
+                                bgcolor=t["PAPER"], border=ft.border.all(1, t["PAPER_EDGE"]),
+                                margin=ft.margin.all(8), padding=ft.padding.all(8),
+                            ),
+                        ], spacing=0, tight=True),
+                        bgcolor=t["SURFACE"], border_radius=4, clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                    ),
+                    ft.Row(controls=[
+                        ft.Text(t["nombre"], size=14, weight=ft.FontWeight.W_600, color=INK,
+                                font_family=FONT_BODY, expand=True),
+                        ft.Icon(ft.Icons.CHECK_CIRCLE, color=ACCENT, size=18, visible=elegido),
+                    ], spacing=4),
+                    ft.Text(t["descripcion"], size=12, color=INK_SOFT, font_family=FONT_BODY),
+                ], spacing=6, tight=True),
+                col={"xs": 12, "sm": 6}, padding=ft.padding.all(10), border_radius=6,
+                border=ft.border.all(2 if elegido else 1, ACCENT if elegido else RULE),
+                on_click=lambda e, c=clave: elegir(c), ink=True,
+            )
+
+        tema_actual = usuario.get("tema") or temas.MARCA
+        dlg = ft.AlertDialog(
+            modal=True, bgcolor=PAPER,
+            title=ft.Text("Apariencia", font_family=FONT_DISPLAY, color=INK, size=24),
+            content=ft.Column(controls=[
+                ft.Text("Elija los colores del despacho. Se guardan en su cuenta y se ven igual en todos sus equipos.",
+                        size=14, color=INK_SOFT, font_family=FONT_BODY),
+                ft.ResponsiveRow(controls=[muestra(c, t) for c, t in temas.TEMAS.items()],
+                                 spacing=12, run_spacing=12),
+            ], tight=True, scroll=ft.ScrollMode.AUTO, width=520, spacing=14),
+            actions=[ft.TextButton("Cerrar", on_click=lambda e: page.close(dlg), style=ft.ButtonStyle(color=INK_SOFT))],
+        )
+        page.open(dlg)
+
     menu_usuario = ft.PopupMenuButton(
-        icon=ft.Icons.ACCOUNT_CIRCLE, icon_color=PAPER, tooltip=usuario["nombre"],
+        icon=ft.Icons.ACCOUNT_CIRCLE, icon_color=ON_PANEL, tooltip=usuario["nombre"], bgcolor=PAPER,
         items=[
             ft.PopupMenuItem(text=f'{usuario["nombre"]} ({usuario["usuario"]})', disabled=True),
+            ft.PopupMenuItem(text="Apariencia", icon=ft.Icons.PALETTE_OUTLINED, on_click=lambda e: abrir_apariencia()),
             *([ft.PopupMenuItem(text="Usuarios", icon=ft.Icons.GROUP, on_click=lambda e: abrir_usuarios())]
               if usuario["es_admin"] else []),
             ft.PopupMenuItem(text="Cerrar sesión", icon=ft.Icons.LOGOUT, on_click=lambda e: salir()),
@@ -2304,7 +2400,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         scroll_hint.visible = con_plantillas and not pestanas_llenan["si"] and plantilla["actual"] != KEYS[-1]
         for clave, boton in (("historial", historial_btn), ("jurisprudencia", juris_btn)):
             activo = plantilla["actual"] == clave
-            boton.bgcolor = PAPER if activo else ACCENT
+            boton.bgcolor = PAPER if activo else BAR_BTN
             boton.border = ft.border.all(2, ACCENT) if activo else None
 
     def actualizar_contador():
@@ -2363,12 +2459,12 @@ def app_principal(page: ft.Page, usuario: dict, salir):
 
     # ── BARRA SUPERIOR ───────────────────────────
     titulo_app = ft.Text("Automatización Legal", size=24,
-                         weight=ft.FontWeight.W_500, color=PAPER, font_family=FONT_DISPLAY)
+                         weight=ft.FontWeight.W_500, color=ON_PANEL, font_family=FONT_DISPLAY)
     topbar = ft.Container(
         content=ft.Column(controls=[
             ft.Row(controls=[
                 ft.Column(controls=[
-                    ft.Text("DEPARTAMENTO LEGAL", size=12, color=RULE, font_family=FONT_BODY),
+                    ft.Text("DEPARTAMENTO LEGAL", size=12, color=NAV_SUB, font_family=FONT_BODY),
                     titulo_app,
                 ], spacing=0, tight=True, expand=True),
                 ft.Row(controls=[*([juris_btn, historial_btn] if con_plantillas else []), menu_usuario],
@@ -2380,7 +2476,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
             ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.END, visible=con_plantillas),
         ], spacing=8),
         bgcolor=PANEL_INK,
-        border=ft.border.only(bottom=ft.BorderSide(3, ACCENT)),
+        border=ft.border.only(bottom=ft.BorderSide(3, NAV_LINEA)),
     )
     contenido = ft.Container(content=form_area, expand=True)
 
@@ -2392,7 +2488,7 @@ def app_principal(page: ft.Page, usuario: dict, salir):
         juris_btn.content.controls[1].visible = historial_txt.visible = ancho >= 640   # solo íconos en el celular
         topbar.padding    = ft.padding.only(top=16, bottom=0, left=lado, right=lado)
         llenar = ancho >= 900
-        alto   = 78 if ancho >= 1150 else 100   # más angosto: el texto ocupa más líneas
+        alto   = 80 if ancho >= 1280 else 100   # más angosto: el texto ocupa más líneas (dos como máximo)
         if (llenar, alto) != (pestanas_llenan["si"], pestanas_llenan["alto"]):
             pestanas_llenan.update(si=llenar, alto=alto)
             rebuild_tabs()
@@ -2539,7 +2635,7 @@ def pantalla_login(page: ft.Page, al_entrar):
         boton = ("Entrar", entrar)
 
     boton_principal = ft.ElevatedButton(boton[0], on_click=boton[1], width=360, style=ft.ButtonStyle(
-        bgcolor=PANEL_INK, color=PAPER, shape=ft.RoundedRectangleBorder(radius=4),
+        bgcolor=BOTON, color=ON_BOTON, shape=ft.RoundedRectangleBorder(radius=4),
         padding=ft.padding.symmetric(vertical=16)))
 
     if google:
@@ -2602,14 +2698,10 @@ def pantalla_login(page: ft.Page, al_entrar):
 
 def main(page: ft.Page):
     page.title   = "Solicitudes Legales"
-    page.bgcolor = SURFACE
     page.padding = 0
     page.scroll  = ft.ScrollMode.AUTO
-    page.fonts = {
-        FONT_DISPLAY: "/fonts/EBGaramond.ttf",
-        FONT_BODY:    "/fonts/Lato-Regular.ttf",
-    }
-    page.theme = ft.Theme(font_family=FONT_BODY)
+    page.fonts   = FUENTES
+    aplicar_tema(page)
 
     def leer_token():
         try:
@@ -2619,6 +2711,7 @@ def main(page: ft.Page):
 
     def mostrar_login():
         page.controls.clear(); page.overlay.clear(); page.on_resized = None
+        aplicar_tema(page)   # la entrada siempre con la marca, aunque adentro use otro tema
         pantalla_login(page, entrar)
         page.update()
 

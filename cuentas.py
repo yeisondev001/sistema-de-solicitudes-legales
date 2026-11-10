@@ -77,6 +77,8 @@ _MIGRACIONES = {
             actualizada BIGINT NOT NULL,
             mensajes TEXT NOT NULL)""",
         "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
+        # tema de colores que eligió en Mi cuenta → Apariencia (vacío: el de la marca)
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema TEXT",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -97,6 +99,7 @@ _MIGRACIONES = {
             actualizada INTEGER NOT NULL,
             mensajes TEXT NOT NULL)""",
         "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
+        "ALTER TABLE usuarios ADD COLUMN tema TEXT",
     ],
 }
 _tablas_listas = False
@@ -149,7 +152,7 @@ def _verificar(clave: str, guardado: str) -> bool:
 def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
             "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": u.get("plan") or "activo",
-            "plantillas": bool(u.get("plantillas"))}
+            "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or ""}
 
 
 def _bloqueo(u: dict):
@@ -197,6 +200,11 @@ def cambiar_activo(usuario_id: int, activo: bool):
     _ejecutar("UPDATE usuarios SET activo = %s WHERE id = %s", (activo, usuario_id))
     if not activo:
         _ejecutar("DELETE FROM sesiones WHERE usuario_id = %s", (usuario_id,))
+
+
+def cambiar_tema(usuario_id: int, tema: str):
+    """Guarda el tema de colores que eligió (Mi cuenta → Apariencia); se usa en todos sus equipos."""
+    _ejecutar("UPDATE usuarios SET tema = %s WHERE id = %s", (tema, usuario_id))
 
 
 def cambiar_plantillas(usuario_id: int, plantillas: bool):

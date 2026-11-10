@@ -50,6 +50,7 @@ El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que e
 - **Google:** quien entra por primera vez queda en `prueba`. Si el administrador le pone un correo a una cuenta existente (panel **Usuarios**), con ese Gmail entra a esa misma cuenta.
 - **Plantillas:** casilla **"Ve las plantillas de solicitudes"** por cuenta, en el panel Usuarios. Sin ella, la cuenta entra directo a Jurisprudencia, sin pestañas ni historial. Las cuentas nuevas la traen apagada. Se aplica cuando la persona vuelve a entrar.
 - Las preguntas se cuentan por día en la tabla `uso`.
+- **Tema de colores:** cada cuenta guarda el suyo en `usuarios.tema` (lo elige en Apariencia).
 
 ## Cómo funciona la jurisprudencia
 
@@ -116,7 +117,7 @@ Los archivos están en `jurisprudencia/`.
 - `kaggle/huellas.py` es el mismo código en forma de script; el `.ipynb` se genera desde ahí.
 - **Si *Import Notebook* se queda en "Loading file…"** (pasó la primera vez): crear el cuaderno vacío, abrir `huellas.py` en el Bloc de notas y pegar todo en una sola celda de código. Funciona igual.
 
-## Diseño y marca (decidido el 10 nov 2026, todavía no está en la app)
+## Diseño y marca (decidido el 10 nov 2026)
 
 El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisional). Cada parte es una sala: Escritorio (inicio), Asistente (el chat), Biblioteca (sentencias, leyes y documentos), Expedientes (una carpeta por cliente), Redacción (plantillas), Calculadoras y Agenda. Las pantallas, el recorrido del abogado y la marca están en un lienzo de diseño privado del dueño (pedírselo).
 
@@ -131,7 +132,18 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
   | Tinta | `#241C17` | Texto |
 
 - **Letras:** **Literata** para títulos y textos largos (hecha para leer en pantalla) y **Atkinson Hyperlegible** para botones, menús y números (no confunde I/l/1 ni O/0: importa en números de sentencia, expediente y montos). Tamaños: lectura 18 px con interlineado 1,7; botones 16 px; nada por debajo de 13 px; renglones de ~70 letras como máximo.
-- **Temas por dentro:** el abogado elige en **Mi cuenta → Apariencia** entre 4 temas cerrados (no un selector libre de colores, para que siempre se lea bien): *Vino y madera* (por defecto), *Papel y tinta* (lo más legible), *Cuero vino y azul oscuro* y *Biblioteca de noche* (oscuro). También **tamaño de letra: Normal, Grande, Muy grande**. Se guarda en su cuenta. Para hacerlo, los colores de `main.py` tienen que pasar a una lista por tema en vez de estar fijos.
+- **Temas por dentro:** el abogado elige en **Mi cuenta → Apariencia** entre 4 temas cerrados (no un selector libre de colores, para que siempre se lea bien): *Vino y madera* (por defecto), *Papel y tinta* (lo más legible), *Cuero vino y azul oscuro* y *Biblioteca de noche* (oscuro). También **tamaño de letra: Normal, Grande, Muy grande**. Se guarda en su cuenta.
+- **Ya en la app (10 nov):**
+  - **Temas:** los 4 están en `temas.py`, con todos los contrastes en 5,9:1 o más. La entrada siempre usa la marca.
+  - **Dónde se elige:** en el menú de la cuenta → **Apariencia**. Se guarda en la columna `usuarios.tema`; vacío quiere decir la marca.
+  - **Cómo lo usa `main.py`:**
+    - `app_principal` toma los colores del tema de la persona.
+    - Las ayudas de afuera (`campo`, `tarjeta`, `boton_generar`…) reciben el tema con `t=`.
+    - Un color nuevo se agrega en los 4 temas y en `temas.NOMBRES`.
+  - **Letras:** Literata y Atkinson Hyperlegible se cargan desde jsDelivr (Fontsource). Flet admite un solo archivo por letra, así que la negrita la dibuja el navegador.
+  - **Falta:**
+    - El tamaño de letra.
+    - Rehacer la entrada y el inicio con el diseño de salas.
 - **Lo que se descartó:** azul marino con dorado (es el estándar del sector y fue lo que no le gustó al dueño), el verde y la pizarra azul.
 
 ## Para vender con Lemon Squeezy
@@ -197,6 +209,7 @@ Falta, en orden:
 
 - **Requisitos:** Python 3.11+, un PostgreSQL con `pgvector` y `pdftotext` (poppler) para leer el Boletín rápido.
 - **Variables:** `JURIS_DATABASE_URL` y, si se quiere varias bases, `JURIS_ARCHIVO_URLS`. Sin `DATABASE_URL`, los usuarios y el historial van a SQLite local.
+- **Sin `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`** la entrada no muestra el botón de Google (solo usuario y contraseña). Es normal en local; en Render sí aparece.
 
 ```bash
 python cargar_boletines.py --mes 2025-05 --sin-vectores   # cargar un mes
