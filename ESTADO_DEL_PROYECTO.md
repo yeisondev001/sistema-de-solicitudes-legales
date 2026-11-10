@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Resumen para retomar el trabajo (personas o agentes). Actualizado: **8 de noviembre de 2026**.
+Resumen para retomar el trabajo (personas o agentes). Actualizado: **10 de noviembre de 2026**.
 
 > **El repositorio es público.** Nunca escribir aquí claves, tokens, cadenas de conexión ni IDs de cuenta.
 > Solo se nombran las variables y dónde están guardadas.
@@ -115,6 +115,36 @@ Los archivos están en `jurisprudencia/`.
 - **Cómo correrlo:** crear un cuaderno en Kaggle → *File → Import Notebook* → `huellas.ipynb`. En *Session options*: **GPU T4 x2** e **Internet On** (la cuenta debe tener el teléfono verificado). En *Add-ons → Secrets*: `JURIS_URLS`. Después: **Save Version → Save & Run All (Commit)**.
 - `kaggle/huellas.py` es el mismo código en forma de script; el `.ipynb` se genera desde ahí.
 - **Si *Import Notebook* se queda en "Loading file…"** (pasó la primera vez): crear el cuaderno vacío, abrir `huellas.py` en el Bloc de notas y pegar todo en una sola celda de código. Funciona igual.
+
+## Diseño y marca (decidido el 10 nov 2026, todavía no está en la app)
+
+El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisional). Cada parte es una sala: Escritorio (inicio), Asistente (el chat), Biblioteca (sentencias, leyes y documentos), Expedientes (una carpeta por cliente), Redacción (plantillas), Calculadoras y Agenda. Las pantallas, el recorrido del abogado y la marca están en un lienzo de diseño privado del dueño (pedírselo).
+
+- **Paleta de la marca: «Vino y madera».** Es la de la página pública, la entrada, los correos y el pago, y el tema por defecto adentro. El vino son los libros y la madera el escritorio. Todos los contrastes pasan 4,5:1.
+
+  | Color | Valor | Uso |
+  |---|---|---|
+  | Vino | `#7A1F2B` | Principal: logo, botones, enlaces importantes, color en Lemon Squeezy |
+  | Nogal | `#3E2C20` | Menú lateral, encabezados, pie |
+  | Marfil | `#F8F4EC` | Fondo |
+  | Roble | `#8A5A36` | Citas, etiquetas de materia, líneas |
+  | Tinta | `#241C17` | Texto |
+
+- **Letras:** **Literata** para títulos y textos largos (hecha para leer en pantalla) y **Atkinson Hyperlegible** para botones, menús y números (no confunde I/l/1 ni O/0: importa en números de sentencia, expediente y montos). Tamaños: lectura 18 px con interlineado 1,7; botones 16 px; nada por debajo de 13 px; renglones de ~70 letras como máximo.
+- **Temas por dentro:** el abogado elige en **Mi cuenta → Apariencia** entre 4 temas cerrados (no un selector libre de colores, para que siempre se lea bien): *Vino y madera* (por defecto), *Papel y tinta* (lo más legible), *Cuero vino y azul oscuro* y *Biblioteca de noche* (oscuro). También **tamaño de letra: Normal, Grande, Muy grande**. Se guarda en su cuenta. Para hacerlo, los colores de `main.py` tienen que pasar a una lista por tema en vez de estar fijos.
+- **Lo que se descartó:** azul marino con dorado (es el estándar del sector y fue lo que no le gustó al dueño), el verde y la pizarra azul.
+
+## Para vender con Lemon Squeezy
+
+Revisado en su documentación (nov 2026): **República Dominicana puede cobrar a cuenta de banco** (o PayPal; mínimo US$50 por pago); aceptan **software por suscripción**, pero normalmente **no** "servicios": en el cuestionario se describe como software para abogados, no como asesoría legal. Comisión: 5 % + US$0,50 por cobro (más recargos según el caso). Aprobación en 2–3 días laborables.
+
+Falta, en orden:
+1. **Decidir precios y nombre** (los planes de la página dicen [PRECIO]).
+2. **Página pública** con la marca nueva: qué es, salas, precios, y las páginas de **Términos, Privacidad (Ley 172-13), Reembolso y Contacto** (borradores para que los revise el abogado). Una **cuenta de demostración** por si la revisión quiere ver la app.
+3. **El dueño:** cuenta y tienda en Lemon Squeezy, cuestionario, verificación de identidad, cuenta de banco, planes.
+4. **Conectar los pagos:** botón "Elegir plan" → checkout con el correo del abogado; un *webhook* que reciba pagos, renovaciones y cancelaciones y cambie el plan de la cuenta (`prueba` → `activo` → `vencido`); enlace "Gestionar mi suscripción". Probar todo en modo de prueba.
+5. **Publicar la pantalla de consentimiento de Google** (hoy solo entran los *test users*).
+6. Cuando pague el primer cliente: Render de pago (~US$7/mes) para que no se duerma.
 
 ## Por dónde vamos (8 nov 2026)
 
