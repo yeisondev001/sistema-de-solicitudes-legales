@@ -58,8 +58,12 @@ _SISTEMA = (
     "el artículo de las fuentes según el tiempo y los datos del caso, muestra la operación paso a paso y cita "
     "el artículo [n]; si el artículo no está en las fuentes no pongas cifras de memoria: di qué artículo hay "
     "que revisar. No sumes conceptos que dependen de otra cosa (por ejemplo, una indemnización que solo da "
-    "el tribunal) sin advertirlo. No repitas la pregunta. Usa negritas y listas cortas, nunca tablas ni "
-    "títulos con #. Eres una herramienta "
+    "el tribunal) sin advertirlo. Si viene un «CÁLCULO DE LA APP», es el cálculo correcto hecho con las "
+    "fórmulas del Código de Trabajo: muestra su tabla tal cual, explica cada concepto con su artículo y sus "
+    "notas, y no lo rehagas, no cambies montos ni le sumes nada. No repitas la pregunta. Usa negritas, listas "
+    "cortas y, para cálculos o comparaciones, tablas de pocas columnas; nunca títulos con # ni fórmulas en "
+    "LaTeX (nada de \\frac, \\times ni corchetes [ ] alrededor de una operación): escribe las operaciones "
+    "con × y /, por ejemplo «14 días × RD$ 2,098.20 = RD$ 29,374.80». Eres una herramienta "
     "de apoyo: la decisión es del abogado."
 )
 
@@ -280,7 +284,19 @@ def cifras_sin_respaldo(respuesta: str, textos: list) -> list:
     return list(dict.fromkeys(salida))
 
 
-def responder(pregunta: str, fuentes: list, referencia, historial: list = None) -> dict:
+def sin_latex(texto: str) -> str:
+    """La app no dibuja fórmulas: '[ \\frac{14}{30}\\times 50,000 = 23,333.33\\ \\text{RD} ]' -> '14/30 × 50,000 = 23,333.33 RD'."""
+    texto = re.sub(r"\\d?frac\{([^{}]*)\}\{([^{}]*)\}", r"\1/\2", texto)
+    texto = re.sub(r"\\(?:text|mathrm|textbf|mathbf)\{([^{}]*)\}", r"\1", texto)
+    texto = texto.replace("\\times", " × ").replace("\\cdot", " × ").replace("\\div", "/").replace("\\%", "%")
+    texto = re.sub(r"\\[ ,;!]", " ", texto)
+    texto = re.sub(r"\\[\[\]()]", "", texto)   # \[ \] \( \)
+    # "[ 14/30 × 50,000 = … ]" en su propia línea: se quitan los corchetes (las citas [3] no se tocan)
+    texto = re.sub(r"(?m)^(\s*)\[\s+(.*?[=×/].*?)\s+\]\s*$", r"\1\2", texto)
+    return re.sub(r"(?<=\S)[ \t]{2,}", " ", texto)   # sin tocar la sangría de las listas
+
+
+def responder(pregunta: str, fuentes: list, referencia, historial: list = None, calculo: str = None) -> dict:
     """Redacta la respuesta con análisis y quita cualquier cita a una fuente que no exista.
     Si pone plazos que no salen de las fuentes, se le pide una vez que los corrija; si insiste, se avisa."""
     fuentes = fuentes[:MAX_FUENTES]
@@ -288,9 +304,10 @@ def responder(pregunta: str, fuentes: list, referencia, historial: list = None) 
     bloque = "\n\n".join(f"[{n}] {referencia(f)}\n{f['texto'][:por_fuente]}" for n, f in enumerate(fuentes, 1))
     mensajes = [{"role": "system", "content": _SISTEMA},
                 *_memoria(historial),
-                {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\nPregunta: {pregunta}"}]
+                {"role": "user", "content": f"Fuentes:\n\n{bloque}\n\n" + (f"{calculo}\n\n" if calculo else "")
+                                            + f"Pregunta: {pregunta}"}]
     texto = _chat_en_cadena(mensajes, max_tokens=MAX_TOKENS_RESPUESTA)
-    respaldo = [bloque, pregunta] + [m["content"] for m in _memoria(historial)]
+    respaldo = [bloque, pregunta, calculo or ""] + [m["content"] for m in _memoria(historial)]
     dudosas = cifras_sin_respaldo(texto, respaldo)
     if dudosas:
         try:
@@ -312,6 +329,7 @@ def responder(pregunta: str, fuentes: list, referencia, historial: list = None) 
                       + ". No aparecen en las fuentes encontradas; pueden ser un error.")
     # algunos modelos citan como 【1】 o 【1†fuente】: se pasan a [1]
     texto = re.sub(r"【\s*(\d+)[^】]*】", r"[\1]", texto)
+    texto = sin_latex(texto)
     validas = set(range(1, len(fuentes) + 1))
     citadas = sorted({int(n) for n in re.findall(r"\[(\d+)\]", texto)} & validas)
     texto = re.sub(r"\[(\d+)\]", lambda m: m.group(0) if int(m.group(1)) in validas else "", texto)

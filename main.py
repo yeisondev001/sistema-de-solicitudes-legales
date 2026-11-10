@@ -12,7 +12,7 @@ import flet as ft
 import cuentas
 import historial
 from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
-from jurisprudencia import visor as juris_visor
+from jurisprudencia import visor as juris_visor, prestaciones as juris_prestaciones
 from generators import (
     generar_informe_tecnico,
     generar_copia_certificada,
@@ -2008,17 +2008,21 @@ def app_principal(page: ft.Page, usuario: dict, salir):
                             fuentes = juris_buscar.buscar(plan["busquedas"] or [plan["consulta"]], usuario["id"],
                                                           limite=juris_ia.MAX_FUENTES, pregunta=plan["consulta"])
                         turno["fuentes"] = fuentes
+                        # prestaciones con salario y tiempo: los montos los calcula la app, la IA los explica
+                        calculo = juris_prestaciones.calcular(q) or juris_prestaciones.calcular(plan["consulta"])
                         if not fuentes:
                             turno["texto"] = ("No encontré sentencias sobre eso. Pruebe a decirlo con otras palabras, "
                                               "o suba sus propios documentos en «Mis documentos».")
                         elif juris_ia.disponible():
                             avance("Analizando las sentencias…")
                             try:
-                                r = juris_ia.responder(q, fuentes, juris_buscar.referencia, historial)
+                                r = juris_ia.responder(q, fuentes, juris_buscar.referencia, historial, calculo)
                                 turno.update(texto=r["texto"], citadas=r["citadas"], ia=True)
                             except juris_ia.LimiteAlcanzado:
                                 turno["texto"] = ("_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto. "
                                                   "Mientras tanto, abajo están las sentencias encontradas._")
+                                if calculo:
+                                    turno["texto"] = juris_prestaciones.para_mostrar(calculo) + "\n\n" + turno["texto"]
                         else:
                             turno["texto"] = (f"_La IA no está disponible en el servidor (claves: {juris_ia.estado()}). "
                                               "Abajo están las sentencias encontradas._")

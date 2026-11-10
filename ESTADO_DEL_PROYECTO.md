@@ -172,3 +172,11 @@ python cargar_boletines.py --mes 2025-05 --sin-vectores   # cargar un mes
 python crear_usuario.py --admin                           # crear un usuario
 python main.py                                            # abrir la app (puerto 8080)
 ```
+
+## Cálculo de prestaciones laborales (`jurisprudencia/prestaciones.py`)
+La IA calculaba mal las prestaciones (dividía entre 30, inventaba escalas, sumaba los 6 meses del art. 95 sin juicio).
+Si la pregunta habla de despido/desahucio/prestaciones y trae salario y tiempo, la app calcula con las reglas fijas
+del Código de Trabajo (arts. 76, 80, 177-182, 219-220; salario diario = mensual / 23.83) y le pasa el cálculo a la
+IA, que solo lo explica. El art. 95 se menciona aparte, nunca se suma. Además, `ia.cifras_sin_respaldo` revisa que
+cada "N días / meses / años" de una respuesta salga de las fuentes (si no, pide corregir una vez y si no, avisa).
+
