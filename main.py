@@ -539,7 +539,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
 
     # las plantillas de solicitudes (sala Redacción) son solo para las cuentas que las tienen activadas
     con_plantillas = usuario.get("plantillas", False)
-    # la sección abierta: "escritorio", "jurisprudencia" (el Asistente), "biblioteca", "calculadoras",
+    # la sección abierta: "escritorio", "jurisprudencia" (el Asistente), "biblioteca",
     # "historial" o una plantilla
     plantilla = {"actual": seccion or "escritorio"}
 
@@ -1779,7 +1779,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
     page.overlay.append(selector)
 
     def hoja_markdown():
-        """Estilos de las respuestas en Markdown (el Asistente y las calculadoras). Todos con color propio:
+        """Estilos de las respuestas en Markdown (el Asistente). Todos con color propio:
         los que quedan sin definir salen con el color del tema de Flet y no siempre se leen, como las
         tablas y los títulos que a veces pone la IA."""
         def _estilo(size=15, color=INK, **kw):
@@ -2183,54 +2183,6 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
             ], spacing=12)),
         ]
 
-    # ── CALCULADORAS ─────────────────────────────
-    calc_estado = {"salario": "", "anios": "", "meses": "", "resultado": ""}
-
-    def build_calculadoras():
-        resultado = ft.Markdown(calc_estado["resultado"], selectable=True, md_style_sheet=hoja_markdown(),
-                                extension_set=ft.MarkdownExtensionSet.GITHUB_WEB)
-        error = ft.Text("", size=13, color=PDF_COLOR, font_family=FONT_BODY, visible=False)
-
-        def calcular(e=None):
-            try:
-                salario = float((calc_estado["salario"] or "0").replace(",", ""))
-                anios = int(calc_estado["anios"] or 0)
-                meses = int(calc_estado["meses"] or 0)
-            except ValueError:
-                salario = anios = meses = 0
-            if salario < 1000 or (anios == 0 and meses == 0):
-                error.value, error.visible = "Escriba el salario mensual y el tiempo trabajado (años, meses o los dos).", True
-                page.update(); return
-            # el cálculo es el mismo que usa el asistente (jurisprudencia/prestaciones.py)
-            texto = f"prestaciones con salario de {salario:,.2f} mensual, {anios} años y {meses} meses"
-            calculo = juris_prestaciones.calcular(texto)
-            calc_estado["resultado"] = juris_prestaciones.para_mostrar(calculo) if calculo else ""
-            resultado.value, error.visible = calc_estado["resultado"], not calculo
-            error.value = "" if calculo else "No se pudo calcular con esos datos."
-            page.update()
-
-        return [
-            tarjeta("I", "Prestaciones laborales", "Desahucio o despido sin causa · Código de Trabajo", ft.Column(controls=[
-                fila_campos(
-                    campo("Salario mensual (RD$)", calc_estado, "salario", lambda: None, hint="50,000",
-                          keyboard_type=KT_NUM, char_filter=re.compile(r"[^0-9.,]")),
-                    campo("Años trabajados", calc_estado, "anios", lambda: None, hint="0",
-                          keyboard_type=KT_NUM, char_filter=re.compile(r"[^0-9]")),
-                    campo("Meses", calc_estado, "meses", lambda: None, hint="0",
-                          keyboard_type=KT_NUM, char_filter=re.compile(r"[^0-9]")),
-                ),
-                error,
-                ft.Row(controls=[ft.ElevatedButton("Calcular", icon=ft.Icons.CALCULATE_OUTLINED, on_click=calcular,
-                                                   style=ft.ButtonStyle(bgcolor=BOTON, color=ON_BOTON, icon_color=ON_BOTON,
-                                                                        shape=ft.RoundedRectangleBorder(radius=6),
-                                                                        padding=ft.padding.symmetric(horizontal=22, vertical=16)))]),
-                resultado,
-            ], spacing=16)),
-            tarjeta("II", "Plazos procesales e intereses", "Pronto", ft.Text(
-                "Contar el plazo de un recurso (días francos y feriados) y calcular intereses: vienen pronto. "
-                "Mientras tanto, pregúntele a su asistente.", size=14, color=INK_SOFT, font_family=FONT_BODY)),
-        ]
-
     # ── USUARIOS (solo administradores) ──────────
     def abrir_usuarios():
         lista = ft.Column(spacing=0, tight=True)
@@ -2355,7 +2307,6 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         ("biblioteca",   "Biblioteca",   ft.Icons.MENU_BOOK_OUTLINED),
         ("expedientes",  "Expedientes",  ft.Icons.FOLDER_OUTLINED),
         ("redaccion",    "Redacción",    ft.Icons.EDIT_NOTE),
-        ("calculadoras", "Calculadoras", ft.Icons.CALCULATE_OUTLINED),
         ("agenda",       "Agenda",       ft.Icons.CALENDAR_MONTH_OUTLINED),
     ]
     PRONTO  = {"expedientes", "agenda"} | (set() if con_plantillas else {"redaccion"})
@@ -2691,9 +2642,16 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
             style=ft.ButtonStyle(bgcolor=BOTON, color=ON_BOTON, icon_color=ON_BOTON,
                                  shape=ft.RoundedRectangleBorder(radius=10),
                                  padding=ft.padding.symmetric(horizontal=22, vertical=20)))
+        def escribir_prestaciones(e=None):
+            # deja una pregunta de ejemplo para cambiarle los datos; los montos los saca el asistente
+            # con las reglas fijas de jurisprudencia/prestaciones.py
+            pregunta.value = ("Calcule las prestaciones de un despido sin causa: salario de RD$50,000 al mes, "
+                              "3 años y 4 meses trabajados.")
+            pregunta.focus()
+
         atajos = [
             ("Plazo para recurrir en casación", lambda e: preguntar("¿Cuál es el plazo para recurrir en casación?")),
-            ("Calcular prestaciones", lambda e: ir_a("calculadoras")),
+            ("Calcular prestaciones", escribir_prestaciones),
             ("Subir un documento", lambda e: subir_documentos()),
             *([("Redactar una solicitud", lambda e: ir_a(KEYS[0]))] if con_plantillas else []),
         ]
@@ -2744,11 +2702,11 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
                 on_click=accion, ink=True, col={"xs": 6},
             )
         tarjeta_mano = seccion_escritorio("A la mano", [ft.ResponsiveRow(controls=[
-            mosaico(ft.Icons.CALCULATE_OUTLINED, "Calcular prestaciones", lambda e: ir_a("calculadoras")),
             mosaico(ft.Icons.ADD_COMMENT_OUTLINED, "Nueva conversación", lambda e: nueva_conversacion()),
             mosaico(ft.Icons.UPLOAD_FILE, "Subir un documento", lambda e: subir_documentos()),
-            mosaico(ft.Icons.EDIT_NOTE, "Nueva solicitud", lambda e: ir_a(KEYS[0])) if con_plantillas else
             mosaico(ft.Icons.MENU_BOOK_OUTLINED, "Ver la biblioteca", lambda e: ir_a("biblioteca")),
+            mosaico(ft.Icons.EDIT_NOTE, "Nueva solicitud", lambda e: ir_a(KEYS[0])) if con_plantillas else
+            mosaico(ft.Icons.PALETTE_OUTLINED, "Cambiar los colores", lambda e: abrir_apariencia()),
         ], spacing=10, run_spacing=10)])
 
         # sus documentos están en la base de jurisprudencia, que puede tardar en despertar: se cuentan aparte
@@ -2787,7 +2745,6 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         "historial": ("Historial de expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
         "jurisprudencia": ("Asistente", "Pregúntele como a un colega; cada respuesta cita sentencias del Boletín Judicial, leyes o sus documentos."),
         "biblioteca": ("Biblioteca", "Las sentencias, las leyes y sus documentos, en un mismo buscador."),
-        "calculadoras": ("Calculadoras", "Con las reglas fijas de la ley y el detalle de cada paso."),
     }
 
     BUILDERS = {
@@ -2801,7 +2758,6 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         "historial": build_historial,
         "jurisprudencia": build_jurisprudencia,
         "biblioteca": build_biblioteca,
-        "calculadoras": build_calculadoras,
     }
 
     def rebuild_form():

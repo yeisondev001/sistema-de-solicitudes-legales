@@ -119,7 +119,7 @@ Los archivos están en `jurisprudencia/`.
 
 ## Diseño y marca (decidido el 10 nov 2026)
 
-El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisional). Cada parte es una sala: Escritorio (inicio), Asistente (el chat), Biblioteca (sentencias, leyes y documentos), Expedientes (una carpeta por cliente), Redacción (plantillas), Calculadoras y Agenda. Las pantallas, el recorrido del abogado y la marca están en un lienzo de diseño privado del dueño (pedírselo).
+El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisional). Cada parte es una sala: Escritorio (inicio), Asistente (el chat), Biblioteca (sentencias, leyes y documentos), Expedientes (una carpeta por cliente), Redacción (plantillas) y Agenda. Las pantallas, el recorrido del abogado y la marca están en un lienzo de diseño privado del dueño (pedírselo).
 
 - **Paleta de la marca: «Vino y madera».** Es la de la página pública, la entrada, los correos y el pago, y el tema por defecto adentro. El vino son los libros y la madera el escritorio. Todos los contrastes pasan 4,5:1.
 
@@ -142,7 +142,7 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - Un color nuevo se agrega en los 4 temas y en `temas.NOMBRES`.
   - **Letras:** Literata y Atkinson Hyperlegible se cargan desde jsDelivr (Fontsource). Flet admite un solo archivo por letra, así que la negrita la dibuja el navegador.
 - **La oficina por dentro (11 nov):**
-  - **Menú de salas** a la izquierda; en el celular, con el botón ☰ arriba. Las salas son Escritorio, Asistente, Biblioteca, Expedientes, Redacción, Calculadoras y Agenda.
+  - **Menú de salas** a la izquierda; en el celular, con el botón ☰ arriba. Las salas son Escritorio, Asistente, Biblioteca, Expedientes, Redacción y Agenda.
   - **Las que todavía no existen dicen «Pronto»:** Expedientes y Agenda para todos, y Redacción para las cuentas sin plantillas.
   - **Escritorio (el inicio):**
     - Saludo con la fecha y una caja para preguntarle al asistente (abre una conversación nueva).
@@ -150,7 +150,10 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - Para las cuentas con plantillas, también las audiencias de la semana (salen del historial de reportes).
   - **Asistente:** el chat de siempre. **Biblioteca:** qué hay y «Mis documentos», que antes estaba debajo del chat.
   - **Redacción:** las 7 plantillas y el historial, como pestañas.
-  - **Calculadoras:** prestaciones laborales con un formulario. Usa el mismo cálculo que el asistente (`jurisprudencia/prestaciones.py`).
+  - **No hay sala de Calculadoras** (se quitó el 11 nov): los cálculos los pide el abogado al asistente.
+    - Los montos de prestaciones no los saca la IA: salen de las reglas fijas de `jurisprudencia/prestaciones.py` y la IA solo los explica.
+    - En el Escritorio, «Calcular prestaciones» deja en la caja una pregunta de ejemplo para cambiarle los datos.
+    - Cuando se agreguen plazos e intereses, hacerlos igual: reglas en el código y la IA explicando.
   - **Abajo del menú:**
     - La cuenta, con **Apariencia** y **Cerrar sesión**.
     - En plan `prueba`, los días que quedan y las consultas del día.
