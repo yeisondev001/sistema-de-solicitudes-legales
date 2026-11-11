@@ -43,6 +43,7 @@ export const api = {
   get: <T>(ruta: string) => pedir<T>(ruta),
   post: <T>(ruta: string, datos?: unknown) =>
     pedir<T>(ruta, { method: 'POST', body: datos === undefined ? undefined : JSON.stringify(datos) }),
+  patch: <T>(ruta: string, datos: unknown) => pedir<T>(ruta, { method: 'PATCH', body: JSON.stringify(datos) }),
   borrar: <T>(ruta: string) => pedir<T>(ruta, { method: 'DELETE' }),
 }
 
@@ -83,6 +84,34 @@ export async function preguntarAlAsistente(
     }
   }
   throw new ErrorApi('La respuesta se cortó. Intente de nuevo.', 0)
+}
+
+/**
+ * Pide un documento (Word o PDF) y lo descarga con el nombre que puso el servidor.
+ * Con cuerpo es un POST (las plantillas); sin cuerpo, un GET (el historial en Word).
+ * Devuelve los encabezados, por si traen algo más (X-Historial).
+ */
+export async function descargar(ruta: string, cuerpo?: unknown): Promise<Headers> {
+  let r: Response
+  try {
+    r = await fetch(ruta, {
+      method: cuerpo === undefined ? 'GET' : 'POST',
+      credentials: 'same-origin',
+      headers: cuerpo === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+    })
+  } catch {
+    throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
+  }
+  await respuesta(r, ruta)
+  const nombre = decodeURIComponent(r.headers.get('X-Nombre') ?? 'documento')
+  const url = URL.createObjectURL(await r.blob())
+  const enlace = Object.assign(document.createElement('a'), { href: url, download: nombre })
+  document.body.append(enlace)
+  enlace.click()
+  enlace.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 30_000)
+  return r.headers
 }
 
 /** Sube un PDF o Word a la parte del buscador de la persona */

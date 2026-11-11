@@ -126,7 +126,7 @@ export default function Escritorio() {
 
       <div className="grid gap-5 md:grid-cols-2">
         {perfil.plantillas && (
-          <Seccion titulo="Audiencias de la semana" accion={{ texto: 'Ver historial', a: '/redaccion' }}>
+          <Seccion titulo="Audiencias de la semana" accion={{ texto: 'Ver historial', a: '/redaccion/historial' }}>
             {audiencias.length ? (
               audiencias.slice(0, 5).map((a) => (
                 <Renglon
@@ -134,6 +134,7 @@ export default function Escritorio() {
                   titulo={a.recurrente || a.expediente || 'Expediente'}
                   detalle={[a.tribunal, a.expediente && `Exp. ${a.expediente}`].filter(Boolean).join(' · ')}
                   etiqueta={a.dias === 0 ? 'Hoy' : a.dias === 1 ? 'Mañana' : `En ${a.dias} días`}
+                  a="/redaccion/historial"
                 />
               ))
             ) : (

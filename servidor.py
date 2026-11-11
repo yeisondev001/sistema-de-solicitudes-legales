@@ -24,7 +24,9 @@ from pydantic import BaseModel
 
 import cuentas
 import historial
+import redaccion
 import temas
+from generators import generar_expedientes
 from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
 from jurisprudencia import visor as juris_visor, prestaciones as juris_prestaciones
 
@@ -449,6 +451,133 @@ async def subir_documento(request: Request, u=Depends(usuario_actual)):
 @app.delete("/api/documentos/{doc_id}")
 def borrar_documento(doc_id: int, u=Depends(usuario_actual)):
     juris_proc.borrar_documento(doc_id, u["id"])
+    return {"ok": True}
+
+
+# ── REDACCIÓN (solo cuentas con plantillas) ──────
+def con_plantillas(u=Depends(usuario_actual)) -> dict:
+    if not u["plantillas"]:
+        raise HTTPException(403, "Su cuenta no tiene las plantillas de solicitudes.")
+    return u
+
+
+def _archivo(contenido: bytes, nombre: str, **cabeceras) -> Response:
+    tipo = ("application/pdf" if nombre.endswith(".pdf")
+            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    return Response(contenido, media_type=tipo, headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(nombre)}", "X-Nombre": quote(nombre),
+        **cabeceras})
+
+
+@app.get("/api/redaccion")
+def redaccion_datos(u=Depends(con_plantillas)):
+    """Las plantillas con sus valores iniciales (fechas de hoy) y las listas de tribunales y salas."""
+    return {"plantillas": [{"clave": k, "nombre": p["nombre"], "sub": p["sub"], "valores": p["valores"]()}
+                           for k, p in redaccion.PLANTILLAS.items()],
+            "listas": redaccion.LISTAS}
+
+
+class Documento(BaseModel):
+    datos: dict
+    editando_id: int | None = None   # Reporte de Audiencia abierto desde el historial con «Editar»
+
+
+@app.post("/api/redaccion/{clave}/{formato}")
+def redaccion_generar(clave: str, formato: str, doc: Documento, u=Depends(con_plantillas)):
+    if clave not in redaccion.PLANTILLAS or formato not in ("docx", "pdf"):
+        raise HTTPException(404, "Esa plantilla no existe.")
+    try:
+        contenido, nombre = redaccion.generar(clave, doc.datos, formato)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    except Exception as ex:
+        raise HTTPException(500, f"No se pudo armar el documento: {ex}")
+    guardado = ""
+    if redaccion.PLANTILLAS[clave].get("historial"):
+        try:
+            historial.guardar(historial.desde_reporte(doc.datos), datos=doc.datos, id_=doc.editando_id)
+            guardado = "si"
+        except Exception:
+            guardado = "no"   # el documento sale igual; la pantalla avisa que no quedó en el historial
+    return _archivo(contenido, nombre, **({"X-Historial": guardado} if guardado else {}))
+
+
+@app.get("/api/historial")
+def historial_lista(u=Depends(con_plantillas)):
+    """Los reportes generados, en orden de creación (numero 1 es el primero)."""
+    try:
+        return [{**e, "numero": n} for n, e in enumerate(historial.listar(), start=1)]
+    except Exception as ex:
+        raise HTTPException(503, f"No se pudo leer el historial: {ex}")
+
+
+@app.delete("/api/historial/{id_}")
+def historial_borrar(id_: int, u=Depends(con_plantillas)):
+    historial.borrar(id_)
+    return {"ok": True}
+
+
+@app.get("/api/historial/word")
+def historial_word(u=Depends(con_plantillas)):
+    """Todo el historial en Word, con el formato de EXPEDIENTES."""
+    return _archivo(generar_expedientes(historial.listar()), f"EXPEDIENTES {datetime.now(ZONA_RD).year}.docx")
+
+
+# ── USUARIOS (solo administradores) ──────────────
+def solo_admin(u=Depends(usuario_actual)) -> dict:
+    if not u["es_admin"]:
+        raise HTTPException(403, "Solo los administradores pueden ver esto.")
+    return u
+
+
+@app.get("/api/usuarios")
+def usuarios(u=Depends(solo_admin)):
+    return [{**x, "es_admin": bool(x["es_admin"]), "activo": bool(x["activo"]), "plantillas": bool(x["plantillas"]),
+             "email": x["email"] or "", "plan": x["plan"] or "activo"} for x in cuentas.listar_usuarios()]
+
+
+class NuevoUsuario(BaseModel):
+    usuario: str
+    nombre: str = ""
+    clave: str
+    email: str = ""
+    es_admin: bool = False
+    plantillas: bool = False
+
+
+@app.post("/api/usuarios")
+def crear_usuario(datos: NuevoUsuario, u=Depends(solo_admin)):
+    try:
+        cuentas.crear_usuario(datos.usuario, datos.clave, datos.nombre, datos.es_admin, email=datos.email,
+                              plantillas=datos.plantillas)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    return {"ok": True}
+
+
+class CambioUsuario(BaseModel):
+    plan: str | None = None
+    email: str | None = None
+    activo: bool | None = None
+    plantillas: bool | None = None
+
+
+@app.patch("/api/usuarios/{uid}")
+def cambiar_usuario(uid: int, c: CambioUsuario, u=Depends(solo_admin)):
+    # su propia cuenta no se puede vencer ni desactivar (se quedaría afuera)
+    if uid == u["id"] and (c.plan is not None or c.activo is not None):
+        raise HTTPException(400, "No puede cambiar el plan ni desactivar su propia cuenta.")
+    try:
+        if c.plan is not None:
+            cuentas.cambiar_plan(uid, c.plan)
+        if c.email is not None:
+            cuentas.asignar_email(uid, c.email.strip().lower())
+        if c.activo is not None:
+            cuentas.cambiar_activo(uid, c.activo)
+        if c.plantillas is not None:
+            cuentas.cambiar_plantillas(uid, c.plantillas)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
     return {"ok": True}
 
 

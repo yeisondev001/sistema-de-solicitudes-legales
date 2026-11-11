@@ -10,6 +10,8 @@ import Biblioteca from '@/pages/biblioteca'
 import Entrada from '@/pages/entrada'
 import Escritorio from '@/pages/escritorio'
 import Pronto from '@/pages/pronto'
+import Redaccion from '@/pages/redaccion'
+import Usuarios from '@/pages/usuarios'
 
 export default function App() {
   // undefined: todavía se está preguntando al servidor si hay sesión
@@ -69,7 +71,15 @@ export default function App() {
           <Route path="asistente" element={<Asistente />} />
           <Route path="asistente/:id" element={<Asistente />} />
           <Route path="biblioteca" element={<Biblioteca />} />
-          <Route path="redaccion" element={<Pronto sala="redaccion" />} />
+          {sesion.perfil.plantillas ? (
+            <>
+              <Route path="redaccion" element={<Redaccion />} />
+              <Route path="redaccion/:clave" element={<Redaccion />} />
+            </>
+          ) : (
+            <Route path="redaccion/*" element={<Pronto sala="redaccion" />} />
+          )}
+          {sesion.perfil.es_admin && <Route path="usuarios" element={<Usuarios />} />}
           <Route path="expedientes" element={<Pronto sala="expedientes" />} />
           <Route path="agenda" element={<Pronto sala="agenda" />} />
           <Route path="*" element={<Navigate to="/" replace />} />

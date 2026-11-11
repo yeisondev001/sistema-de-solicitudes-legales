@@ -170,14 +170,13 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - **Google:** el flujo se hace a mano con `httpx`. La redirección sigue siendo `/oauth_callback`, así que no hay que tocar Google Cloud.
     - **Asistente:** contesta por partes (`/api/asistente`, una línea JSON por evento) para mostrar «Buscando…». La conversación se lee de la base, no de la pantalla.
     - **Visor de páginas:** solo abre PDFs de las fuentes oficiales (`FUENTES_PERMITIDAS`), no cualquier dirección.
-  - **Ya hechas:** entrada (Google, usuario y crear administrador), menú de salas con panel en el celular, Escritorio, Asistente (lista de conversaciones, fuentes, visor de la página, copiar), Biblioteca (subir y quitar documentos) y Apariencia (los 4 temas, cambian al instante).
+  - **Ya hechas:** entrada (Google, usuario y crear administrador), menú de salas con panel en el celular, Escritorio, Asistente (lista de conversaciones, fuentes, visor de la página, copiar), Biblioteca (subir y quitar documentos), Apariencia (los 4 temas, cambian al instante), Redacción (las 7 plantillas en Word y PDF, y el historial: buscar, editar, usar como base, borrar y descargar todo en Word) y Usuarios (solo administradores, en el menú de la cuenta).
+  - **Redacción:** `redaccion.py` tiene lo de cada plantilla (valores iniciales, campos obligatorios, generadores, nombre del archivo) y las listas de tribunales, salas y asuntos, que antes estaban en `main.py`. Los campos de cada formulario en pantalla están en `web/src/lib/plantillas.ts`. Lo escrito se conserva al cambiar de sala mientras la app esté abierta.
   - **Colores:** salen de `temas.py`. `/api/sesion` manda los del tema de la persona y `web/src/lib/tema.ts` los pone en las variables `--t-*` de `web/src/index.css`.
   - **Letras:** Literata y Atkinson Hyperlegible desde npm (Fontsource), con negrita y cursiva de verdad.
   - **Falta para cambiar en Render:**
-    1. Redacción: las 7 plantillas, Word y PDF, y el historial de reportes con las audiencias.
-    2. Administrar usuarios.
-    3. Que Render arme las pantallas (`npm run build`) y arranque con `uvicorn servidor:app`.
-    4. Probar con la base real.
+    1. Que Render arme las pantallas (`npm run build`) y arranque con `uvicorn servidor:app`.
+    2. Probar con la base real: el asistente, la biblioteca y la entrada con Google.
   - **Mientras tanto, la app de Flet (`main.py`) sigue siendo la que está en Render, sin cambios.**
   - **En local:** ver `web/README.md`. Vite va en el puerto 5180, porque el 5173 lo usa otro proyecto del dueño.
 - **Lo que se descartó:** azul marino con dorado (es el estándar del sector y fue lo que no le gustó al dueño), el verde y la pizarra azul.

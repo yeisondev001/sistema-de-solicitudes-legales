@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  CalendarDays, ChevronsUpDown, FolderClosed, House, LogOut, Menu, MessageSquare, Palette, PenLine,
-  LibraryBig, type LucideIcon,
+  CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, MessageSquare, Palette, PenLine,
+  Users, type LucideIcon,
 } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
 import { Logo } from '@/components/logo'
@@ -89,6 +89,7 @@ function CajaPrueba() {
 
 function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
   const { perfil, salir } = useSesion()
+  const navegar = useNavigate()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex w-full items-center gap-3 rounded-lg p-2 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring">
@@ -109,6 +110,11 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
         <DropdownMenuItem onSelect={abrirApariencia} className="h-10 text-[0.95rem]">
           <Palette /> Apariencia
         </DropdownMenuItem>
+        {perfil.es_admin && (
+          <DropdownMenuItem onSelect={() => navegar('/usuarios')} className="h-10 text-[0.95rem]">
+            <Users /> Administrar usuarios
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={salir} className="h-10 text-[0.95rem]">
           <LogOut /> Cerrar sesión
         </DropdownMenuItem>
@@ -139,6 +145,12 @@ export function Oficina() {
   const { pathname } = useLocation()
   // el Asistente usa todo el alto para la conversación; las demás salas se desplazan
   const conversacion = pathname.startsWith('/asistente')
+  // cada sala abre desde arriba
+  const contenido = useRef<HTMLElement>(null)
+  useEffect(() => {
+    // con llaves: en los navegadores nuevos scrollTo devuelve una promesa, y un efecto no puede devolver nada
+    contenido.current?.scrollTo(0, 0)
+  }, [pathname])
 
   return (
     <div className="flex h-dvh flex-col bg-background lg:flex-row">
@@ -168,7 +180,7 @@ export function Oficina() {
         </Sheet>
       </header>
 
-      <main className={cn('min-h-0 flex-1', conversacion ? 'flex flex-col' : 'overflow-y-auto')}>
+      <main ref={contenido} className={cn('min-h-0 flex-1', conversacion ? 'flex flex-col' : 'overflow-y-auto')}>
         <Outlet />
       </main>
 

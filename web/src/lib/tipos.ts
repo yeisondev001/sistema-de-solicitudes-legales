@@ -70,6 +70,35 @@ export interface Documento {
   fragmentos: number
 }
 
+/** Un Reporte de Audiencia guardado en el historial de expedientes */
+export interface EntradaHistorial {
+  id: number
+  numero: number
+  tribunal: string
+  fecha_audiencia: string
+  expediente: string
+  recurrente: string
+  recurrido: string
+  agrimensor: string
+  objeto: string
+  parcela: string
+  fallo: string
+  fecha_proxima: string
+  datos: Record<string, string | string[]>
+}
+
+export interface Usuario {
+  id: number
+  usuario: string
+  nombre: string
+  es_admin: boolean
+  activo: boolean
+  email: string
+  plan: Perfil['plan']
+  prueba_hasta: number | null
+  plantillas: boolean
+}
+
 export interface Audiencia {
   id: number
   dias: number

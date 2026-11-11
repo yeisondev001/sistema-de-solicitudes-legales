@@ -12,7 +12,7 @@ const SALAS = {
   },
   redaccion: {
     titulo: 'Redacción',
-    texto: 'Las plantillas de solicitudes y el historial de reportes se están pasando a esta versión de la app.',
+    texto: 'Plantillas de escritos y solicitudes listas para llenar y descargar en Word o PDF. Viene pronto.',
   },
 }
 
