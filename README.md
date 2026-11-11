@@ -177,4 +177,4 @@ Evite versionar expedientes, cédulas, documentos generados u otra información 
 
 ## Licencia
 
-Este proyecto se distribuye bajo la [Licencia MIT](LICENSE).
+Software privado. Todos los derechos reservados: no se permite copiarlo, modificarlo, distribuirlo ni usarlo sin autorización escrita del titular (ver [LICENSE](LICENSE)).
