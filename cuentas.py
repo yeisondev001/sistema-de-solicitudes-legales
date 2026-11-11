@@ -152,7 +152,8 @@ def _verificar(clave: str, guardado: str) -> bool:
 def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
             "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": u.get("plan") or "activo",
-            "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or ""}
+            "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or "",
+            "prueba_hasta": u.get("prueba_hasta")}
 
 
 def _bloqueo(u: dict):
@@ -289,6 +290,13 @@ def registrar_pregunta(usuario_id: int, plan: str):
                              "Mañana puede seguir, o escríbanos para activar su cuenta.")
     _ejecutar("INSERT INTO uso (usuario_id, dia, preguntas) VALUES (%s, %s, 1) "
               "ON CONFLICT (usuario_id, dia) DO UPDATE SET preguntas = uso.preguntas + 1", (usuario_id, dia))
+
+
+def preguntas_de_hoy(usuario_id: int) -> int:
+    """Cuántas preguntas lleva hoy (para mostrar lo que le queda de la prueba)."""
+    filas = _ejecutar("SELECT preguntas FROM uso WHERE usuario_id = %s AND dia = %s",
+                      (usuario_id, time.strftime("%Y-%m-%d")), leer=True)
+    return filas[0]["preguntas"] if filas else 0
 
 
 def usuario_de_sesion(token: str):

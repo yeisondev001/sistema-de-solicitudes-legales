@@ -5,7 +5,7 @@ UI principal — generación de documentos en generators/
 """
 
 import os, base64, copy, functools, platform, pathlib, re, secrets, uuid, time, threading
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 import flet as ft
 
@@ -46,6 +46,11 @@ FUENTES = {
     FONT_BODY:    "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@5.3.0/latin-400-normal.ttf",
 }
 ANCHO_MAX    = 1200       # ancho máximo del contenido en pantallas grandes
+NOMBRE_APP   = "Despacho"   # nombre provisional del producto
+ZONA_RD      = timezone(timedelta(hours=-4))   # República Dominicana no cambia la hora en verano
+DIAS_SEMANA  = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+MESES_ANIO   = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+                "octubre", "noviembre", "diciembre")
 
 KT_NUM    = ft.KeyboardType.NUMBER
 RE_FECHA  = re.compile(r"[^0-9/]")
@@ -529,11 +534,14 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         "_guardar_y_abrir", "_guardar_pdf", "campo", "combobox_campo", "materia_selector", "tarjeta",
         "boton_generar", "boton_pdf", "nota_descarga"))
     aplicar_tema(page, tema)
+    # el menú de las salas queda fijo y cada sección se desliza por dentro (ver form_area)
+    page.scroll = None
 
-    # las plantillas de solicitudes son solo para las cuentas que las tienen activadas; las demás
-    # (clientes que entran con Google) ven directamente la jurisprudencia
+    # las plantillas de solicitudes (sala Redacción) son solo para las cuentas que las tienen activadas
     con_plantillas = usuario.get("plantillas", False)
-    plantilla = {"actual": seccion or ("informe" if con_plantillas else "jurisprudencia")}
+    # la sección abierta: "escritorio", "jurisprudencia" (el Asistente), "biblioteca", "calculadoras",
+    # "historial" o una plantilla
+    plantilla = {"actual": seccion or "escritorio"}
 
     # ── VALORES POR DEFECTO DE FORMULARIOS ───────
     form_informe = {
@@ -1738,7 +1746,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
             snack(f"«{nombre_original}» no se pudo leer. Verifique que sea un PDF o Word válido.", ok=False)
         finally:
             ruta.unlink(missing_ok=True)
-        if plantilla["actual"] == "jurisprudencia":
+        if plantilla["actual"] in ("biblioteca", "escritorio"):   # las dos muestran sus documentos
             rebuild_form()
         page.update()
 
@@ -1770,21 +1778,13 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
     selector = ft.FilePicker(on_result=al_elegir_archivos, on_upload=al_subir)
     page.overlay.append(selector)
 
-    def build_jurisprudencia():
-        if not juris_db.configurada():
-            return [tarjeta("!", "Falta configurar el buscador", "Base de jurisprudencia",
-                            ft.Text("Agregue la variable JURIS_DATABASE_URL (Neon) para activar esta sección.",
-                                    size=14, color=INK_SOFT, font_family=FONT_BODY))]
-
-        # La consulta es una conversación: cada mensaje del abogado y cada respuesta del asistente
-        # (con las sentencias que usó) quedan en juris_estado["chat"] y se guardan en la base, así el
-        # abogado las vuelve a abrir desde la lista de conversaciones (como en ChatGPT).
-        chat = juris_estado["chat"]
-        # todos los estilos con color propio: los que quedan sin definir salen con el color del tema
-        # (casi blanco sobre el papel) y no se leen, como las tablas y los títulos que a veces pone la IA
+    def hoja_markdown():
+        """Estilos de las respuestas en Markdown (el Asistente y las calculadoras). Todos con color propio:
+        los que quedan sin definir salen con el color del tema de Flet y no siempre se leen, como las
+        tablas y los títulos que a veces pone la IA."""
         def _estilo(size=15, color=INK, **kw):
             return ft.TextStyle(font_family=FONT_BODY, size=size, color=color, **kw)
-        texto_md = ft.MarkdownStyleSheet(
+        return ft.MarkdownStyleSheet(
             p_text_style=_estilo(),
             list_bullet_text_style=_estilo(),
             strong_text_style=_estilo(weight=ft.FontWeight.W_600),
@@ -1802,6 +1802,19 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
             table_head_text_style=_estilo(size=14, weight=ft.FontWeight.W_600),
             table_body_text_style=_estilo(size=14),
             table_cells_padding=ft.padding.symmetric(horizontal=12, vertical=8))
+
+    def build_jurisprudencia():
+        juris_estado["enviar"] = None
+        if not juris_db.configurada():
+            return [tarjeta("!", "Falta configurar el buscador", "Base de jurisprudencia",
+                            ft.Text("Agregue la variable JURIS_DATABASE_URL (Neon) para activar esta sección.",
+                                    size=14, color=INK_SOFT, font_family=FONT_BODY))]
+
+        # La consulta es una conversación: cada mensaje del abogado y cada respuesta del asistente
+        # (con las sentencias que usó) quedan en juris_estado["chat"] y se guardan en la base, así el
+        # abogado las vuelve a abrir desde la lista de conversaciones (como en ChatGPT).
+        chat = juris_estado["chat"]
+        texto_md = hoja_markdown()
         # STRETCH: cada mensaje ocupa el ancho, así los del abogado se pueden alinear a la derecha
         mensajes_col = ft.Column(spacing=16, scroll=ft.ScrollMode.AUTO, auto_scroll=True,
                                  horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
@@ -1893,7 +1906,8 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
             boton_nueva.disabled = not chat or bool(juris_estado["pendiente"])
 
         lista_conv = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, expand=True)
-        lateral = (page.width or 1280) >= 900   # en pantallas chicas la lista se abre con un botón
+        # con el menú de las salas al lado, la lista cabe desde 1100; si no, se abre con un botón
+        lateral = (page.width or 1280) >= 1100
 
         def conversaciones():
             try:
@@ -2069,38 +2083,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
                 guardar_chat()
             page.run_thread(tarea)
 
-        def lista_documentos():
-            try:
-                docs = juris_proc.mis_documentos(usuario["id"])
-            except Exception as ex:
-                return [ft.Text(f"No se pudieron leer sus documentos: {ex}", size=13, color=PDF_COLOR)]
-            if not docs:
-                return [ft.Text("Todavía no ha subido documentos. Puede subir sentencias, resoluciones o escritos "
-                                "en PDF digital o Word; solo usted los verá.",
-                                size=13, color=INK_SOFT, font_family=FONT_BODY)]
-
-            def borrar(d):
-                juris_proc.borrar_documento(d["id"], usuario["id"])
-                snack(f"«{d['titulo']}» quitado del buscador.")
-                rebuild_form(); page.update()
-
-            return [ft.Container(
-                content=ft.Row(controls=[
-                    ft.Icon(ft.Icons.DESCRIPTION_OUTLINED, color=INK_SOFT, size=18),
-                    ft.Column(controls=[
-                        ft.Text(d["titulo"], size=14, color=INK, font_family=FONT_BODY,
-                                max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                        ft.Text(" · ".join(x for x in (d["numero"], d["sala"], d["materia"]) if x) or "Sin ficha",
-                                size=12, color=INK_SOFT, font_family=FONT_BODY,
-                                max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                    ], spacing=0, expand=True),
-                    ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=PDF_COLOR, tooltip="Quitar del buscador",
-                                  on_click=lambda e, d=d: borrar(d)),
-                ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                border=ft.border.only(bottom=ft.BorderSide(1, PAPER_EDGE)),
-                padding=ft.padding.symmetric(vertical=6, horizontal=4),
-            ) for d in docs]
-
+        juris_estado["enviar"] = enviar   # el Escritorio manda por aquí la pregunta que escribieron allá
         pintar()
         arriba = [boton_nueva] if lateral else [ft.TextButton(
             "Conversaciones", icon=ft.Icons.HISTORY, on_click=lambda e: ver_conversaciones(),
@@ -2124,17 +2107,128 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
                     lista_conv], spacing=8),
                     padding=ft.padding.only(right=12), border=ft.border.only(right=ft.BorderSide(1, PAPER_EDGE))),
                 chat_col], vertical_alignment=ft.CrossAxisAlignment.START, spacing=16)
+        return [tarjeta("I", "Consulta", "Converse con su asistente; cada respuesta cita sus fuentes", consulta)]
+
+    # ── BIBLIOTECA ───────────────────────────────
+    def subir_documentos():
+        selector.pick_files(allow_multiple=True, allowed_extensions=["pdf", "docx"])
+
+    def mis_documentos():
+        if not juris_db.configurada():
+            return None
+        try:
+            return juris_proc.mis_documentos(usuario["id"])
+        except Exception:
+            return None
+
+    def lista_documentos():
+        docs = mis_documentos()
+        if docs is None:
+            return [ft.Text("No se pudieron leer sus documentos. Intente de nuevo en un momento.",
+                            size=13, color=PDF_COLOR, font_family=FONT_BODY)]
+        if not docs:
+            return [ft.Text("Todavía no ha subido documentos. Puede subir sentencias, resoluciones o escritos "
+                            "en PDF digital o Word; solo usted los verá.",
+                            size=13, color=INK_SOFT, font_family=FONT_BODY)]
+
+        def borrar(d):
+            juris_proc.borrar_documento(d["id"], usuario["id"])
+            snack(f"«{d['titulo']}» quitado del buscador.")
+            rebuild_form(); page.update()
+
+        return [ft.Container(
+            content=ft.Row(controls=[
+                ft.Icon(ft.Icons.DESCRIPTION_OUTLINED, color=INK_SOFT, size=18),
+                ft.Column(controls=[
+                    ft.Text(d["titulo"], size=14, color=INK, font_family=FONT_BODY,
+                            max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                    ft.Text(" · ".join(x for x in (d["numero"], d["sala"], d["materia"]) if x) or "Sin ficha",
+                            size=12, color=INK_SOFT, font_family=FONT_BODY,
+                            max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                ], spacing=0, expand=True),
+                ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=PDF_COLOR, tooltip="Quitar del buscador",
+                              on_click=lambda e, d=d: borrar(d)),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            border=ft.border.only(bottom=ft.BorderSide(1, PAPER_EDGE)),
+            padding=ft.padding.symmetric(vertical=6, horizontal=4),
+        ) for d in docs]
+
+    def build_biblioteca():
+        estantes = [
+            (ft.Icons.GAVEL, "Sentencias de la Suprema Corte de Justicia",
+             "Del Boletín Judicial, desde noviembre de 2020; se agregan solas cada mes."),
+            (ft.Icons.MENU_BOOK_OUTLINED, "Leyes y reglamentos",
+             "La Ley 108-05 de Registro Inmobiliario y sus reglamentos, artículo por artículo."),
+            (ft.Icons.FOLDER_SHARED_OUTLINED, "Sus documentos",
+             "Lo que usted sube entra al mismo buscador; nadie más lo ve."),
+        ]
         return [
-            tarjeta("I", "Consulta", "Converse con el asistente; cada respuesta cita sus fuentes", consulta),
+            tarjeta("I", "Qué hay en su biblioteca", "Su asistente busca aquí cuando le pregunta", ft.Column(controls=[
+                *[ft.Row(controls=[
+                    ft.Icon(icono, color=ACCENT_TEXT, size=22),
+                    ft.Column(controls=[
+                        ft.Text(titulo, size=15, weight=ft.FontWeight.W_600, color=INK, font_family=FONT_BODY),
+                        ft.Text(detalle, size=13, color=INK_SOFT, font_family=FONT_BODY),
+                    ], spacing=2, expand=True),
+                ], spacing=14, vertical_alignment=ft.CrossAxisAlignment.START) for icono, titulo, detalle in estantes],
+                ft.TextButton("Preguntarle al asistente", icon=ft.Icons.ARROW_FORWARD,
+                              on_click=lambda e: ir_a("jurisprudencia"), style=ft.ButtonStyle(color=ACCENT_TEXT)),
+            ], spacing=14)),
             tarjeta("II", "Mis documentos", "Solo usted los ve; entran al mismo buscador", ft.Column(controls=[
-                ft.OutlinedButton("Subir PDF o Word", icon=ft.Icons.UPLOAD_FILE,
-                                  on_click=lambda e: selector.pick_files(allow_multiple=True,
-                                                                         allowed_extensions=["pdf", "docx"]),
+                ft.OutlinedButton("Subir PDF o Word", icon=ft.Icons.UPLOAD_FILE, on_click=lambda e: subir_documentos(),
                                   style=ft.ButtonStyle(color=INK, icon_color=INK, side=ft.BorderSide(1, INK_SOFT),
                                                        shape=ft.RoundedRectangleBorder(radius=4),
                                                        padding=ft.padding.symmetric(horizontal=16, vertical=14))),
                 ft.Column(controls=lista_documentos(), spacing=0),
             ], spacing=12)),
+        ]
+
+    # ── CALCULADORAS ─────────────────────────────
+    calc_estado = {"salario": "", "anios": "", "meses": "", "resultado": ""}
+
+    def build_calculadoras():
+        resultado = ft.Markdown(calc_estado["resultado"], selectable=True, md_style_sheet=hoja_markdown(),
+                                extension_set=ft.MarkdownExtensionSet.GITHUB_WEB)
+        error = ft.Text("", size=13, color=PDF_COLOR, font_family=FONT_BODY, visible=False)
+
+        def calcular(e=None):
+            try:
+                salario = float((calc_estado["salario"] or "0").replace(",", ""))
+                anios = int(calc_estado["anios"] or 0)
+                meses = int(calc_estado["meses"] or 0)
+            except ValueError:
+                salario = anios = meses = 0
+            if salario < 1000 or (anios == 0 and meses == 0):
+                error.value, error.visible = "Escriba el salario mensual y el tiempo trabajado (años, meses o los dos).", True
+                page.update(); return
+            # el cálculo es el mismo que usa el asistente (jurisprudencia/prestaciones.py)
+            texto = f"prestaciones con salario de {salario:,.2f} mensual, {anios} años y {meses} meses"
+            calculo = juris_prestaciones.calcular(texto)
+            calc_estado["resultado"] = juris_prestaciones.para_mostrar(calculo) if calculo else ""
+            resultado.value, error.visible = calc_estado["resultado"], not calculo
+            error.value = "" if calculo else "No se pudo calcular con esos datos."
+            page.update()
+
+        return [
+            tarjeta("I", "Prestaciones laborales", "Desahucio o despido sin causa · Código de Trabajo", ft.Column(controls=[
+                fila_campos(
+                    campo("Salario mensual (RD$)", calc_estado, "salario", lambda: None, hint="50,000",
+                          keyboard_type=KT_NUM, char_filter=re.compile(r"[^0-9.,]")),
+                    campo("Años trabajados", calc_estado, "anios", lambda: None, hint="0",
+                          keyboard_type=KT_NUM, char_filter=re.compile(r"[^0-9]")),
+                    campo("Meses", calc_estado, "meses", lambda: None, hint="0",
+                          keyboard_type=KT_NUM, char_filter=re.compile(r"[^0-9]")),
+                ),
+                error,
+                ft.Row(controls=[ft.ElevatedButton("Calcular", icon=ft.Icons.CALCULATE_OUTLINED, on_click=calcular,
+                                                   style=ft.ButtonStyle(bgcolor=BOTON, color=ON_BOTON, icon_color=ON_BOTON,
+                                                                        shape=ft.RoundedRectangleBorder(radius=6),
+                                                                        padding=ft.padding.symmetric(horizontal=22, vertical=16)))]),
+                resultado,
+            ], spacing=16)),
+            tarjeta("II", "Plazos procesales e intereses", "Pronto", ft.Text(
+                "Contar el plazo de un recurso (días francos y feriados) y calcular intereses: vienen pronto. "
+                "Mientras tanto, pregúntele a su asistente.", size=14, color=INK_SOFT, font_family=FONT_BODY)),
         ]
 
     # ── USUARIOS (solo administradores) ──────────
@@ -2235,6 +2329,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         page.open(dlg)
 
     # ── NAVEGACIÓN ───────────────────────────────
+    # Las plantillas de solicitudes, dentro de la sala Redacción
     KEYS = ["informe", "archivo", "reporte", "cobros", "inspeccion", "audiencia_provincial", "conclusiones_saneamiento"]
     PESTANAS = {
         "informe":    "Informe Técnico", "archivo": "Archivo", "reporte": "Reporte de Audiencia",
@@ -2249,71 +2344,95 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         "inspeccion": "Inspección · Cuerpo libre",
         "audiencia_provincial":     "Audiencia · Traslado a provincia",
         "conclusiones_saneamiento": "Saneamiento · Modelo fijo",
+        "historial":  "Expedientes generados",
     }
 
-    tabs_row = ft.Row(controls=[], spacing=2, scroll=ft.ScrollMode.AUTO)
+    # Las salas del despacho, en el menú de la izquierda (en el celular, en un cajón). Cada sala abre
+    # una sección; las que todavía no existen salen con «Pronto».
+    SALAS = [
+        ("escritorio",   "Escritorio",   ft.Icons.HOME_OUTLINED),
+        ("asistente",    "Asistente",    ft.Icons.CHAT_BUBBLE_OUTLINE),
+        ("biblioteca",   "Biblioteca",   ft.Icons.MENU_BOOK_OUTLINED),
+        ("expedientes",  "Expedientes",  ft.Icons.FOLDER_OUTLINED),
+        ("redaccion",    "Redacción",    ft.Icons.EDIT_NOTE),
+        ("calculadoras", "Calculadoras", ft.Icons.CALCULATE_OUTLINED),
+        ("agenda",       "Agenda",       ft.Icons.CALENDAR_MONTH_OUTLINED),
+    ]
+    PRONTO  = {"expedientes", "agenda"} | (set() if con_plantillas else {"redaccion"})
+    PRIMERA = {"asistente": "jurisprudencia", "redaccion": KEYS[0]}   # la sección con que abre cada sala
+
+    def sala_de(key):
+        if key in KEYS or key == "historial":
+            return "redaccion"
+        return "asistente" if key == "jurisprudencia" else key
 
     def ir_a(key):
-        plantilla["actual"] = key if con_plantillas else "jurisprudencia"
-        rebuild_form(); rebuild_tabs(); page.update()
+        if sala_de(key) in PRONTO:
+            key = "escritorio"
+        plantilla["actual"] = key
+        rebuild_form(); pintar_menu(); page.update()
 
-    def on_arrow_click(e):
-        actual = plantilla["actual"]
-        idx = KEYS.index(actual) if actual in KEYS else -1
-        ir_a(KEYS[idx + 1] if idx < len(KEYS) - 1 else KEYS[0])
+    menu_salas = ft.Column(spacing=3)   # en la barra lateral
+    menu_panel = ft.Column(spacing=3)   # las mismas salas, en el panel que se abre en el celular
 
-    scroll_hint = ft.Container(
-        content=ft.Icon(ft.Icons.CHEVRON_RIGHT, color=NAV_TEXT, size=26),
-        padding=ft.padding.symmetric(horizontal=6, vertical=10),
-        tooltip="Siguiente plantilla",
-        on_click=on_arrow_click, ink=True, border_radius=4,
-    )
+    def boton_sala(clave, nombre, icono, en_panel):
+        activa = sala_de(plantilla["actual"]) == clave
+        pronto = clave in PRONTO
+        color = BAR_BTN_TEXT if activa else NAV_SUB if pronto else NAV_TEXT
 
-    # En pantallas anchas las pestañas se reparten el ancho (sin cortes);
-    # en las angostas se desliza la fila con la flecha.
-    pestanas_llenan = {"si": True, "alto": 80}
+        def abrir(e):
+            if en_panel:
+                menu_movil.visible = False
+            ir_a(PRIMERA.get(clave, clave))
 
-    def tab_btn(key):
-        activa = plantilla["actual"] == key
-        llenar = pestanas_llenan["si"]
         return ft.Container(
-            content=ft.Column(controls=[
-                ft.Text(PESTANAS[key], size=14, weight=ft.FontWeight.W_600 if activa else ft.FontWeight.W_400,
-                        color=ON_PANEL if activa else NAV_TEXT, font_family=FONT_BODY,
-                        max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
-                ft.Text(SUB_PESTANAS[key], size=12, italic=True,
-                        color=NAV_TEXT if activa else NAV_SUB, font_family=FONT_BODY,
-                        max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
-            ], spacing=2, tight=True),
-            # un velo del color del texto: aclara la barra oscura y oscurece la clara
-            bgcolor=ft.Colors.with_opacity(0.14, ON_PANEL) if activa else "transparent",
-            padding=ft.padding.symmetric(vertical=10, horizontal=12 if llenar else 16),
-            expand=llenar, height=pestanas_llenan["alto"] if llenar else None,
-            border=ft.border.only(bottom=ft.BorderSide(3, NAV_LINEA if activa else "transparent")),
-            on_click=lambda e, k=key: ir_a(k), ink=True,
-            border_radius=ft.border_radius.only(top_left=4, top_right=4),
+            content=ft.Row(controls=[
+                ft.Icon(icono, size=20, color=color),
+                ft.Text(nombre, size=16, color=color, font_family=FONT_BODY, expand=True,
+                        weight=ft.FontWeight.W_600 if activa else None),
+                *([ft.Text("Pronto", size=12, italic=True, color=NAV_SUB, font_family=FONT_BODY)] if pronto else []),
+            ], spacing=12),
+            bgcolor=BAR_BTN if activa else None, border_radius=9,
+            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            on_click=None if pronto else abrir, ink=not pronto,
+            tooltip="Todavía no está lista: viene pronto." if pronto else None,
         )
 
-    contador = ft.Container(
-        content=ft.Text("", size=12, weight=ft.FontWeight.W_600, color=ON_PANEL, font_family=FONT_BODY),
-        bgcolor=PANEL_INK, border_radius=10, padding=ft.padding.symmetric(horizontal=7, vertical=1),
-        visible=False,
-    )
-    historial_txt = ft.Text("Historial", size=14, weight=ft.FontWeight.W_600, color=BAR_BTN_TEXT, font_family=FONT_BODY)
-    historial_btn = ft.Container(
-        content=ft.Row(controls=[ft.Icon(ft.Icons.HISTORY, color=BAR_BTN_TEXT, size=18), historial_txt, contador],
-                       spacing=6, tight=True),
-        bgcolor=BAR_BTN, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
-        on_click=lambda e: ir_a("historial"), ink=True, tooltip="Ver expedientes generados",
-    )
+    def pintar_menu():
+        menu_salas.controls = [boton_sala(*s, en_panel=False) for s in SALAS]
+        menu_panel.controls = [boton_sala(*s, en_panel=True) for s in SALAS]
 
-    juris_btn = ft.Container(
-        content=ft.Row(controls=[ft.Icon(ft.Icons.GAVEL, color=BAR_BTN_TEXT, size=18),
-                                 ft.Text("Jurisprudencia", size=14, weight=ft.FontWeight.W_600,
-                                         color=BAR_BTN_TEXT, font_family=FONT_BODY)], spacing=6, tight=True),
-        bgcolor=BAR_BTN, border_radius=4, padding=ft.padding.symmetric(horizontal=14, vertical=9),
-        on_click=lambda e: ir_a("jurisprudencia"), ink=True, tooltip="Buscar sentencias y consultar sus documentos",
-    )
+    def logo():
+        return ft.Row(controls=[
+            ft.Container(content=ft.Icon(ft.Icons.BALANCE, size=22, color=BAR_BTN_TEXT), width=40, height=40,
+                         bgcolor=BAR_BTN, border_radius=9, alignment=ft.alignment.center),
+            ft.Text(NOMBRE_APP, size=25, weight=ft.FontWeight.W_600, color=ON_PANEL, font_family=FONT_DISPLAY),
+        ], spacing=12)
+
+    # la prueba gratis: los días que quedan y las preguntas de hoy (se lee una vez al entrar)
+    en_prueba = usuario.get("plan") == "prueba"
+    dias_prueba = max(0, int(((usuario.get("prueba_hasta") or 0) - time.time() + 86399) // 86400))
+    try:
+        preguntas_hoy = cuentas.preguntas_de_hoy(usuario["id"]) if en_prueba else 0
+    except Exception:
+        preguntas_hoy = 0
+
+    def caja_plan():
+        if not en_prueba:
+            return ft.Container(visible=False)
+        tope = cuentas.PREGUNTAS_PRUEBA
+        return ft.Container(
+            content=ft.Column(controls=[
+                ft.Text("PRUEBA GRATIS", size=12, weight=ft.FontWeight.W_600, color=NAV_SUB, font_family=FONT_BODY),
+                ft.Text(f"Quedan {dias_prueba} día{'s' if dias_prueba != 1 else ''}", size=19, color=ON_PANEL,
+                        font_family=FONT_DISPLAY),
+                ft.ProgressBar(value=min(1, preguntas_hoy / tope) if tope else 0, color=NAV_LINEA, bar_height=6,
+                               bgcolor=ft.Colors.with_opacity(0.18, ON_PANEL), border_radius=3),
+                ft.Text(f"{preguntas_hoy} de {tope} consultas hoy", size=14, color=NAV_SUB, font_family=FONT_BODY),
+            ], spacing=8),
+            border=ft.border.only(top=ft.BorderSide(1, ft.Colors.with_opacity(0.2, ON_PANEL))),
+            padding=ft.padding.only(left=10, right=10, top=16),
+        )
 
     # ── MI CUENTA → APARIENCIA ───────────────────
     def abrir_apariencia():
@@ -2383,25 +2502,58 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         )
         page.open(dlg)
 
-    menu_usuario = ft.PopupMenuButton(
-        icon=ft.Icons.ACCOUNT_CIRCLE, icon_color=ON_PANEL, tooltip=usuario["nombre"], bgcolor=PAPER,
-        items=[
+    def opciones_cuenta():
+        return [
             ft.PopupMenuItem(text=f'{usuario["nombre"]} ({usuario["usuario"]})', disabled=True),
             ft.PopupMenuItem(text="Apariencia", icon=ft.Icons.PALETTE_OUTLINED, on_click=lambda e: abrir_apariencia()),
             *([ft.PopupMenuItem(text="Usuarios", icon=ft.Icons.GROUP, on_click=lambda e: abrir_usuarios())]
               if usuario["es_admin"] else []),
             ft.PopupMenuItem(text="Cerrar sesión", icon=ft.Icons.LOGOUT, on_click=lambda e: salir()),
-        ],
-    )
+        ]
 
-    def rebuild_tabs():
-        tabs_row.controls = [tab_btn(k) for k in KEYS] if con_plantillas else []
-        tabs_row.scroll   = None if pestanas_llenan["si"] else ft.ScrollMode.AUTO
-        scroll_hint.visible = con_plantillas and not pestanas_llenan["si"] and plantilla["actual"] != KEYS[-1]
-        for clave, boton in (("historial", historial_btn), ("jurisprudencia", juris_btn)):
-            activo = plantilla["actual"] == clave
-            boton.bgcolor = PAPER if activo else BAR_BTN
-            boton.border = ft.border.all(2, ACCENT) if activo else None
+    iniciales = "".join(p[0] for p in usuario["nombre"].split()[:2]).upper() or "?"
+    cuenta_lateral = ft.PopupMenuButton(
+        bgcolor=PAPER, tooltip="Mi cuenta", items=opciones_cuenta(),
+        content=ft.Row(controls=[
+            ft.Container(content=ft.Text(iniciales, size=14, weight=ft.FontWeight.W_600, color=BAR_BTN_TEXT,
+                                         font_family=FONT_BODY),
+                         width=38, height=38, border_radius=19, bgcolor=BAR_BTN, alignment=ft.alignment.center),
+            ft.Column(controls=[
+                ft.Text(usuario["nombre"], size=15, weight=ft.FontWeight.W_600, color=ON_PANEL, font_family=FONT_BODY,
+                        max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, width=160),
+                ft.Text("Mi cuenta · Apariencia", size=13, color=NAV_SUB, font_family=FONT_BODY),
+            ], spacing=0, tight=True),
+        ], spacing=10, tight=True),
+    )
+    cuenta_movil = ft.PopupMenuButton(icon=ft.Icons.ACCOUNT_CIRCLE, icon_color=ON_PANEL, tooltip=usuario["nombre"],
+                                      bgcolor=PAPER, items=opciones_cuenta())
+
+    # ── REDACCIÓN: las plantillas y el historial ──
+    conteo = {"n": 0, "ctrl": None}   # expedientes guardados, en la pestaña «Historial»
+
+    def pestanas_redaccion():
+        def pestana(key, texto):
+            activa = plantilla["actual"] == key
+            extra = []
+            if key == "historial":
+                conteo["ctrl"] = ft.Container(
+                    content=ft.Text(str(conteo["n"]), size=12, weight=ft.FontWeight.W_600, color=ON_PANEL,
+                                    font_family=FONT_BODY),
+                    bgcolor=PANEL_INK, border_radius=10, padding=ft.padding.symmetric(horizontal=7, vertical=1),
+                    visible=conteo["n"] > 0)
+                extra = [conteo["ctrl"]]
+            return ft.Container(
+                content=ft.Row(controls=[
+                    ft.Text(texto, size=14, color=ON_BOTON if activa else INK, font_family=FONT_BODY,
+                            weight=ft.FontWeight.W_600 if activa else None),
+                    *extra,
+                ], spacing=6, tight=True),
+                bgcolor=BOTON if activa else PAPER, border=ft.border.all(1, BOTON if activa else RULE),
+                border_radius=20, padding=ft.padding.symmetric(horizontal=14, vertical=8),
+                on_click=lambda e: ir_a(key), ink=True, tooltip=SUB_PESTANAS[key],
+            )
+        return ft.Row(controls=[*[pestana(k, PESTANAS[k]) for k in KEYS], pestana("historial", "Historial")],
+                      wrap=True, spacing=8, run_spacing=8)
 
     def actualizar_contador():
         def tarea():
@@ -2409,14 +2561,221 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
                 n = historial.contar()
             except Exception:
                 return
-            contador.content.value = str(n)
-            contador.visible = n > 0
+            conteo["n"] = n
+            if conteo["ctrl"]:
+                conteo["ctrl"].content.value, conteo["ctrl"].visible = str(n), n > 0
             page.update()
         page.run_thread(tarea)
 
-    rebuild_tabs()
+    # ── ESCRITORIO (inicio) ──────────────────────
+    def preguntar(q):
+        """Lo que escriben en el Escritorio abre una conversación nueva con el asistente."""
+        q = (q or "").strip()
+        if len(q) < 2:
+            return
+        nueva_conversacion()
+        if juris_estado.get("enviar"):
+            juris_estado["enviar"](q)
 
-    # ── ENCABEZADO + FORMULARIO ──────────────────
+    def nueva_conversacion():
+        juris_estado["chat"].clear()
+        juris_estado["conv_id"] = None
+        ir_a("jurisprudencia")
+
+    def abrir_conversacion_guardada(conv_id):
+        try:
+            mensajes = cuentas.abrir_conversacion(usuario["id"], conv_id)
+        except Exception as ex:
+            snack(f"No se pudo abrir la conversación: {ex}", ok=False); return
+        juris_estado["chat"][:] = mensajes
+        juris_estado["conv_id"] = conv_id
+        ir_a("jurisprudencia")
+
+    def cuando(ts):
+        """'hoy, 8:40 a. m.', 'ayer' o '7 nov'."""
+        momento = datetime.fromtimestamp(ts, ZONA_RD)
+        dias = (datetime.now(ZONA_RD).date() - momento.date()).days
+        if dias == 0:
+            return (f"hoy, {momento.hour % 12 or 12}:{momento.minute:02d} "
+                    f"{'a. m.' if momento.hour < 12 else 'p. m.'}")
+        return "ayer" if dias == 1 else f"{momento.day} {MESES_ANIO[momento.month - 1][:3]}"
+
+    def seccion_escritorio(titulo, contenido, accion=None):
+        """Una tarjeta del Escritorio: título, un enlace («Ver todas») y su contenido."""
+        return ft.Container(
+            content=ft.Column(controls=[
+                ft.Row(controls=[
+                    ft.Text(titulo, size=22, weight=ft.FontWeight.W_600, color=INK, font_family=FONT_DISPLAY,
+                            expand=True),
+                    *([ft.TextButton(accion[0], on_click=accion[1], style=ft.ButtonStyle(color=ACCENT_TEXT))]
+                      if accion else []),
+                ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                *contenido,
+            ], spacing=6),
+            bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=12, padding=ft.padding.all(22),
+            col={"xs": 12, "lg": 6},
+        )
+
+    def renglon(titulo, detalle, al_tocar=None, etiqueta=None, ultimo=False):
+        return ft.Container(
+            content=ft.Row(controls=[
+                ft.Column(controls=[
+                    ft.Text(titulo, size=16, weight=ft.FontWeight.W_600, color=INK, font_family=FONT_BODY,
+                            max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
+                    ft.Text(detalle, size=14, color=INK_SOFT, font_family=FONT_BODY,
+                            max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
+                ], spacing=2, expand=True),
+                *([ft.Container(content=ft.Text(etiqueta, size=13, weight=ft.FontWeight.W_600, color=AVISO_TEXT,
+                                                font_family=FONT_BODY),
+                                bgcolor=AVISO_BG, border_radius=12,
+                                padding=ft.padding.symmetric(horizontal=11, vertical=4))] if etiqueta else []),
+            ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.padding.symmetric(vertical=11),
+            border=None if ultimo else ft.border.only(bottom=ft.BorderSide(1, PAPER_EDGE)),
+            on_click=al_tocar, ink=bool(al_tocar),
+        )
+
+    def build_escritorio():
+        ahora = datetime.now(ZONA_RD)
+        saludo = "Buenos días" if ahora.hour < 12 else "Buenas tardes" if ahora.hour < 19 else "Buenas noches"
+        nombre = (usuario["nombre"].split() or [""])[0].capitalize()
+        fecha = f"{DIAS_SEMANA[ahora.weekday()]}, {ahora.day} de {MESES_ANIO[ahora.month - 1]}".upper()
+        angosto = (page.width or 1280) < 760
+
+        # audiencias de esta semana: las del historial de reportes (solo en las cuentas con plantillas)
+        audiencias = []
+        if con_plantillas:
+            try:
+                for ent in historial.listar():
+                    etiqueta = etiqueta_proxima(ent["fecha_proxima"] or "")
+                    if etiqueta:
+                        audiencias.append((ent, etiqueta))
+            except Exception:
+                pass
+            audiencias.sort(key=lambda a: datetime.strptime(a[0]["fecha_proxima"].strip(), "%d/%m/%Y"))
+        if con_plantillas:
+            n = len(audiencias)
+            resumen = f"{n} audiencia{'s' if n != 1 else ''} esta semana" if n else "Sin audiencias esta semana"
+        elif en_prueba:
+            resumen = f"Prueba gratis · quedan {dias_prueba} día{'s' if dias_prueba != 1 else ''}"
+        else:
+            resumen = ""
+
+        cabecera = ft.Container(
+            content=ft.ResponsiveRow(controls=[
+                ft.Column(controls=[
+                    ft.Text(fecha, size=13, weight=ft.FontWeight.W_600, color=HINT, font_family=FONT_BODY),
+                    ft.Text(f"{saludo}, {nombre}." if nombre else f"{saludo}.", size=32 if angosto else 40,
+                            weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
+                ], spacing=6, col={"xs": 12, "md": 8}),
+                ft.Container(content=ft.Text(resumen, size=15, color=INK_SOFT, font_family=FONT_BODY),
+                             col={"xs": 12, "md": 4},
+                             alignment=ft.alignment.center_left if angosto else ft.alignment.bottom_right),
+            ], vertical_alignment=ft.CrossAxisAlignment.END),
+            padding=ft.padding.only(bottom=20), border=ft.border.only(bottom=ft.BorderSide(1, INK)),
+        )
+
+        pregunta = ft.TextField(
+            hint_text="Una duda, un número de sentencia, un artículo…", expand=True,
+            on_submit=lambda e: preguntar(pregunta.value), bgcolor=SURFACE, border_color=RULE,
+            focused_border_color=ACCENT, cursor_color=ACCENT, border_radius=10,
+            text_style=ft.TextStyle(font_family=FONT_BODY, size=17, color=INK),
+            hint_style=ft.TextStyle(font_family=FONT_BODY, size=16, color=HINT),
+            content_padding=ft.padding.symmetric(horizontal=18, vertical=16),
+        )
+        # en el celular solo la flecha, para que la pregunta tenga espacio
+        boton = ft.IconButton(
+            ft.Icons.ARROW_FORWARD, icon_color=ON_BOTON, bgcolor=BOTON, tooltip="Preguntar", icon_size=22,
+            on_click=lambda e: preguntar(pregunta.value)) if angosto else ft.ElevatedButton(
+            "Preguntar", icon=ft.Icons.ARROW_FORWARD, on_click=lambda e: preguntar(pregunta.value),
+            style=ft.ButtonStyle(bgcolor=BOTON, color=ON_BOTON, icon_color=ON_BOTON,
+                                 shape=ft.RoundedRectangleBorder(radius=10),
+                                 padding=ft.padding.symmetric(horizontal=22, vertical=20)))
+        atajos = [
+            ("Plazo para recurrir en casación", lambda e: preguntar("¿Cuál es el plazo para recurrir en casación?")),
+            ("Calcular prestaciones", lambda e: ir_a("calculadoras")),
+            ("Subir un documento", lambda e: subir_documentos()),
+            *([("Redactar una solicitud", lambda e: ir_a(KEYS[0]))] if con_plantillas else []),
+        ]
+        tarjeta_pregunta = ft.Container(
+            content=ft.Column(controls=[
+                ft.Text("PREGÚNTELE A SU ASISTENTE", size=13, weight=ft.FontWeight.W_600, color=ACCENT_TEXT,
+                        font_family=FONT_BODY),
+                ft.Row(controls=[pregunta, boton], spacing=10),
+                ft.Row(controls=[ft.OutlinedButton(
+                    texto, on_click=accion,
+                    style=ft.ButtonStyle(color=INK, bgcolor=PAPER, side=ft.BorderSide(1, RULE),
+                                         shape=ft.RoundedRectangleBorder(radius=20),
+                                         padding=ft.padding.symmetric(horizontal=15, vertical=10)))
+                    for texto, accion in atajos], wrap=True, spacing=8, run_spacing=8),
+            ], spacing=14),
+            bgcolor=PAPER, border=ft.border.all(1, RULE), border_radius=14,
+            padding=ft.padding.symmetric(horizontal=22, vertical=20),
+            shadow=ft.BoxShadow(blur_radius=28, color=ft.Colors.with_opacity(0.06, INK), offset=ft.Offset(0, 10)),
+        )
+
+        try:
+            convs = cuentas.listar_conversaciones(usuario["id"])[:4]
+        except Exception:
+            convs = []
+        tarjeta_convs = seccion_escritorio("Conversaciones recientes", [
+            renglon(c["titulo"], cuando(c["actualizada"]), lambda e, i=c["id"]: abrir_conversacion_guardada(i),
+                    ultimo=n == len(convs) - 1) for n, c in enumerate(convs)
+        ] or [ft.Text("Todavía no ha conversado con su asistente. Escriba arriba su primera pregunta.",
+                      size=14, color=INK_SOFT, font_family=FONT_BODY)],
+            ("Ver todas", lambda e: ir_a("jurisprudencia")))
+
+        tarjeta_audiencias = seccion_escritorio("Audiencias de la semana", [
+            renglon(ent["recurrente"] or ent["expediente"] or "Expediente",
+                    " · ".join(x for x in (ent["tribunal"], f"Exp. {ent['expediente']}" if ent["expediente"] else "")
+                               if x),
+                    lambda e: ir_a("historial"), etiqueta, ultimo=n == len(audiencias) - 1)
+            for n, (ent, etiqueta) in enumerate(audiencias[:5])
+        ] or [ft.Text("No hay audiencias en los próximos 7 días.", size=14, color=INK_SOFT, font_family=FONT_BODY)],
+            ("Ver historial", lambda e: ir_a("historial")))
+
+        def mosaico(icono, texto, accion):
+            return ft.Container(
+                content=ft.Column(controls=[
+                    ft.Icon(icono, size=24, color=ACCENT_TEXT),
+                    ft.Text(texto, size=15, weight=ft.FontWeight.W_600, color=INK, font_family=FONT_BODY),
+                ], spacing=9),
+                bgcolor=SURFACE, border=ft.border.all(1, PAPER_EDGE), border_radius=10, padding=ft.padding.all(15),
+                on_click=accion, ink=True, col={"xs": 6},
+            )
+        tarjeta_mano = seccion_escritorio("A la mano", [ft.ResponsiveRow(controls=[
+            mosaico(ft.Icons.CALCULATE_OUTLINED, "Calcular prestaciones", lambda e: ir_a("calculadoras")),
+            mosaico(ft.Icons.ADD_COMMENT_OUTLINED, "Nueva conversación", lambda e: nueva_conversacion()),
+            mosaico(ft.Icons.UPLOAD_FILE, "Subir un documento", lambda e: subir_documentos()),
+            mosaico(ft.Icons.EDIT_NOTE, "Nueva solicitud", lambda e: ir_a(KEYS[0])) if con_plantillas else
+            mosaico(ft.Icons.MENU_BOOK_OUTLINED, "Ver la biblioteca", lambda e: ir_a("biblioteca")),
+        ], spacing=10, run_spacing=10)])
+
+        # sus documentos están en la base de jurisprudencia, que puede tardar en despertar: se cuentan aparte
+        cuantos_docs = ft.Text("", size=14, color=INK_SOFT, font_family=FONT_BODY)
+
+        def contar_documentos():
+            docs = mis_documentos() or []
+            cuantos_docs.value = (f"Ha subido {len(docs)} documento{'s' if len(docs) != 1 else ''}." if docs
+                                  else "Todavía no ha subido documentos propios.")
+            page.update()
+        page.run_thread(contar_documentos)
+        tarjeta_biblioteca = seccion_escritorio("Su biblioteca", [
+            ft.Text("Sentencias de la Suprema Corte desde 2020, la Ley 108-05 con sus reglamentos y los documentos "
+                    "que usted sube.", size=15, color=INK, font_family=FONT_BODY),
+            cuantos_docs,
+        ], ("Abrir", lambda e: ir_a("biblioteca")))
+
+        tarjeta_pronto = seccion_escritorio("Pronto en su despacho", [
+            renglon("Expedientes", "Una carpeta por cliente con sus documentos, conversaciones y plazos."),
+            renglon("Agenda", "Audiencias y vencimientos; el escritorio le avisará lo de la semana.", ultimo=True),
+        ])
+
+        tarjetas = ([tarjeta_audiencias, tarjeta_convs] if con_plantillas else [tarjeta_convs])
+        tarjetas += [tarjeta_mano, tarjeta_biblioteca, tarjeta_pronto]
+        return [cabecera, tarjeta_pregunta, ft.ResponsiveRow(controls=tarjetas, spacing=20, run_spacing=20)]
+
+    # ── ENCABEZADO + SECCIÓN ─────────────────────
     SUBTITULOS = {
         "informe":    ("Nueva solicitud al Catastro",  "Complete los campos para generar la solicitud de Informe Técnico."),
         "archivo":    ("Solicitud de Archivo",          "Complete los campos para generar la solicitud de Copia Certificada."),
@@ -2426,7 +2785,9 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         "audiencia_provincial": ("Informe de Audiencia Provincial", "Registre el traslado y la audiencia conforme al modelo suministrado."),
         "conclusiones_saneamiento": ("Conclusiones de Saneamiento", "Cambie expediente, reclamante e inmueble; el resto del modelo se conserva."),
         "historial": ("Historial de expedientes", "Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí automáticamente."),
-        "jurisprudencia": ("Jurisprudencia", "Pregunte en lenguaje normal; la respuesta cita sentencias del Boletín Judicial, leyes y sus documentos."),
+        "jurisprudencia": ("Asistente", "Pregúntele como a un colega; cada respuesta cita sentencias del Boletín Judicial, leyes o sus documentos."),
+        "biblioteca": ("Biblioteca", "Las sentencias, las leyes y sus documentos, en un mismo buscador."),
+        "calculadoras": ("Calculadoras", "Con las reglas fijas de la ley y el detalle de cada paso."),
     }
 
     BUILDERS = {
@@ -2439,60 +2800,74 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
         "conclusiones_saneamiento": build_conclusiones_saneamiento,
         "historial": build_historial,
         "jurisprudencia": build_jurisprudencia,
+        "biblioteca": build_biblioteca,
+        "calculadoras": build_calculadoras,
     }
 
     def rebuild_form():
         key = plantilla["actual"]
+        if key == "escritorio":
+            form_area.controls = build_escritorio()
+            return
         titulo, sub = SUBTITULOS[key]
-        ruta = (f"Inicio  ›  {SUBTITULOS[key][0]}" if key in ("historial", "jurisprudencia")
-                else f"Plantillas  ›  {PESTANAS[key]}")
+        en_redaccion = sala_de(key) == "redaccion"
+        ruta = f"Redacción  ›  {PESTANAS.get(key, 'Historial')}" if en_redaccion else f"{NOMBRE_APP}  ›  {titulo}"
         form_area.controls = [
             ft.Column(controls=[
                 ft.Text(ruta, size=12, color=INK_SOFT, font_family=FONT_BODY),
                 ft.Text(titulo, size=32, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
                 ft.Text(sub, size=14, color=INK_SOFT, font_family=FONT_BODY),
             ], spacing=4),
+            *([pestanas_redaccion()] if en_redaccion else []),
             *BUILDERS[key](),
         ]
 
-    rebuild_form()
+    # ── LA OFICINA: menú de salas + sección ──────
+    lateral_col = ft.Column(controls=[
+        ft.Column(controls=[ft.Container(content=logo(), padding=ft.padding.symmetric(horizontal=10)), menu_salas],
+                  spacing=28),
+        ft.Column(controls=[caja_plan(),
+                            ft.Container(content=cuenta_lateral, padding=ft.padding.symmetric(horizontal=10))],
+                  spacing=16),
+    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, expand=True)
+    barra_lateral = ft.Container(content=lateral_col, width=256, bgcolor=PANEL_INK,
+                                 padding=ft.padding.symmetric(horizontal=16, vertical=28))
 
-    # ── BARRA SUPERIOR ───────────────────────────
-    titulo_app = ft.Text("Automatización Legal", size=24,
-                         weight=ft.FontWeight.W_500, color=ON_PANEL, font_family=FONT_DISPLAY)
-    topbar = ft.Container(
-        content=ft.Column(controls=[
-            ft.Row(controls=[
-                ft.Column(controls=[
-                    ft.Text("DEPARTAMENTO LEGAL", size=12, color=NAV_SUB, font_family=FONT_BODY),
-                    titulo_app,
-                ], spacing=0, tight=True, expand=True),
-                ft.Row(controls=[*([juris_btn, historial_btn] if con_plantillas else []), menu_usuario],
-                       spacing=8, tight=True),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            ft.Row(controls=[
-                ft.Container(content=tabs_row, expand=True),
-                scroll_hint,
-            ], spacing=0, vertical_alignment=ft.CrossAxisAlignment.END, visible=con_plantillas),
-        ], spacing=8),
-        bgcolor=PANEL_INK,
+    # en el celular: una barra arriba y las salas en un panel que se despliega debajo
+    menu_movil = ft.Container(content=ft.Column(controls=[menu_panel, caja_plan()], spacing=16), visible=False,
+                              bgcolor=PANEL_INK, padding=ft.padding.only(left=12, right=12, bottom=16))
+
+    def alternar_menu_movil(e):
+        menu_movil.visible = not menu_movil.visible
+        page.update()
+
+    barra_movil = ft.Container(
+        content=ft.Row(controls=[
+            ft.IconButton(ft.Icons.MENU, icon_color=ON_PANEL, tooltip="Salas del despacho",
+                          on_click=alternar_menu_movil),
+            ft.Text(NOMBRE_APP, size=21, weight=ft.FontWeight.W_600, color=ON_PANEL, font_family=FONT_DISPLAY,
+                    expand=True),
+            cuenta_movil,
+        ], spacing=4),
+        bgcolor=PANEL_INK, padding=ft.padding.symmetric(horizontal=6, vertical=4),
         border=ft.border.only(bottom=ft.BorderSide(3, NAV_LINEA)),
     )
+
+    rebuild_form()
+    pintar_menu()
     contenido = ft.Container(content=form_area, expand=True)
 
     def ajustar_ancho():
-        """Contenido centrado con ancho máximo; márgenes chicos en el celular."""
-        ancho = page.width or 1280
-        lado  = max(24, (ancho - ANCHO_MAX) / 2) if ancho >= 760 else 16
-        titulo_app.size = 24 if ancho >= 480 else 19
-        juris_btn.content.controls[1].visible = historial_txt.visible = ancho >= 640   # solo íconos en el celular
-        topbar.padding    = ft.padding.only(top=16, bottom=0, left=lado, right=lado)
-        llenar = ancho >= 900
-        alto   = 80 if ancho >= 1280 else 100   # más angosto: el texto ocupa más líneas (dos como máximo)
-        if (llenar, alto) != (pestanas_llenan["si"], pestanas_llenan["alto"]):
-            pestanas_llenan.update(si=llenar, alto=alto)
-            rebuild_tabs()
-        contenido.padding = ft.padding.symmetric(horizontal=lado, vertical=24 if ancho >= 760 else 16)
+        """Menú a la izquierda en pantallas anchas y en un cajón en el celular; la sección centrada."""
+        ancho, alto = page.width or 1280, page.height or 800
+        con_menu = ancho >= 900
+        barra_lateral.visible, barra_movil.visible = con_menu, not con_menu
+        menu_movil.visible = menu_movil.visible and not con_menu
+        # en pantallas bajas el menú se desliza; si no, la cuenta queda abajo del todo
+        lateral_col.scroll = None if alto >= 760 else ft.ScrollMode.AUTO
+        util = ancho - (256 if con_menu else 0)
+        lado = max(32, (util - ANCHO_MAX) / 2) if util >= 760 else 16
+        contenido.padding = ft.padding.symmetric(horizontal=lado, vertical=32 if util >= 760 else 16)
 
     def on_resized(e):
         ajustar_ancho()
@@ -2504,7 +2879,12 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
     page.on_resized = on_resized
     ajustar_ancho()
 
-    page.add(ft.Column(controls=[topbar, contenido], spacing=0, expand=True))
+    page.add(ft.Column(controls=[
+        barra_movil,
+        menu_movil,
+        ft.Row(controls=[barra_lateral, contenido], spacing=0, expand=True,
+               vertical_alignment=ft.CrossAxisAlignment.STRETCH),
+    ], spacing=0, expand=True))
     if con_plantillas:
         actualizar_contador()
 
@@ -2551,8 +2931,9 @@ def pantalla_login(page: ft.Page, al_entrar):
 
     def campo(etiqueta, clave=False, al_enviar=None):
         return ft.TextField(label=etiqueta, password=clave, can_reveal_password=clave, on_submit=al_enviar,
-                            border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=PAPER,
-                            text_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK))
+                            border_color=RULE, focused_border_color=ACCENT, cursor_color=ACCENT, bgcolor=SURFACE,
+                            border_radius=8, text_style=ft.TextStyle(font_family=FONT_BODY, size=16, color=INK),
+                            label_style=ft.TextStyle(font_family=FONT_BODY, size=15, color=INK_SOFT))
 
     error = ft.Text("", size=13, color=PDF_COLOR, font_family=FONT_BODY, visible=False)   # solo ocupa lugar con texto
 
@@ -2630,74 +3011,109 @@ def pantalla_login(page: ft.Page, al_entrar):
         if pide_codigo and not codigo_instalacion:
             error.value, error.visible = "Falta la variable CODIGO_INSTALACION en el servidor para crear el administrador.", True
     else:
-        titulo, sub = "Iniciar sesión", "Entre con su usuario y contraseña."
+        titulo, sub = "Entrar a su despacho", "Con su usuario y contraseña."
         campos = [tf_usuario, tf_clave]
         boton = ("Entrar", entrar)
 
-    boton_principal = ft.ElevatedButton(boton[0], on_click=boton[1], width=360, style=ft.ButtonStyle(
-        bgcolor=BOTON, color=ON_BOTON, shape=ft.RoundedRectangleBorder(radius=4),
-        padding=ft.padding.symmetric(vertical=16)))
+    boton_principal = ft.ElevatedButton(boton[0], on_click=boton[1], style=ft.ButtonStyle(
+        bgcolor=PANEL_INK, color=ON_PANEL, shape=ft.RoundedRectangleBorder(radius=8),
+        padding=ft.padding.symmetric(vertical=18)))
 
     if google:
-        # Para los clientes, Google va primero; el usuario y la contraseña quedan plegados
-        sub = "Entre con su cuenta de Google."
-        formulario = ft.Column(controls=[*campos, boton_principal], spacing=12, visible=False)
-
-        def mostrar_formulario(e):
-            formulario.visible = not formulario.visible
-            enlace_clave.text = ("Ocultar usuario y contraseña" if formulario.visible
-                                 else "Entrar con usuario y contraseña")
-            page.update()
-
-        enlace_clave = ft.TextButton("Entrar con usuario y contraseña", on_click=mostrar_formulario,
-                                     style=ft.ButtonStyle(color=INK_SOFT))
+        # Para los clientes, Google va primero; debajo, usuario y contraseña (las cuentas del despacho)
+        sub = "Con su cuenta de Gmail, en un clic."
         cuerpo = [
             ft.OutlinedButton(
                 content=ft.Row(controls=[
                     ft.Image(src="/google_g.svg", width=20, height=20),
-                    ft.Text("Continuar con Google", size=15, weight=ft.FontWeight.W_500, color="#1F1F1F",
+                    ft.Text("Continuar con Google", size=16, weight=ft.FontWeight.W_600, color="#1F1F1F",
                             font_family=FONT_BODY),
                 ], alignment=ft.MainAxisAlignment.CENTER, spacing=12),
-                on_click=con_google, width=360,
+                on_click=con_google,
                 style=ft.ButtonStyle(bgcolor="#FFFFFF", side=ft.BorderSide(1, "#747775"),
-                                     shape=ft.RoundedRectangleBorder(radius=20),
+                                     shape=ft.RoundedRectangleBorder(radius=8),
                                      padding=ft.padding.symmetric(vertical=16))),
             otro_enlace,
+            ft.Row(controls=[ft.Container(height=1, bgcolor=PAPER_EDGE, expand=True), ft.Text("o con usuario y contraseña", size=14, color=HINT, font_family=FONT_BODY),
+                             ft.Container(height=1, bgcolor=PAPER_EDGE, expand=True)],
+                   spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            *campos, error, boton_principal,
             ft.Container(
-                content=ft.Row(controls=[
-                    ft.Icon(ft.Icons.CARD_GIFTCARD_OUTLINED, size=18, color=ACCENT),
-                    ft.Text(f"¿Primera vez? Se crea su cuenta sola, con {cuentas.DIAS_PRUEBA} días de prueba gratis.",
-                            size=13, color=INK, font_family=FONT_BODY, expand=True),
-                ], spacing=10),
-                bgcolor=SURFACE, border_radius=4, padding=ft.padding.symmetric(horizontal=12, vertical=10)),
-            error,
-            ft.Container(height=1, bgcolor=RULE, margin=ft.margin.only(top=4)),
-            ft.Row(controls=[enlace_clave], alignment=ft.MainAxisAlignment.CENTER),
-            formulario,
+                content=ft.Text(spans=[
+                    ft.TextSpan("¿Primera vez? ", ft.TextStyle(weight=ft.FontWeight.W_600, color=INK)),
+                    ft.TextSpan("Su despacho se abre solo al entrar con Google: "),
+                    ft.TextSpan(f"{cuentas.DIAS_PRUEBA} días gratis", ft.TextStyle(weight=ft.FontWeight.W_600,
+                                                                                    color=ACCENT_TEXT)),
+                    ft.TextSpan(", sin tarjeta."),
+                ], size=14, color=INK_SOFT, font_family=FONT_BODY),
+                bgcolor=SURFACE, border=ft.border.all(1, PAPER_EDGE), border_radius=8,
+                padding=ft.padding.symmetric(horizontal=14, vertical=12)),
         ]
     else:
         cuerpo = [*campos, error, boton_principal]
 
-    page.add(ft.Container(
-        alignment=ft.alignment.center, padding=ft.padding.symmetric(horizontal=16, vertical=60),
+    # La recepción: a la izquierda qué es el despacho; a la derecha, la entrada
+    ancho = page.width or 1280
+    angosto = ancho < 760
+    lado = max(20, (ancho - 1240) / 2)
+
+    def dato(fuerte, resto):
+        return ft.Text(spans=[ft.TextSpan(fuerte, ft.TextStyle(weight=ft.FontWeight.W_600, color=INK)),
+                              ft.TextSpan(f" {resto}")], size=15, color=INK_SOFT, font_family=FONT_BODY)
+
+    presentacion = ft.Column(controls=[
+        ft.Text("PARA ABOGADOS DE REPÚBLICA DOMINICANA", size=14, weight=ft.FontWeight.W_600, color=ACCENT_TEXT,
+                font_family=FONT_BODY),
+        ft.Text("Todo su trabajo, en una sola oficina.", size=36 if angosto else 54, weight=ft.FontWeight.W_500,
+                color=INK, font_family=FONT_DISPLAY),
+        ft.Text("Investigue con las sentencias de la Suprema Corte y las leyes, calcule prestaciones y guarde sus "
+                "documentos sin salir de aquí. Su asistente lee por usted y le muestra la página exacta de cada cita.",
+                size=17 if angosto else 19, color=INK_SOFT, font_family=FONT_BODY),
+        ft.Container(
+            content=ft.Row(controls=[dato("Sentencias", "de la SCJ desde 2020"), dato("Leyes", "artículo por artículo"),
+                                     dato("Sus documentos", "en el mismo buscador")],
+                           wrap=True, spacing=28, run_spacing=10),
+            padding=ft.padding.only(top=20), border=ft.border.only(top=ft.BorderSide(1, PAPER_EDGE))),
+    ], spacing=22, col={"xs": 12, "md": 7})
+
+    entrada = ft.Container(
+        col={"xs": 12, "md": 5}, alignment=ft.alignment.center,
         content=ft.Container(
-            width=420, bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=6,
-            padding=ft.padding.all(28),
-            shadow=ft.BoxShadow(blur_radius=24, spread_radius=0, color="#14000000", offset=ft.Offset(0, 6)),
+            width=None if angosto else 460, bgcolor=PAPER, border=ft.border.all(1, PAPER_EDGE), border_radius=14,
+            padding=ft.padding.all(24 if angosto else 34),
+            shadow=ft.BoxShadow(blur_radius=44, color=ft.Colors.with_opacity(0.10, INK), offset=ft.Offset(0, 18)),
             content=ft.Column(controls=[
-                ft.Text("DEPARTAMENTO LEGAL", size=12, color=ACCENT_TEXT, font_family=FONT_BODY),
-                ft.Text("Automatización Legal", size=28, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
-                ft.Container(height=1, bgcolor=RULE, margin=ft.margin.symmetric(vertical=8)),
-                ft.Text(titulo, size=20, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
-                ft.Text(sub, size=13, color=INK_SOFT, font_family=FONT_BODY),
+                ft.Column(controls=[
+                    ft.Text(titulo, size=28, weight=ft.FontWeight.W_500, color=INK, font_family=FONT_DISPLAY),
+                    ft.Text(sub, size=15, color=INK_SOFT, font_family=FONT_BODY),
+                ], spacing=6),
                 *cuerpo,
-            ], spacing=12, tight=True),
+            ], spacing=16, tight=True, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
         ),
-    ))
+    )
+
+    page.add(
+        ft.Container(
+            content=ft.Row(controls=[
+                ft.Container(content=ft.Icon(ft.Icons.BALANCE, size=22, color=ON_BOTON), width=42, height=42,
+                             bgcolor=BOTON, border_radius=9, alignment=ft.alignment.center),
+                ft.Text(NOMBRE_APP, size=27, weight=ft.FontWeight.W_600, color=PANEL_INK, font_family=FONT_DISPLAY),
+            ], spacing=12),
+            padding=ft.padding.symmetric(horizontal=lado, vertical=18),
+            border=ft.border.only(bottom=ft.BorderSide(1, PAPER_EDGE)),
+        ),
+        ft.Container(
+            # en el celular la entrada va primero, para no tener que bajar a buscarla
+            content=ft.ResponsiveRow(controls=[entrada, presentacion] if angosto else [presentacion, entrada],
+                                     spacing=48, run_spacing=40,
+                                     vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.padding.symmetric(horizontal=lado, vertical=32 if angosto else 72),
+        ),
+    )
 
 
 def main(page: ft.Page):
-    page.title   = "Solicitudes Legales"
+    page.title   = NOMBRE_APP
     page.padding = 0
     page.scroll  = ft.ScrollMode.AUTO
     page.fonts   = FUENTES
@@ -2711,6 +3127,7 @@ def main(page: ft.Page):
 
     def mostrar_login():
         page.controls.clear(); page.overlay.clear(); page.on_resized = None
+        page.scroll = ft.ScrollMode.AUTO   # adentro el menú queda fijo y cada sección se desliza
         aplicar_tema(page)   # la entrada siempre con la marca, aunque adentro use otro tema
         pantalla_login(page, entrar)
         page.update()

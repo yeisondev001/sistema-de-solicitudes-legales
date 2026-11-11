@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Resumen para retomar el trabajo (personas o agentes). Actualizado: **10 de noviembre de 2026**.
+Resumen para retomar el trabajo (personas o agentes). Actualizado: **11 de noviembre de 2026**.
 
 > **El repositorio es público.** Nunca escribir aquí claves, tokens, cadenas de conexión ni IDs de cuenta.
 > Solo se nombran las variables y dónde están guardadas.
@@ -141,9 +141,26 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - Las ayudas de afuera (`campo`, `tarjeta`, `boton_generar`…) reciben el tema con `t=`.
     - Un color nuevo se agrega en los 4 temas y en `temas.NOMBRES`.
   - **Letras:** Literata y Atkinson Hyperlegible se cargan desde jsDelivr (Fontsource). Flet admite un solo archivo por letra, así que la negrita la dibuja el navegador.
-  - **Falta:**
-    - El tamaño de letra.
-    - Rehacer la entrada y el inicio con el diseño de salas.
+- **La oficina por dentro (11 nov):**
+  - **Menú de salas** a la izquierda; en el celular, con el botón ☰ arriba. Las salas son Escritorio, Asistente, Biblioteca, Expedientes, Redacción, Calculadoras y Agenda.
+  - **Las que todavía no existen dicen «Pronto»:** Expedientes y Agenda para todos, y Redacción para las cuentas sin plantillas.
+  - **Escritorio (el inicio):**
+    - Saludo con la fecha y una caja para preguntarle al asistente (abre una conversación nueva).
+    - Conversaciones recientes, cosas a la mano y su biblioteca.
+    - Para las cuentas con plantillas, también las audiencias de la semana (salen del historial de reportes).
+  - **Asistente:** el chat de siempre. **Biblioteca:** qué hay y «Mis documentos», que antes estaba debajo del chat.
+  - **Redacción:** las 7 plantillas y el historial, como pestañas.
+  - **Calculadoras:** prestaciones laborales con un formulario. Usa el mismo cálculo que el asistente (`jurisprudencia/prestaciones.py`).
+  - **Abajo del menú:**
+    - La cuenta, con **Apariencia** y **Cerrar sesión**.
+    - En plan `prueba`, los días que quedan y las consultas del día.
+  - **Entrada nueva («recepción»):** a la izquierda qué es el despacho; a la derecha, Google y usuario/contraseña, los dos a la vista. En el celular la entrada va primero.
+  - **El nombre «Despacho» es provisional:** está en `NOMBRE_APP` en `main.py`. El dueño está pensando otro (ideas: Estrado, Toga, Considerando, Foja).
+- **Falta:**
+  - El tamaño de letra.
+  - **Funciones nuevas:** Expedientes (una carpeta por cliente) y Agenda (audiencias y plazos).
+  - El botón «Elegir plan» con Lemon Squeezy.
+  - La página pública completa: qué hay adentro, planes y textos legales.
 - **Lo que se descartó:** azul marino con dorado (es el estándar del sector y fue lo que no le gustó al dueño), el verde y la pizarra azul.
 
 ## Para vender con Lemon Squeezy
