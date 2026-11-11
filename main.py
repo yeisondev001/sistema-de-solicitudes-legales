@@ -2156,7 +2156,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
     def build_biblioteca():
         estantes = [
             (ft.Icons.GAVEL, "Sentencias de la Suprema Corte de Justicia",
-             "Del Boletín Judicial, desde noviembre de 2020; se agregan solas cada mes."),
+             "Del Boletín Judicial; las nuevas se agregan solas cada mes."),
             (ft.Icons.MENU_BOOK_OUTLINED, "Leyes y reglamentos",
              "La Ley 108-05 de Registro Inmobiliario y sus reglamentos, artículo por artículo."),
             (ft.Icons.FOLDER_SHARED_OUTLINED, "Sus documentos",
@@ -2761,7 +2761,7 @@ def app_principal(page: ft.Page, usuario: dict, salir, seccion=None):
             page.update()
         page.run_thread(contar_documentos)
         tarjeta_biblioteca = seccion_escritorio("Su biblioteca", [
-            ft.Text("Sentencias de la Suprema Corte desde 2020, la Ley 108-05 con sus reglamentos y los documentos "
+            ft.Text("Sentencias de la Suprema Corte, la Ley 108-05 con sus reglamentos y los documentos "
                     "que usted sube.", size=15, color=INK, font_family=FONT_BODY),
             cuantos_docs,
         ], ("Abrir", lambda e: ir_a("biblioteca")))
@@ -3070,7 +3070,7 @@ def pantalla_login(page: ft.Page, al_entrar):
                 "documentos sin salir de aquí. Su asistente lee por usted y le muestra la página exacta de cada cita.",
                 size=17 if angosto else 19, color=INK_SOFT, font_family=FONT_BODY),
         ft.Container(
-            content=ft.Row(controls=[dato("Sentencias", "de la SCJ desde 2020"), dato("Leyes", "artículo por artículo"),
+            content=ft.Row(controls=[dato("Sentencias", "de la Suprema Corte"), dato("Leyes", "artículo por artículo"),
                                      dato("Sus documentos", "en el mismo buscador")],
                            wrap=True, spacing=28, run_spacing=10),
             padding=ft.padding.only(top=20), border=ft.border.only(top=ft.BorderSide(1, PAPER_EDGE))),
