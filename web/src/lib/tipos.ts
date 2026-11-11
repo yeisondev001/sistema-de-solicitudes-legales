@@ -22,6 +22,7 @@ export interface Entrada {
   pide_codigo: boolean
   falta_codigo: boolean
   dias_prueba: number
+  preguntas_prueba: number
   colores: Colores
 }
 

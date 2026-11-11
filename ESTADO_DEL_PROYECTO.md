@@ -46,7 +46,7 @@ El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que e
 
 ## Cuentas y planes (`cuentas.py`)
 
-- **Planes:** `activo` (cuentas creadas por el administrador), `beta` (ilimitado y gratis: el abogado), `prueba` (14 días y 20 preguntas por día, variables `PRUEBA_DIAS` y `PRUEBA_PREGUNTAS_DIA`) y `vencido`.
+- **Planes:** `activo` (cuentas creadas por el administrador), `beta` (ilimitado y gratis: el abogado), `prueba` (5 días desde el 11 nov, antes 14, y 20 preguntas por día, variables `PRUEBA_DIAS` y `PRUEBA_PREGUNTAS_DIA`) y `vencido`.
 - **Google:** quien entra por primera vez queda en `prueba`. Si el administrador le pone un correo a una cuenta existente (panel **Usuarios**), con ese Gmail entra a esa misma cuenta.
 - **Plantillas:** casilla **"Ve las plantillas de solicitudes"** por cuenta, en el panel Usuarios. Sin ella, la cuenta entra directo a Jurisprudencia, sin pestañas ni historial. Las cuentas nuevas la traen apagada. Se aplica cuando la persona vuelve a entrar.
 - Las preguntas se cuentan por día en la tabla `uso`.

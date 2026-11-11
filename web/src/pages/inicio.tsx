@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BookOpen, CalendarDays, FileText, FolderClosed, Gavel, LibraryBig, PenLine, Scale, UserRound, type LucideIcon,
@@ -5,9 +6,13 @@ import {
 import { Papiniano } from '@/components/papiniano'
 import { Antetitulo, CabeceraPublica, PiePublico } from '@/components/publico'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { api } from '@/lib/api'
+import type { Entrada } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
-const DIAS_PRUEBA = 14
+// La prueba gratis la decide el servidor (PRUEBA_DIAS y PRUEBA_PREGUNTAS_DIA en cuentas.py); esto se ve mientras responde
+const PRUEBA_INICIAL = { dias: 5, preguntas: 20 }
+type Prueba = typeof PRUEBA_INICIAL
 
 /** Lo que Papiniano lee: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
 const FUENTES: { icono: LucideIcon; titulo: string; texto: string; lista?: string[] }[] = [
@@ -55,10 +60,10 @@ const SALAS: {
 ]
 
 // Los precios todavía no están decididos: se cambian aquí
-const PLANES = [
+const planes = (p: Prueba) => [
   {
-    nombre: 'Prueba', precio: 'Gratis', periodo: `${DIAS_PRUEBA} días`,
-    puntos: ['20 consultas por día a Papiniano', 'Toda la biblioteca', 'Sin tarjeta'], boton: 'Empezar prueba', a: '/entrar',
+    nombre: 'Prueba', precio: 'Gratis', periodo: `${p.dias} días`,
+    puntos: [`${p.preguntas} consultas por día a Papiniano`, 'Toda la biblioteca', 'Sin tarjeta'], boton: 'Empezar prueba', a: '/entrar',
   },
   {
     nombre: 'Abogado', precio: '[PRECIO]', periodo: 'al mes', destacado: true,
@@ -71,7 +76,7 @@ const PLANES = [
   },
 ]
 
-const PREGUNTAS: [string, string][] = [
+const preguntas = (p: Prueba): [string, string][] => [
   ['¿Papiniano reemplaza al abogado?',
     'No. Es una herramienta de apoyo: busca, lee y resume por usted, pero el criterio es suyo. Por eso cada respuesta trae sus citas, para que las verifique en la fuente oficial antes de usarlas.'],
   ['¿De dónde salen las sentencias y las leyes?',
@@ -81,7 +86,7 @@ const PREGUNTAS: [string, string][] = [
   ['¿Quién ve los documentos que subo?',
     'Solo usted. Se usan para buscar cuando usted pregunta, y los puede quitar cuando quiera. Le pedimos no escribir en las consultas datos personales de sus clientes.'],
   ['¿Qué pasa cuando termina la prueba gratis?',
-    `La prueba dura ${DIAS_PRUEBA} días y no pide tarjeta. Al terminar, elige un plan para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
+    `La prueba dura ${p.dias} días y no pide tarjeta. Al terminar, elige un plan para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
   ['¿Cómo se paga y cómo cancelo?',
     'Con tarjeta, a través de Lemon Squeezy. Puede cancelar cuando quiera desde su cuenta y conserva el acceso hasta el final del mes pagado.'],
   ['¿Por qué se llama Papiniano?',
@@ -94,6 +99,14 @@ const PREGUNTAS: [string, string][] = [
  * Los colores son siempre los de la marca, «Vino y madera».
  */
 export default function Inicio() {
+  const [prueba, setPrueba] = useState(PRUEBA_INICIAL)
+  useEffect(() => {
+    api
+      .get<Entrada>('/api/entrada')
+      .then((d) => setPrueba({ dias: d.dias_prueba, preguntas: d.preguntas_prueba }))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="min-h-dvh bg-background text-ink">
       <CabeceraPublica />
@@ -118,7 +131,7 @@ export default function Inicio() {
                 Ver cómo funciona
               </a>
             </div>
-            <p className="text-[0.92rem] text-ink-soft">{DIAS_PRUEBA} días gratis, sin tarjeta. Entra con su cuenta de Gmail.</p>
+            <p className="text-[0.92rem] text-ink-soft">{prueba.dias} días gratis, sin tarjeta. Entra con su cuenta de Gmail.</p>
           </div>
           <EjemploRespuesta />
         </section>
@@ -192,7 +205,7 @@ export default function Inicio() {
           <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
             <Encabezado antetitulo="PLANES" titulo="Empiece gratis. Pague cuando le sirva." claro />
             <div className="grid gap-5 md:grid-cols-3">
-              {PLANES.map((p) => (
+              {planes(prueba).map((p) => (
                 <div
                   key={p.nombre}
                   className={cn('flex flex-col gap-3.5 rounded-2xl p-7', p.destacado ? 'border-2 border-[#F1E8DA] bg-[#4A3527]' : 'border border-[#6B5442]')}
@@ -234,7 +247,7 @@ export default function Inicio() {
             </p>
           </div>
           <Accordion type="single" collapsible className="rounded-2xl border border-papel-borde bg-card px-5 md:px-6">
-            {PREGUNTAS.map(([p, r]) => (
+            {preguntas(prueba).map(([p, r]) => (
               <AccordionItem key={p} value={p} className="border-papel-borde">
                 <AccordionTrigger className="py-5 text-left text-[1.05rem] font-bold text-ink hover:no-underline">{p}</AccordionTrigger>
                 <AccordionContent className="pb-5 text-base leading-relaxed text-ink-soft">{r}</AccordionContent>
@@ -248,7 +261,7 @@ export default function Inicio() {
           <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-6 rounded-2xl bg-boton px-7 py-10 text-sobre-boton md:flex-row md:items-center md:px-12">
             <div className="space-y-2">
               <h2 className="font-heading text-[2rem] leading-tight font-medium">Pruébelo con su próximo caso.</h2>
-              <p className="text-[1.05rem] opacity-90">{DIAS_PRUEBA} días gratis. Sin tarjeta. Entra con su cuenta de Gmail.</p>
+              <p className="text-[1.05rem] opacity-90">{prueba.dias} días gratis. Sin tarjeta. Entra con su cuenta de Gmail.</p>
             </div>
             <Link to="/entrar" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
               Empiece gratis

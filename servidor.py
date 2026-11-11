@@ -110,7 +110,8 @@ def entrada():
     pide_codigo = primera_vez and bool(historial.DATABASE_URL)
     return {"primera_vez": primera_vez, "google": bool(_google()) and not primera_vez, "pide_codigo": pide_codigo,
             "falta_codigo": pide_codigo and not os.environ.get("CODIGO_INSTALACION", "").strip(),
-            "dias_prueba": cuentas.DIAS_PRUEBA, "colores": _colores(temas.MARCA)}
+            "dias_prueba": cuentas.DIAS_PRUEBA, "preguntas_prueba": cuentas.PREGUNTAS_PRUEBA,
+            "colores": _colores(temas.MARCA)}
 
 
 class Credenciales(BaseModel):
