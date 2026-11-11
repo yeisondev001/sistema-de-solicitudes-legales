@@ -158,12 +158,28 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - La cuenta, con **Apariencia** y **Cerrar sesión**.
     - En plan `prueba`, los días que quedan y las consultas del día.
   - **Entrada nueva («recepción»):** a la izquierda qué es el despacho; a la derecha, Google y usuario/contraseña, los dos a la vista. En el celular la entrada va primero.
-  - **El nombre «Despacho» es provisional:** está en `NOMBRE_APP` en `main.py`. El dueño está pensando otro (ideas: Estrado, Toga, Considerando, Foja).
+  - **El nombre «Despacho» es provisional:** está en `NOMBRE_APP` en `main.py` y en `web/src/lib/tema.ts`. El dueño está pensando otro (ideas: Estrado, Toga, Considerando, Foja).
 - **Falta:**
   - El tamaño de letra.
   - **Funciones nuevas:** Expedientes (una carpeta por cliente) y Agenda (audiencias y plazos).
   - El botón «Elegir plan» con Lemon Squeezy.
   - La página pública completa: qué hay adentro, planes y textos legales.
+- **App nueva: pantallas en React, Python detrás (empezó el 11 nov).** El dueño decidió pasar todas las pantallas a React porque el diseño se hace mucho más fácil que en Flet. Lo de fondo se queda en Python.
+  - **Stack:** React + TypeScript + Vite + Tailwind + shadcn/ui en `web/`; Python con FastAPI en `servidor.py`. Se descartó Next.js: con Vite, el mismo servicio de Render da la API y las pantallas, sin un segundo servidor que se duerma.
+  - **`servidor.py`** usa lo mismo que la app de Flet: `cuentas`, `historial`, `temas`, `jurisprudencia/*` y `generators/*`. La sesión es la de la tabla `sesiones`, guardada en una cookie que JavaScript no puede leer.
+    - **Google:** el flujo se hace a mano con `httpx`. La redirección sigue siendo `/oauth_callback`, así que no hay que tocar Google Cloud.
+    - **Asistente:** contesta por partes (`/api/asistente`, una línea JSON por evento) para mostrar «Buscando…». La conversación se lee de la base, no de la pantalla.
+    - **Visor de páginas:** solo abre PDFs de las fuentes oficiales (`FUENTES_PERMITIDAS`), no cualquier dirección.
+  - **Ya hechas:** entrada (Google, usuario y crear administrador), menú de salas con panel en el celular, Escritorio, Asistente (lista de conversaciones, fuentes, visor de la página, copiar), Biblioteca (subir y quitar documentos) y Apariencia (los 4 temas, cambian al instante).
+  - **Colores:** salen de `temas.py`. `/api/sesion` manda los del tema de la persona y `web/src/lib/tema.ts` los pone en las variables `--t-*` de `web/src/index.css`.
+  - **Letras:** Literata y Atkinson Hyperlegible desde npm (Fontsource), con negrita y cursiva de verdad.
+  - **Falta para cambiar en Render:**
+    1. Redacción: las 7 plantillas, Word y PDF, y el historial de reportes con las audiencias.
+    2. Administrar usuarios.
+    3. Que Render arme las pantallas (`npm run build`) y arranque con `uvicorn servidor:app`.
+    4. Probar con la base real.
+  - **Mientras tanto, la app de Flet (`main.py`) sigue siendo la que está en Render, sin cambios.**
+  - **En local:** ver `web/README.md`. Vite va en el puerto 5180, porque el 5173 lo usa otro proyecto del dueño.
 - **Lo que se descartó:** azul marino con dorado (es el estándar del sector y fue lo que no le gustó al dueño), el verde y la pizarra azul.
 
 ## Para vender con Lemon Squeezy

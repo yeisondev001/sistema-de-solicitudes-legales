@@ -20,3 +20,5 @@ prueba*.pdf
 
 historial.db
 uploads/
+
+node_modules/
