@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Burbuja, BurbujaUsuario } from '@/components/respuesta'
@@ -19,6 +19,7 @@ const EJEMPLOS = [
   '¿Qué pasa si se aprobó un deslinde sin citar a los colindantes?',
   '¿Cuándo caduca el recurso de casación?',
   'Me despidieron sin pagarme las prestaciones, ¿qué dice la Suprema?',
+  'Calcule las prestaciones de un despido sin causa: salario de RD$50,000 al mes, 3 años y 4 meses trabajados.',
 ]
 
 /**
@@ -29,7 +30,6 @@ export default function Asistente() {
   const { id } = useParams()
   const convId = id ? Number(id) : null
   const navegar = useNavigate()
-  const { state } = useLocation()
   const { refrescar } = useSesion()
 
   const [mensajes, setMensajes] = useState<Turno[]>([])
@@ -40,12 +40,11 @@ export default function Asistente() {
   const [listaAbierta, setListaAbierta] = useState(false)
   const [porBorrar, setPorBorrar] = useState<Conversacion | null>(null)
 
-  // la conversación abierta, para las preguntas que llegan desde el Escritorio
+  // la conversación abierta (la respuesta puede llegar después de cambiar de dirección)
   const convActual = useRef(convId)
   convActual.current = convId
   // la última conversación que se pintó: así no se vuelve a leer la que se acaba de crear
   const anterior = useRef<number | null | undefined>(undefined)
-  const enviada = useRef(false)
   const fin = useRef<HTMLDivElement>(null)
 
   const cargarLista = useCallback(() => {
@@ -96,17 +95,6 @@ export default function Asistente() {
       setPendiente(null)
     }
   }
-
-  // la pregunta escrita en el Escritorio llega aquí y se manda una sola vez
-  useEffect(() => {
-    const q = (state as { pregunta?: string } | null)?.pregunta
-    if (q && !enviada.current) {
-      enviada.current = true
-      navegar('/asistente', { replace: true, state: null })
-      enviar(q)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   async function borrar(c: Conversacion) {
     try {

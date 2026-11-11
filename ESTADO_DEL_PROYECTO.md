@@ -152,7 +152,7 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
   - **Redacción:** las 7 plantillas y el historial, como pestañas.
   - **No hay sala de Calculadoras** (se quitó el 11 nov): los cálculos los pide el abogado al asistente.
     - Los montos de prestaciones no los saca la IA: salen de las reglas fijas de `jurisprudencia/prestaciones.py` y la IA solo los explica.
-    - En el Escritorio, «Calcular prestaciones» deja en la caja una pregunta de ejemplo para cambiarle los datos.
+    - En el Asistente, uno de los ejemplos de la bienvenida es un cálculo de prestaciones.
     - Cuando se agreguen plazos e intereses, hacerlos igual: reglas en el código y la IA explicando.
   - **Abajo del menú:**
     - La cuenta, con **Apariencia** y **Cerrar sesión**.
@@ -174,6 +174,7 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
   - **Redacción:** `redaccion.py` tiene lo de cada plantilla (valores iniciales, campos obligatorios, generadores, nombre del archivo) y las listas de tribunales, salas y asuntos, que antes estaban en `main.py`. Los campos de cada formulario en pantalla están en `web/src/lib/plantillas.ts`. Lo escrito se conserva al cambiar de sala mientras la app esté abierta.
   - **Página pública (antes de entrar):** la del diseño (lienzo «Despacho jurídico digital», tablero 1): menú, la entrada a la vista, qué hay adentro, cómo trabaja el asistente, planes y el pie. Está en `web/src/pages/entrada.tsx`; los precios dicen [PRECIO] en `PLANES` hasta que el dueño los decida. Se quitó «5 años del Boletín» y la sala de Calculadoras; Expedientes, Redacción y Agenda dicen «Pronto».
   - **Páginas legales:** `/terminos`, `/privacidad`, `/reembolso` y `/contacto` (`web/src/pages/legal.tsx`). Son **borradores**: falta el titular, el correo, el WhatsApp, la fecha y los días de reembolso (entre corchetes), y que los revise un abogado antes de cobrar.
+  - **Escritorio sin caja de preguntas** (lo pidió el dueño el 11 nov): para preguntar se va directo al Asistente, por el menú o por el mosaico «Preguntar al asistente». La app de Flet todavía la tiene.
   - **Colores:** salen de `temas.py`. `/api/sesion` manda los del tema de la persona y `web/src/lib/tema.ts` los pone en las variables `--t-*` de `web/src/index.css`.
   - **Letras:** Literata y Atkinson Hyperlegible desde npm (Fontsource), con negrita y cursiva de verdad.
   - **Falta para cambiar en Render:**
