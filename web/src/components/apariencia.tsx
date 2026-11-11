@@ -7,7 +7,13 @@ import { useSesion } from '@/lib/sesion'
 import type { Perfil, Tema } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
-/** Mi cuenta → Apariencia: los 4 temas cerrados de temas.py. El cambio se ve al instante. */
+const LETRAS = [
+  { clave: 'normal', nombre: 'Normal', muestra: 'text-[17px]' },
+  { clave: 'grande', nombre: 'Grande', muestra: 'text-[19px]' },
+  { clave: 'muy_grande', nombre: 'Muy grande', muestra: 'text-[21px]' },
+] as const
+
+/** Mi cuenta → Apariencia: los 4 temas cerrados de temas.py y el tamaño de letra. El cambio se ve al instante. */
 export function Apariencia({ abierta, alCambiar }: { abierta: boolean; alCambiar: (abierta: boolean) => void }) {
   const { perfil, cambiarPerfil } = useSesion()
   const [lista, setLista] = useState<Tema[]>([])
@@ -25,13 +31,22 @@ export function Apariencia({ abierta, alCambiar }: { abierta: boolean; alCambiar
     }
   }
 
+  async function elegirLetra(letra: string) {
+    if (letra === perfil.letra) return
+    try {
+      cambiarPerfil(await api.post<Perfil>('/api/letra', { letra }))
+    } catch (e) {
+      toast.error((e as ErrorApi).message)
+    }
+  }
+
   return (
     <Dialog open={abierta} onOpenChange={alCambiar}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="font-heading text-2xl font-medium">Apariencia</DialogTitle>
           <DialogDescription className="text-[0.95rem]">
-            Elija los colores de su despacho. Todos se leen bien; se guarda en su cuenta.
+            Elija los colores y el tamaño de la letra. Se guarda en su cuenta y se ve igual en todos sus equipos.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -74,6 +89,27 @@ export function Apariencia({ abierta, alCambiar }: { abierta: boolean; alCambiar
               </button>
             )
           })}
+        </div>
+        <div className="space-y-2.5">
+          <p className="font-bold text-ink">Tamaño de la letra</p>
+          <div role="radiogroup" aria-label="Tamaño de la letra" className="grid grid-cols-3 gap-2">
+            {LETRAS.map((l) => (
+              <button
+                key={l.clave}
+                type="button"
+                role="radio"
+                aria-checked={perfil.letra === l.clave}
+                onClick={() => elegirLetra(l.clave)}
+                className={cn(
+                  'flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 transition-colors',
+                  perfil.letra === l.clave ? 'border-2 border-marca bg-card' : 'border-papel-borde hover:border-marca',
+                )}
+              >
+                <span className={cn('font-heading leading-none font-medium text-ink', l.muestra)}>Aa</span>
+                <span className="text-[0.85rem] text-ink-soft">{l.nombre}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

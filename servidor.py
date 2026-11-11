@@ -74,6 +74,7 @@ def _perfil(u: dict) -> dict:
     perfil = {k: u[k] for k in ("id", "usuario", "nombre", "es_admin", "email", "plan", "plantillas")}
     perfil["tema"] = u["tema"] or temas.MARCA
     perfil["colores"] = _colores(u["tema"])
+    perfil["letra"] = u.get("letra") or "normal"
     perfil["prueba"] = None
     if u["plan"] == "prueba":
         try:
@@ -226,8 +227,23 @@ def lista_temas():
             for k, t in temas.TEMAS.items()]
 
 
+LETRAS = ("normal", "grande", "muy_grande")
+
+
 class Tema(BaseModel):
     tema: str
+
+
+class Letra(BaseModel):
+    letra: str
+
+
+@app.post("/api/letra")
+def cambiar_letra(datos: Letra, u=Depends(usuario_actual)):
+    if datos.letra not in LETRAS:
+        raise HTTPException(400, "Ese tamaño de letra no existe.")
+    cuentas.cambiar_letra(u["id"], "" if datos.letra == "normal" else datos.letra)
+    return _perfil({**u, "letra": datos.letra})
 
 
 @app.post("/api/tema")
@@ -483,7 +499,8 @@ def _archivo(contenido: bytes, nombre: str, **cabeceras) -> Response:
 @app.get("/api/redaccion")
 def redaccion_datos(u=Depends(con_plantillas)):
     """Las plantillas con sus valores iniciales (fechas de hoy) y las listas de tribunales y salas."""
-    return {"plantillas": [{"clave": k, "nombre": p["nombre"], "sub": p["sub"], "valores": p["valores"]()}
+    return {"plantillas": [{"clave": k, "nombre": p["nombre"], "sub": p["sub"], "valores": p["valores"](),
+                            "requeridos": p["requeridos"]}
                            for k, p in redaccion.PLANTILLAS.items()],
             "listas": redaccion.LISTAS}
 

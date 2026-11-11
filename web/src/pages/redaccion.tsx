@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
-import { Copy, FileDown, FileText, Loader2, PencilLine } from 'lucide-react'
+import { Copy, FileDown, FileText, Loader2, PencilLine, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
+import { Cargando } from '@/components/cargando'
 import { Formulario } from '@/components/formulario'
 import { Historial } from '@/components/historial'
 import { TituloSala } from '@/components/oficina'
 import { Button } from '@/components/ui/button'
 import { api, descargar, ErrorApi } from '@/lib/api'
-import { FORMULARIOS, type Datos, type Listas } from '@/lib/plantillas'
+import { FORMULARIOS, idCampo, type Datos, type Listas } from '@/lib/plantillas'
+import { useSesion } from '@/lib/sesion'
 import type { EntradaHistorial } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
@@ -16,25 +18,58 @@ interface Plantilla {
   nombre: string
   sub: string
   valores: Datos
+  /** los campos obligatorios: [clave, nombre para el aviso] (los mismos que revisa redaccion.py) */
+  requeridos: [string, string][]
 }
 
+type Origen = { numero: number; editandoId: number | null } | null
+
 /**
- * Lo escrito en cada plantilla se conserva mientras la app esté abierta, aunque se cambie de
- * sala, como en la app anterior. El Reporte puede venir del historial (para editarlo o copiarlo).
+ * Lo escrito en cada plantilla se guarda en este equipo (por cuenta): no se pierde al cambiar de sala,
+ * al recargar ni si se apaga el celular. El Reporte puede venir del historial (para editarlo o copiarlo).
  */
 const guardado: {
   inicial: { plantillas: Plantilla[]; listas: Listas } | null
+  usuario: number | null
   datos: Record<string, Datos>
-  origen: { numero: number; editandoId: number | null } | null
-} = { inicial: null, datos: {}, origen: null }
+  origen: Origen
+} = { inicial: null, usuario: null, datos: {}, origen: null }
+
+const claveBorrador = (usuario: number) => `papiniano.redaccion.${usuario}`
+
+function leerBorrador(usuario: number): { datos: Record<string, Datos>; origen: Origen } {
+  try {
+    const b = JSON.parse(localStorage.getItem(claveBorrador(usuario)) ?? 'null')
+    if (b && typeof b.datos === 'object') return { datos: b.datos, origen: b.origen ?? null }
+  } catch {
+    // sin acceso al almacenamiento del navegador (ventana privada): se trabaja sin borrador
+  }
+  return { datos: {}, origen: null }
+}
+
+function guardarBorrador(usuario: number) {
+  try {
+    localStorage.setItem(claveBorrador(usuario), JSON.stringify({ datos: guardado.datos, origen: guardado.origen }))
+  } catch {
+    // sin almacenamiento: lo escrito queda mientras la app esté abierta
+  }
+}
+
+const vacio = (v: string | string[] | undefined) => (Array.isArray(v) ? !v.some((x) => x.trim()) : !String(v ?? '').trim())
 
 /** Las plantillas de solicitudes y el historial de reportes (solo cuentas con plantillas). */
 export default function Redaccion() {
   const { clave = 'informe' } = useParams()
   const navegar = useNavigate()
+  const { perfil } = useSesion()
+  if (guardado.usuario !== perfil.id) {
+    Object.assign(guardado, { usuario: perfil.id, ...leerBorrador(perfil.id) })
+  }
   const [inicial, setInicial] = useState(guardado.inicial)
   const [datos, setDatos] = useState(guardado.datos)
   const [origen, setOrigen] = useState(guardado.origen)
+  // los avisos de campos que faltan son de una plantilla: al cambiar a otra ya no se muestran
+  const [avisos, setAvisos] = useState<{ de: string; campos: Record<string, string> }>({ de: '', campos: {} })
   const [generando, setGenerando] = useState<'docx' | 'pdf' | null>(null)
   const [cuantos, setCuantos] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -57,19 +92,36 @@ export default function Redaccion() {
 
   const plantilla = inicial?.plantillas.find((p) => p.clave === clave)
   const form = plantilla ? (datos[clave] ?? plantilla.valores) : null
+  const errores = avisos.de === clave ? avisos.campos : {}
 
   function poner(nuevos: Record<string, Datos>) {
     guardado.datos = nuevos
     setDatos(nuevos)
+    guardarBorrador(perfil.id)
   }
 
-  function cambiarOrigen(o: typeof guardado.origen) {
+  function cambiarOrigen(o: Origen) {
     guardado.origen = o
     setOrigen(o)
+    guardarBorrador(perfil.id)
   }
 
   function cambiar(campo: string, valor: string | string[]) {
-    if (form) poner({ ...datos, [clave]: { ...form, [campo]: valor } })
+    if (!form) return
+    poner({ ...datos, [clave]: { ...form, [campo]: valor } })
+    // al escribir en un campo marcado, su aviso se va
+    if (errores[campo]) {
+      const resto = { ...errores }
+      delete resto[campo]
+      setAvisos({ de: clave, campos: resto })
+    }
+  }
+
+  function enBlanco() {
+    if (!plantilla) return
+    poner({ ...datos, [clave]: plantilla.valores })
+    if (clave === 'reporte') cambiarOrigen(null)
+    setAvisos({ de: '', campos: {} })
   }
 
   /** Llena el Reporte de Audiencia con un expediente del historial */
@@ -92,7 +144,17 @@ export default function Redaccion() {
   }
 
   async function generar(formato: 'docx' | 'pdf') {
-    if (!form) return
+    if (!form || !plantilla) return
+    // los obligatorios vacíos se marcan en el formulario y la pantalla va al primero
+    const faltan = plantilla.requeridos.filter(([k]) => vacio(form[k]))
+    if (faltan.length) {
+      setAvisos({ de: clave, campos: Object.fromEntries(faltan.map(([k, nombre]) => [k, `Falta: ${nombre}`])) })
+      toast.error(faltan.length === 1 ? 'Falta un campo: está marcado en rojo.' : `Faltan ${faltan.length} campos: están marcados en rojo.`)
+      const primero = document.getElementById(idCampo(faltan[0][0]))
+      primero?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      primero?.focus({ preventScroll: true })
+      return
+    }
     setGenerando(formato)
     try {
       const cabeceras = await descargar(`/api/redaccion/${clave}/${formato}`, {
@@ -133,7 +195,7 @@ export default function Redaccion() {
             key={p.clave}
             to={`/redaccion/${p.clave}`}
             className={cn(
-              'flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-[0.92rem] whitespace-nowrap transition-colors',
+              'flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-[0.92rem] whitespace-nowrap transition-colors',
               p.clave === clave
                 ? 'border-marca bg-marca font-bold text-sobre-boton'
                 : 'border-regla bg-card text-ink hover:border-marca',
@@ -150,9 +212,7 @@ export default function Redaccion() {
       {error ? (
         <p className="text-destructive">{error}</p>
       ) : !inicial ? (
-        <p className="flex items-center gap-2 text-ink-soft">
-          <Loader2 className="size-4 animate-spin" /> Cargando las plantillas…
-        </p>
+        <Cargando renglones={4} que="Cargando las plantillas" />
       ) : clave === 'historial' ? (
         <Historial alAbrir={abrirDesdeHistorial} alCambiar={contarHistorial} />
       ) : !plantilla || !form ? (
@@ -167,20 +227,10 @@ export default function Redaccion() {
                   ? `Editando el No.${String(origen.numero).padStart(2, '0')} del historial. Al generar el documento se actualiza ese mismo expediente.`
                   : `Copia del No.${String(origen.numero).padStart(2, '0')} del historial. Cambie lo necesario; al generar se guarda como un expediente nuevo.`}
               </p>
-              <Button
-                variant="ghost"
-                className="h-9 text-aviso-texto hover:bg-black/5"
-                onClick={() => {
-                  poner({ ...datos, reporte: plantilla.valores })
-                  cambiarOrigen(null)
-                }}
-              >
-                Empezar uno en blanco
-              </Button>
             </div>
           )}
 
-          <Formulario bloques={FORMULARIOS[clave]} datos={form} listas={inicial.listas} cambiar={cambiar} />
+          <Formulario bloques={FORMULARIOS[clave]} datos={form} listas={inicial.listas} errores={errores} cambiar={cambiar} />
 
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Button size="grande" className="w-full sm:w-auto sm:min-w-56" disabled={Boolean(generando)} onClick={() => generar('docx')}>
@@ -196,9 +246,14 @@ export default function Redaccion() {
               {generando === 'pdf' ? <Loader2 className="animate-spin" /> : <FileDown />} Generar en PDF
             </Button>
           </div>
-          <p className="mt-3 text-center text-[0.85rem] text-ink-soft">
-            El documento se descarga en su equipo (carpeta Descargas).
-          </p>
+          <div className="mt-4 flex flex-col items-center gap-1 text-center">
+            <p className="text-[0.88rem] text-ink-soft">
+              Lo que escribe se guarda solo en este equipo. El documento se descarga en la carpeta Descargas.
+            </p>
+            <Button variant="ghost" className="h-11 text-ink-soft" onClick={enBlanco}>
+              <RotateCcw /> Empezar esta plantilla en blanco
+            </Button>
+          </div>
         </>
       )}
     </div>

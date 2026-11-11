@@ -1,9 +1,9 @@
-import { useId, useState } from 'react'
-import { ChevronDown, CircleMinus, CirclePlus } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, CircleAlert, CircleMinus, CirclePlus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { MATERIAS, type Bloque, type Campo, type Datos, type Listas } from '@/lib/plantillas'
+import { idCampo, MATERIAS, type Bloque, type Campo, type Datos, type Listas } from '@/lib/plantillas'
 import { cn } from '@/lib/utils'
 
 const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI']
@@ -11,11 +11,13 @@ const campoClase = 'h-11 bg-background px-3 text-base md:text-base'
 
 /** Un formulario de Redacción: tarjetas numeradas (I, II…) con sus campos. */
 export function Formulario({
-  bloques, datos, listas, cambiar,
+  bloques, datos, listas, errores, cambiar,
 }: {
   bloques: Bloque[]
   datos: Datos
   listas: Listas
+  /** los campos obligatorios vacíos, con el mensaje que va debajo de cada uno */
+  errores: Record<string, string>
   cambiar: (clave: string, valor: string | string[]) => void
 }) {
   return (
@@ -39,7 +41,7 @@ export function Formulario({
                 <div key={j} className="flex flex-col gap-4 md:flex-row">
                   {visibles.map((c) => (
                     <div key={c.clave} className={cn('min-w-0', c.corto ? 'md:w-32 md:shrink-0' : 'md:flex-1')}>
-                      <CampoFormulario campo={c} datos={datos} listas={listas} cambiar={cambiar} />
+                      <CampoFormulario campo={c} datos={datos} listas={listas} error={errores[c.clave]} cambiar={cambiar} />
                     </div>
                   ))}
                 </div>
@@ -61,19 +63,31 @@ function Etiqueta({ id, campo, texto }: { id: string; campo: Campo; texto?: stri
   )
 }
 
+/** El mensaje rojo debajo de un campo obligatorio vacío (no solo el color: también el ícono y el texto) */
+function Falta({ id, error }: { id: string; error?: string }) {
+  if (!error) return null
+  return (
+    <p id={`${id}-error`} className="mt-1.5 flex items-center gap-1.5 text-[0.9rem] font-bold text-destructive">
+      <CircleAlert className="size-4 shrink-0" aria-hidden /> {error}
+    </p>
+  )
+}
+
 function CampoFormulario({
-  campo, datos, listas, cambiar,
+  campo, datos, listas, error, cambiar,
 }: {
   campo: Campo
   datos: Datos
   listas: Listas
+  error?: string
   cambiar: (clave: string, valor: string | string[]) => void
 }) {
-  const id = useId()
+  const id = idCampo(campo.clave)
   const valor = datos[campo.clave]
   const texto = typeof valor === 'string' ? valor : ''
   const materia = String(datos.materia ?? '')
   const poner = (v: string) => cambiar(campo.clave, v)
+  const aviso = error ? { 'aria-invalid': true, 'aria-describedby': `${id}-error` } : {}
 
   // asunto, tribunal y sala cambian con la materia elegida
   let tipo = campo.tipo ?? 'texto'
@@ -107,7 +121,7 @@ function CampoFormulario({
               aria-checked={materia === m.valor}
               onClick={() => poner(m.valor)}
               className={cn(
-                'h-10 rounded-full border px-4 text-[0.95rem] transition-colors',
+                'h-11 rounded-full border px-4 text-[0.95rem] transition-colors',
                 materia === m.valor ? 'border-marca bg-marca text-sobre-boton' : 'border-regla bg-background text-ink hover:border-marca',
               )}
             >
@@ -122,23 +136,24 @@ function CampoFormulario({
     const filas = Array.isArray(valor) && valor.length ? valor : ['']
     return (
       <div>
-        <Etiqueta id={`${id}-0`} campo={campo} />
+        <Etiqueta id={id} campo={campo} />
         <div className="space-y-2">
           {filas.map((v, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="w-6 shrink-0 text-right text-[0.9rem] text-ink-soft">{i + 1}-</span>
               <Input
-                id={`${id}-${i}`}
+                id={i === 0 ? id : `${id}-${i}`}
                 value={v}
                 placeholder={campo.pista}
                 onChange={(e) => cambiar(campo.clave, filas.map((x, k) => (k === i ? e.target.value : x)))}
                 className={campoClase}
+                {...(i === 0 ? aviso : {})}
               />
               <button
                 type="button"
                 disabled={filas.length <= 1}
                 onClick={() => cambiar(campo.clave, filas.filter((_, k) => k !== i))}
-                className="flex size-10 shrink-0 items-center justify-center rounded-lg text-marca-texto hover:bg-muted disabled:opacity-30"
+                className="flex size-11 shrink-0 items-center justify-center rounded-lg text-marca-texto hover:bg-muted disabled:opacity-30"
                 aria-label={`Quitar ${i + 1}`}
               >
                 <CircleMinus className="size-5" />
@@ -148,11 +163,12 @@ function CampoFormulario({
           <button
             type="button"
             onClick={() => cambiar(campo.clave, [...filas, ''])}
-            className="ml-8 flex items-center gap-1.5 rounded-md py-1.5 text-[0.92rem] text-marca-texto hover:underline"
+            className="ml-8 flex h-11 items-center gap-1.5 rounded-md px-1 text-[0.95rem] text-marca-texto hover:underline"
           >
-            <CirclePlus className="size-4" /> {campo.agregar ?? 'Agregar'}
+            <CirclePlus className="size-5" /> {campo.agregar ?? 'Agregar'}
           </button>
         </div>
+        <Falta id={id} error={error} />
       </div>
     )
   }
@@ -161,7 +177,8 @@ function CampoFormulario({
     return (
       <div>
         <Etiqueta id={id} campo={campo} texto={etiqueta} />
-        <Combo id={id} valor={texto} opciones={opciones} filtrar={filtrar} alCambiar={poner} />
+        <Combo id={id} valor={texto} opciones={opciones} filtrar={filtrar} alCambiar={poner} aviso={aviso} />
+        <Falta id={id} error={error} />
       </div>
     )
 
@@ -176,7 +193,9 @@ function CampoFormulario({
           onChange={(e) => poner(e.target.value)}
           rows={2}
           className="min-h-11 bg-background px-3 py-2.5 text-base md:text-base"
+          {...aviso}
         />
+        <Falta id={id} error={error} />
       </div>
     )
 
@@ -192,7 +211,9 @@ function CampoFormulario({
         inputMode={filtro ? 'numeric' : undefined}
         onChange={(e) => poner(filtro ? e.target.value.replace(filtro, '') : e.target.value)}
         className={campoClase}
+        {...aviso}
       />
+      <Falta id={id} error={error} />
     </div>
   )
 }
@@ -201,13 +222,14 @@ const sinTildes = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 
 /** Campo con lista de opciones: se puede elegir una o escribir otra cosa */
 function Combo({
-  id, valor, opciones, filtrar, alCambiar,
+  id, valor, opciones, filtrar, alCambiar, aviso,
 }: {
   id: string
   valor: string
   opciones: string[]
   filtrar: boolean
   alCambiar: (v: string) => void
+  aviso: object
 }) {
   const [abierto, setAbierto] = useState(false)
   const [activo, setActivo] = useState(-1)
@@ -253,7 +275,8 @@ function Combo({
           }
         }}
         placeholder="Elija de la lista o escriba"
-        className={cn(campoClase, 'pr-10')}
+        className={cn(campoClase, 'pr-11')}
+        {...aviso}
       />
       <button
         type="button"
@@ -264,7 +287,7 @@ function Combo({
           setAbierto(!abierto)
           document.getElementById(id)?.focus()
         }}
-        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-ink-soft"
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-ink-soft"
       >
         <ChevronDown className="size-4" />
       </button>
@@ -285,7 +308,7 @@ function Combo({
               }}
               onMouseEnter={() => setActivo(i)}
               className={cn(
-                'cursor-pointer px-3 py-2 text-[0.92rem] text-ink',
+                'cursor-pointer px-3 py-2.5 text-[0.95rem] text-ink',
                 i === activo && 'bg-muted',
                 o === valor && 'font-bold text-marca-texto',
               )}

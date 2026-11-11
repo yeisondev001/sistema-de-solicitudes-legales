@@ -134,7 +134,7 @@ export default function Asistente() {
             </button>
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon-grande"
               className="text-ink-soft opacity-70 group-hover:opacity-100"
               aria-label={`Borrar «${c.titulo}»`}
               onClick={() => setPorBorrar(c)}
@@ -168,16 +168,16 @@ export default function Asistente() {
             </div>
           </div>
           <div className="flex gap-1">
-            <Button variant="ghost" className="h-10 text-ink-soft xl:hidden" onClick={() => setListaAbierta(true)}>
-              <History /> <span className="hidden sm:inline">Conversaciones</span>
+            <Button variant="ghost" className="h-11 min-w-11 text-ink-soft xl:hidden" onClick={() => setListaAbierta(true)}>
+              <History /> <span className="sr-only sm:not-sr-only">Conversaciones</span>
             </Button>
             <Button
               variant="ghost"
-              className="h-10 text-ink-soft"
+              className="h-11 min-w-11 text-ink-soft"
               disabled={!mensajes.length || Boolean(pendiente)}
               onClick={() => navegar('/papiniano')}
             >
-              <MessageSquarePlus /> <span className="hidden sm:inline">Nueva conversación</span>
+              <MessageSquarePlus /> <span className="sr-only sm:not-sr-only">Nueva conversación</span>
             </Button>
           </div>
         </div>
@@ -281,12 +281,13 @@ export default function Asistente() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel size="grande">Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="h-10 bg-destructive text-card hover:bg-destructive/90"
+              variant="peligro"
+              size="grande"
               onClick={() => porBorrar && borrar(porBorrar)}
             >
-              Borrar
+              <Trash2 /> Sí, borrar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

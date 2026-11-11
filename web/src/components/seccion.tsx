@@ -12,10 +12,14 @@ export function Seccion({
 }) {
   return (
     <section className={cn('rounded-2xl border border-papel-borde bg-card p-5 md:p-6', className)}>
-      <div className="mb-4 flex items-baseline justify-between gap-3">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="font-heading text-[1.35rem] font-medium text-ink">{titulo}</h2>
         {accion && (
-          <Link to={accion.a} className="shrink-0 text-[0.9rem] text-marca-texto hover:underline">
+          // 44 px para el dedo sin agrandar el encabezado: el margen negativo se come el relleno
+          <Link
+            to={accion.a}
+            className="-my-2.5 -mr-2 inline-flex min-h-11 shrink-0 items-center px-2 text-[0.9rem] text-marca-texto hover:underline"
+          >
             {accion.texto}
           </Link>
         )}

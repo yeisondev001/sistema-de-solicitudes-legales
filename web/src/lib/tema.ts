@@ -16,6 +16,14 @@ export function aplicarColores(colores?: Colores | null) {
   }
 }
 
+// Mi cuenta → Apariencia: todo está medido en rem, así que basta con cambiar la letra de la página
+const LETRA: Record<string, string> = { normal: '', grande: '19px', muy_grande: '21px' }
+
+/** Pone el tamaño de letra de la cuenta; sin cuenta, el normal (17 px, en index.css) */
+export function aplicarLetra(letra?: string | null) {
+  document.documentElement.style.fontSize = LETRA[letra ?? 'normal'] ?? ''
+}
+
 /** Iniciales para el círculo de la cuenta: «Ana Martínez» → «AM» */
 export function iniciales(nombre: string) {
   const partes = nombre.trim().split(/\s+/).filter(Boolean)

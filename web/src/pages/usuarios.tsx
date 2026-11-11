@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Loader2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
+import { Cargando } from '@/components/cargando'
 import { TituloSala } from '@/components/oficina'
 import { Seccion } from '@/components/seccion'
 import { Button } from '@/components/ui/button'
@@ -43,7 +44,7 @@ export default function Usuarios() {
           {error ? (
             <p className="text-destructive">{error}</p>
           ) : !lista ? (
-            <p className="flex items-center gap-2 text-ink-soft"><Loader2 className="size-4 animate-spin" /> Cargando…</p>
+            <Cargando que="Cargando las cuentas" />
           ) : (
             <ul>
               {lista.map((u) => {
@@ -65,7 +66,7 @@ export default function Usuarios() {
                         disabled={propia}
                         aria-label={`Plan de ${u.usuario}`}
                         onChange={(e) => cambiar(u, { plan: e.target.value as Usuario['plan'] })}
-                        className="h-10 rounded-lg border border-input bg-background px-3 text-[0.95rem] text-ink disabled:opacity-60"
+                        className="h-11 rounded-lg border border-input bg-background px-3 text-[0.95rem] text-ink disabled:opacity-60"
                       >
                         {PLANES.map((p) => (
                           <option key={p} value={p}>{p}</option>
@@ -76,7 +77,7 @@ export default function Usuarios() {
                         key={`${u.id}-${u.email}`}
                         placeholder="correo de Google"
                         aria-label={`Correo de Google de ${u.usuario}`}
-                        className="h-10 flex-1 bg-background text-[0.95rem] md:text-[0.95rem]"
+                        className="h-11 bg-background sm:flex-1 text-[0.95rem] md:text-[0.95rem]"
                         onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                         onBlur={(e) => {
                           const nuevo = e.target.value.trim().toLowerCase()

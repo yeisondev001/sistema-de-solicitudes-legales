@@ -160,8 +160,8 @@ export default function Inicio() {
         {/* qué hay adentro */}
         <section id="salas" className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
           <Encabezado antetitulo="QUÉ HAY ADENTRO" titulo="Cada sala de su oficina, a un clic." />
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {SALAS.map(({ icono: Icono, nombre, texto, pronto, retrato }) => (
+          <div className="grid gap-5 sm:grid-cols-2">
+            {SALAS.filter((s) => !s.pronto).map(({ icono: Icono, nombre, texto, retrato }) => (
               <div key={nombre} className="space-y-2.5 rounded-xl border border-papel-borde bg-card p-6">
                 <div className="flex items-center justify-between gap-3">
                   {retrato ? (
@@ -171,13 +171,16 @@ export default function Inicio() {
                       <Icono className="size-[22px]" />
                     </span>
                   )}
-                  {pronto && <span className="rounded-full bg-aviso px-2.5 py-0.5 text-[0.8rem] font-bold text-aviso-texto">Pronto</span>}
                 </div>
                 <h3 className="font-heading text-[1.4rem] font-semibold">{nombre}</h3>
                 <p className="leading-relaxed text-ink-soft">{texto}</p>
               </div>
             ))}
           </div>
+          <p className="text-[1.05rem] text-ink-soft">
+            <strong className="text-ink">Muy pronto, en la misma oficina:</strong> Expedientes (una carpeta por cliente),
+            Redacción de escritos y la Agenda de audiencias.
+          </p>
         </section>
 
         {/* cómo funciona */}

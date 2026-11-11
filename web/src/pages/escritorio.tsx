@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LibraryBig, MessageSquarePlus, Palette, PenLine, Upload, type LucideIcon } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
+import { Cargando } from '@/components/cargando'
 import { Renglon, Seccion } from '@/components/seccion'
 import { useSubida } from '@/components/subida'
 import { api } from '@/lib/api'
@@ -80,7 +81,7 @@ export default function Escritorio() {
 
         <Seccion titulo="Conversaciones recientes" accion={{ texto: 'Ver todas', a: '/papiniano' }}>
           {convs === null ? (
-            <p className="text-ink-soft">Cargando…</p>
+            <Cargando renglones={2} que="Cargando sus conversaciones" />
           ) : convs.length ? (
             convs.slice(0, 4).map((c) => (
               <Renglon key={c.id} titulo={c.titulo} detalle={cuando(c.actualizada)} a={`/papiniano/${c.id}`} />
@@ -122,10 +123,6 @@ export default function Escritorio() {
           )}
         </Seccion>
 
-        <Seccion titulo="Pronto en su despacho">
-          <Renglon titulo="Expedientes" detalle="Una carpeta por cliente con sus documentos, conversaciones y plazos." />
-          <Renglon titulo="Agenda" detalle="Audiencias y vencimientos; el escritorio le avisará lo de la semana." />
-        </Seccion>
       </div>
 
       {/* la misma ventana de Mi cuenta → Apariencia, abierta desde el mosaico «Cambiar los colores» */}

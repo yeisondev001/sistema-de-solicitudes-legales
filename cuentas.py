@@ -79,6 +79,8 @@ _MIGRACIONES = {
         "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
         # tema de colores que eligió en Mi cuenta → Apariencia (vacío: el de la marca)
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema TEXT",
+        # tamaño de letra que eligió en Apariencia (vacío: normal)
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS letra TEXT",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -100,6 +102,7 @@ _MIGRACIONES = {
             mensajes TEXT NOT NULL)""",
         "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
         "ALTER TABLE usuarios ADD COLUMN tema TEXT",
+        "ALTER TABLE usuarios ADD COLUMN letra TEXT",
     ],
 }
 _tablas_listas = False
@@ -152,7 +155,7 @@ def _verificar(clave: str, guardado: str) -> bool:
 def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
             "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": u.get("plan") or "activo",
-            "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or "",
+            "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or "", "letra": u.get("letra") or "",
             "prueba_hasta": u.get("prueba_hasta")}
 
 
@@ -206,6 +209,11 @@ def cambiar_activo(usuario_id: int, activo: bool):
 def cambiar_tema(usuario_id: int, tema: str):
     """Guarda el tema de colores que eligió (Mi cuenta → Apariencia); se usa en todos sus equipos."""
     _ejecutar("UPDATE usuarios SET tema = %s WHERE id = %s", (tema, usuario_id))
+
+
+def cambiar_letra(usuario_id: int, letra: str):
+    """Guarda el tamaño de letra que eligió (normal, grande o muy grande); se usa en todos sus equipos."""
+    _ejecutar("UPDATE usuarios SET letra = %s WHERE id = %s", (letra, usuario_id))
 
 
 def cambiar_plantillas(usuario_id: int, plantillas: bool):

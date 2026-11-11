@@ -13,6 +13,9 @@ export type Listas = Record<
 
 export type Datos = Record<string, string | string[]>
 
+/** El id de cada campo: así Redacción puede llevar la pantalla al primero que falta */
+export const idCampo = (clave: string) => `campo-${clave}`
+
 /**
  * texto · largo (varios renglones) · fecha (DD/MM/AAAA) · cedula · lista (anexos, demandados)
  * materia · y los que cambian con la materia: asunto, tribunal y sala · combo (lista fija con opciones)

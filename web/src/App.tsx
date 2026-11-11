@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Oficina } from '@/components/oficina'
 import { api, SESION_TERMINADA } from '@/lib/api'
 import { ContextoSesion, type Sesion } from '@/lib/sesion'
-import { aplicarColores } from '@/lib/tema'
+import { aplicarColores, aplicarLetra } from '@/lib/tema'
 import type { Perfil } from '@/lib/tipos'
 import Asistente from '@/pages/asistente'
 import Biblioteca from '@/pages/biblioteca'
@@ -27,7 +27,10 @@ export default function App() {
   useEffect(refrescar, [refrescar])
 
   // el tema de la persona por dentro; por fuera, la marca
-  useEffect(() => aplicarColores(perfil?.colores), [perfil])
+  useEffect(() => {
+    aplicarColores(perfil?.colores)
+    aplicarLetra(perfil?.letra)
+  }, [perfil])
 
   useEffect(() => {
     const terminar = () => setPerfil(null)

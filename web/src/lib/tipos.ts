@@ -12,6 +12,7 @@ export interface Perfil {
   plan: 'beta' | 'prueba' | 'activo' | 'vencido'
   plantillas: boolean
   tema: string
+  letra: 'normal' | 'grande' | 'muy_grande'
   colores: Colores
   prueba: { dias: number; preguntas_hoy: number; tope: number } | null
 }

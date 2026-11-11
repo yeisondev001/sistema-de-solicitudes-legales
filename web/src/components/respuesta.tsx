@@ -42,7 +42,7 @@ export function Burbuja({ turno }: { turno: Turno }) {
         <Papiniano className="size-7" decorativo />
         <span className="flex-1 text-[0.9rem] text-ink">{NOMBRE_ASISTENTE}</span>
         {(turno.fuentes || turno.ia) && (
-          <Button variant="ghost" size="sm" className="h-8 text-ink-soft" onClick={copiar}>
+          <Button variant="ghost" size="sm" className="h-11 px-3 text-ink-soft" onClick={copiar}>
             <Copy /> Copiar
           </Button>
         )}
@@ -115,16 +115,16 @@ function TarjetaFuente({ n, f, citada }: { n: number; f: Fuente; citada: boolean
       )}
       <div className="flex flex-wrap gap-1">
         {f.fuente_url ? (
-          <Button variant="ghost" size="sm" className="h-8 text-ink" onClick={() => setVerPagina(true)}>
+          <Button variant="ghost" size="sm" className="h-11 px-3 text-ink" onClick={() => setVerPagina(true)}>
             <FileText /> Ver la página aquí
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" className="h-8 text-ink" onClick={() => setLeer(true)}>
+          <Button variant="ghost" size="sm" className="h-11 px-3 text-ink" onClick={() => setLeer(true)}>
             <FileText /> Leer aquí
           </Button>
         )}
         {f.fuente_url && (
-          <Button variant="ghost" size="sm" className="h-8 text-ink-soft" asChild>
+          <Button variant="ghost" size="sm" className="h-11 px-3 text-ink-soft" asChild>
             <a href={`${f.fuente_url}#page=${f.pagina}`} target="_blank" rel="noreferrer">
               <ExternalLink /> {ABRIR[f.origen] ?? 'Abrir en el Boletín Judicial'}
             </a>
@@ -199,7 +199,7 @@ function Visor({ f, alCerrar }: { f: Fuente; alCerrar: () => void }) {
         </div>
         <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
           <div className="flex items-center">
-            <Button variant="ghost" size="icon-lg" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)} aria-label="Página anterior">
+            <Button variant="ghost" size="icon-grande" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)} aria-label="Página anterior">
               <ChevronLeft />
             </Button>
             <span className="min-w-28 text-center text-[0.9rem] text-ink-soft">
@@ -207,7 +207,7 @@ function Visor({ f, alCerrar }: { f: Fuente; alCerrar: () => void }) {
             </span>
             <Button
               variant="ghost"
-              size="icon-lg"
+              size="icon-grande"
               disabled={Boolean(total) && pagina >= (total ?? 0)}
               onClick={() => setPagina(pagina + 1)}
               aria-label="Página siguiente"
@@ -215,9 +215,9 @@ function Visor({ f, alCerrar }: { f: Fuente; alCerrar: () => void }) {
               <ChevronRight />
             </Button>
           </div>
-          <Button variant="ghost" className="h-10 text-ink-soft" asChild>
+          <Button variant="ghost" className="h-11 text-ink-soft" asChild>
             <a href={`${f.fuente_url}#page=${pagina}`} target="_blank" rel="noreferrer">
-              <ExternalLink /> <span className="hidden sm:inline">Abrir el PDF oficial</span>
+              <ExternalLink /> <span className="sr-only sm:not-sr-only">Abrir el PDF oficial</span>
             </a>
           </Button>
         </DialogFooter>

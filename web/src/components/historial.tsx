@@ -6,6 +6,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Cargando } from '@/components/cargando'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api, descargar, ErrorApi } from '@/lib/api'
@@ -66,12 +67,7 @@ export function Historial({
   }
 
   if (error) return <p className="text-destructive">{error}</p>
-  if (!lista)
-    return (
-      <p className="flex items-center gap-2 text-ink-soft">
-        <Loader2 className="size-4 animate-spin" /> Cargando el historial…
-      </p>
-    )
+  if (!lista) return <Cargando renglones={4} que="Cargando el historial" />
   if (!lista.length)
     return (
       <section className="rounded-2xl border border-papel-borde bg-card p-6">
@@ -166,13 +162,13 @@ export function Historial({
                       ))}
                     </dl>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <Button variant="outline" className="h-10 border-regla" onClick={() => alAbrir(e, true)}>
+                      <Button variant="outline" className="h-11 border-regla" onClick={() => alAbrir(e, true)}>
                         <Pencil /> Editar
                       </Button>
-                      <Button variant="outline" className="h-10 border-regla" onClick={() => alAbrir(e, false)}>
+                      <Button variant="outline" className="h-11 border-regla" onClick={() => alAbrir(e, false)}>
                         <Copy /> Usar como base
                       </Button>
-                      <Button variant="outline" className="h-10 border-regla text-destructive" onClick={() => setPorBorrar(e)}>
+                      <Button variant="outline" className="h-11 border-regla text-destructive" onClick={() => setPorBorrar(e)}>
                         <Trash2 /> Borrar
                       </Button>
                     </div>
@@ -196,9 +192,9 @@ export function Historial({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10">Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="h-10 bg-destructive text-card hover:bg-destructive/90" onClick={() => porBorrar && borrar(porBorrar)}>
-              Borrar
+            <AlertDialogCancel size="grande">Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="peligro" size="grande" onClick={() => porBorrar && borrar(porBorrar)}>
+              <Trash2 /> Sí, borrar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

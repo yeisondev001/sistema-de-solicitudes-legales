@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BookOpen, FileText, Gavel, Loader2, Trash2, Upload, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
+import { Cargando } from '@/components/cargando'
 import { TituloSala } from '@/components/oficina'
 import { Seccion } from '@/components/seccion'
 import { useSubida } from '@/components/subida'
@@ -77,7 +78,7 @@ export default function Biblioteca() {
           {error ? (
             <p className="text-destructive">{error}</p>
           ) : !datos ? (
-            <p className="text-ink-soft">Cargando…</p>
+            <Cargando que="Cargando sus documentos" />
           ) : !datos.configurada ? (
             <p className="text-ink-soft">Falta configurar el buscador en el servidor (variable JURIS_DATABASE_URL).</p>
           ) : datos.documentos.length ? (
@@ -91,7 +92,7 @@ export default function Biblioteca() {
                       {[d.numero, d.sala, d.materia].filter(Boolean).join(' · ') || 'Sin ficha'}
                     </p>
                   </div>
-                  <Button variant="ghost" size="icon-lg" className="text-destructive" aria-label={`Quitar «${d.titulo}»`} onClick={() => setPorQuitar(d)}>
+                  <Button variant="ghost" size="icon-grande" className="text-destructive" aria-label={`Quitar «${d.titulo}»`} onClick={() => setPorQuitar(d)}>
                     <Trash2 />
                   </Button>
                 </li>
@@ -112,9 +113,9 @@ export default function Biblioteca() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10">Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="h-10 bg-destructive text-card hover:bg-destructive/90" onClick={() => porQuitar && quitar(porQuitar)}>
-              Quitar
+            <AlertDialogCancel size="grande">Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="peligro" size="grande" onClick={() => porQuitar && quitar(porQuitar)}>
+              <Trash2 /> Sí, quitar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
