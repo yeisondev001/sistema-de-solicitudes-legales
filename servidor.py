@@ -306,27 +306,35 @@ def _responder(q: str, historial_chat: list, u: dict, avance) -> dict:
         fuentes = anteriores   # "explíquelo más simple": las mismas sentencias
     else:
         avance("Buscando en las sentencias…")
-        fuentes = juris_buscar.buscar(plan["busquedas"] or [plan["consulta"]], u["id"],
-                                      limite=juris_ia.MAX_FUENTES, pregunta=plan["consulta"])
-    turno["fuentes"] = fuentes
-    # prestaciones con salario y tiempo: los montos los calcula la app, la IA los explica
+        try:
+            fuentes = juris_buscar.buscar(plan["busquedas"] or [plan["consulta"]], u["id"],
+                                          limite=juris_ia.MAX_FUENTES, pregunta=plan["consulta"])
+        except Exception as ex:
+            print(f"La búsqueda falló: {ex}", flush=True)
+            fuentes = None   # la biblioteca no respondió (la base gratis puede estar despertando)
+    turno["fuentes"] = fuentes or []
+    # prestaciones con salario y tiempo: los montos los calcula la app con las fórmulas fijas, la IA solo
+    # los explica; así la tabla sale aunque no haya fuentes, la biblioteca no responda o la IA no esté
     calculo = juris_prestaciones.calcular(q) or juris_prestaciones.calcular(plan["consulta"])
-    if not fuentes:
-        turno["texto"] = ("No encontré sentencias sobre eso. Pruebe a decirlo con otras palabras, "
-                          "o suba sus propios documentos en la Biblioteca.")
+    tabla = juris_prestaciones.para_mostrar(calculo) + "\n\n" if calculo else ""
+    if fuentes is None:
+        turno["texto"] = tabla + ("_No pude conectarme con la biblioteca de sentencias en este momento. "
+                                  "Intente de nuevo en un minuto._")
+    elif not fuentes:
+        turno["texto"] = tabla + ("No encontré sentencias sobre eso. Pruebe a decirlo con otras palabras, "
+                                  "o suba sus propios documentos en la Biblioteca.")
     elif juris_ia.disponible():
         avance("Analizando las sentencias…")
         try:
             r = juris_ia.responder(q, fuentes, juris_buscar.referencia, historial_chat, calculo)
             turno.update(texto=r["texto"], citadas=r["citadas"], ia=True)
         except juris_ia.LimiteAlcanzado:
-            turno["texto"] = ("_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto. "
-                              "Mientras tanto, abajo están las sentencias encontradas._")
-            if calculo:
-                turno["texto"] = juris_prestaciones.para_mostrar(calculo) + "\n\n" + turno["texto"]
+            turno["texto"] = tabla + ("_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto. "
+                                      "Mientras tanto, abajo están las sentencias encontradas._")
     else:
-        turno["texto"] = (f"_La IA no está disponible en el servidor (claves: {juris_ia.estado()}). "
-                          "Abajo están las sentencias encontradas._")
+        print(f"IA no disponible (claves: {juris_ia.estado()})", flush=True)
+        turno["texto"] = tabla + ("_Papiniano no puede analizar en este momento. "
+                                  "Abajo están las sentencias encontradas._")
     return turno
 
 
@@ -370,7 +378,9 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
                     try:
                         cola.put(("turno", _responder(q, historial_chat, u, lambda t: cola.put(("avance", t)))))
                     except Exception as ex:
-                        cola.put(("turno", {"rol": "asistente", "texto": f"No pude completar la consulta: {ex}"}))
+                        print(f"La consulta falló: {ex}", flush=True)
+                        cola.put(("turno", {"rol": "asistente",
+                                            "texto": "_No pude completar la consulta. Intente de nuevo en un momento._"}))
 
                 threading.Thread(target=trabajo, daemon=True).start()
                 while True:
