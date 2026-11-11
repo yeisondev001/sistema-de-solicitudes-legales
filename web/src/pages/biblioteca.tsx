@@ -15,7 +15,7 @@ import type { Documento } from '@/lib/tipos'
 const ESTANTES = [
   { icono: Gavel, titulo: 'Sentencias de la Suprema Corte de Justicia', texto: 'Del Boletín Judicial; las nuevas se agregan solas cada mes.' },
   { icono: BookOpen, titulo: 'Leyes y reglamentos', texto: 'La Ley 108-05 y sus reglamentos, los códigos y otras leyes, artículo por artículo.' },
-  { icono: UserRound, titulo: 'Sus documentos', texto: 'Lo que usted sube: solo usted lo ve, y el asistente lo busca junto con lo demás.' },
+  { icono: UserRound, titulo: 'Sus documentos', texto: 'Lo que usted sube: solo usted lo ve, y Papiniano lo busca junto con lo demás.' },
 ]
 
 /** Qué hay en la biblioteca y los documentos propios de la persona. */

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, MessageSquare, Palette, PenLine,
-  Users, type LucideIcon,
+  CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, Users,
 } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
 import { Logo } from '@/components/logo'
+import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 interface Sala {
   ruta: string
   nombre: string
-  icono: LucideIcon
+  icono: React.ComponentType<{ className?: string }>
   pronto?: boolean
 }
 
@@ -28,7 +28,7 @@ function useSalas(): Sala[] {
   const { perfil } = useSesion()
   return [
     { ruta: '/', nombre: 'Escritorio', icono: House },
-    { ruta: '/asistente', nombre: 'Asistente', icono: MessageSquare },
+    { ruta: '/papiniano', nombre: NOMBRE_ASISTENTE, icono: Papiniano },
     { ruta: '/biblioteca', nombre: 'Biblioteca', icono: LibraryBig },
     { ruta: '/expedientes', nombre: 'Expedientes', icono: FolderClosed, pronto: true },
     { ruta: '/redaccion', nombre: 'Redacción', icono: PenLine, pronto: !perfil.plantillas },
@@ -143,8 +143,8 @@ export function Oficina() {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [apariencia, setApariencia] = useState(false)
   const { pathname } = useLocation()
-  // el Asistente usa todo el alto para la conversación; las demás salas se desplazan
-  const conversacion = pathname.startsWith('/asistente')
+  // Papiniano usa todo el alto para la conversación; las demás salas se desplazan
+  const conversacion = pathname.startsWith('/papiniano')
   // cada sala abre desde arriba
   const contenido = useRef<HTMLElement>(null)
   useEffect(() => {

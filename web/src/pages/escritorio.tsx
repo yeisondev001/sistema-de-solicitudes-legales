@@ -9,7 +9,7 @@ import { useSesion } from '@/lib/sesion'
 import type { Audiencia, Conversacion, Documento } from '@/lib/tipos'
 import { cuando, fechaDeHoy, saludo } from '@/lib/fechas'
 
-/** El inicio: el saludo y lo del día. Para preguntar se va directo al Asistente (no hay caja aquí). */
+/** El inicio: el saludo y lo del día. Para preguntar se va directo a Papiniano (no hay caja aquí). */
 export default function Escritorio() {
   const { perfil } = useSesion()
   const navegar = useNavigate()
@@ -38,7 +38,7 @@ export default function Escritorio() {
       : ''
 
   const mosaicos: [LucideIcon, string, () => void][] = [
-    [MessageSquarePlus, 'Preguntar al asistente', () => navegar('/asistente')],
+    [MessageSquarePlus, 'Preguntarle a Papiniano', () => navegar('/papiniano')],
     [Upload, 'Subir un documento', subida.abrir],
     [LibraryBig, 'Ver la biblioteca', () => navegar('/biblioteca')],
     perfil.plantillas
@@ -78,17 +78,17 @@ export default function Escritorio() {
           </Seccion>
         )}
 
-        <Seccion titulo="Conversaciones recientes" accion={{ texto: 'Ver todas', a: '/asistente' }}>
+        <Seccion titulo="Conversaciones recientes" accion={{ texto: 'Ver todas', a: '/papiniano' }}>
           {convs === null ? (
             <p className="text-ink-soft">Cargando…</p>
           ) : convs.length ? (
             convs.slice(0, 4).map((c) => (
-              <Renglon key={c.id} titulo={c.titulo} detalle={cuando(c.actualizada)} a={`/asistente/${c.id}`} />
+              <Renglon key={c.id} titulo={c.titulo} detalle={cuando(c.actualizada)} a={`/papiniano/${c.id}`} />
             ))
           ) : (
             <p className="text-ink-soft">
-              Todavía no ha conversado con su asistente.{' '}
-              <Link to="/asistente" className="text-marca-texto hover:underline">Hágale su primera pregunta</Link>.
+              Todavía no ha conversado con Papiniano, su asistente.{' '}
+              <Link to="/papiniano" className="text-marca-texto hover:underline">Hágale su primera pregunta</Link>.
             </p>
           )}
         </Seccion>

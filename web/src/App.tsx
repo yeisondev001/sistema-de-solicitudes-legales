@@ -87,8 +87,8 @@ export default function App() {
         {legales}
         <Route element={<Oficina />}>
           <Route index element={<Escritorio />} />
-          <Route path="asistente" element={<Asistente />} />
-          <Route path="asistente/:id" element={<Asistente />} />
+          <Route path="papiniano" element={<Asistente />} />
+          <Route path="papiniano/:id" element={<Asistente />} />
           <Route path="biblioteca" element={<Biblioteca />} />
           {sesion.perfil.plantillas ? (
             <>

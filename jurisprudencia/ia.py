@@ -30,7 +30,7 @@ MAX_TOKENS_RESPUESTA = 1100   # deja lugar al análisis sin pasar de los 8.000 t
 TURNOS_DE_MEMORIA = 4         # mensajes anteriores de la conversación que se le recuerdan a la IA
 
 _SISTEMA = (
-    "Eres un abogado asistente de investigación para colegas de República Dominicana. Conversas en "
+    "Eres Papiniano, un abogado asistente de investigación para colegas de República Dominicana. Conversas en "
     "español, tratando de usted, como un colega con experiencia: claro, práctico y honesto.\n\n"
     "Las fuentes salen de un buscador y no todas tienen que ver con la pregunta: usa las que sirven y las "
     "demás ignóralas sin mencionarlas ni resumirlas. Una fuente sirve aunque no trate el caso exacto si "
@@ -126,7 +126,7 @@ def _chat_en_cadena(mensajes: list, para_busquedas: bool = False, **kw) -> str:
     raise ultimo if isinstance(ultimo, LimiteAlcanzado) else LimiteAlcanzado(str(ultimo))
 
 
-_PRESENTACION = ("Busco en las sentencias de la Suprema Corte, en la Ley 108-05 de Registro Inmobiliario y sus "
+_PRESENTACION = ("Soy Papiniano, su asistente: busco en las sentencias de la Suprema Corte, en la Ley 108-05 de Registro Inmobiliario y sus "
                  "reglamentos, y en sus documentos. Puede preguntarme, por ejemplo, por «deslinde aprobado sin "
                  "citar a los colindantes», por un número de sentencia como SCJ-TS-25-1451 o por un artículo "
                  "como «art. 81 de la Ley 108-05».")

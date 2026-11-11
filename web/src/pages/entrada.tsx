@@ -31,7 +31,7 @@ export default function Entrada({ alEntrar }: { alEntrar: (p: Perfil) => void })
           <h2 className="font-heading text-[2.4rem] leading-tight font-medium">Su despacho, listo para trabajar.</h2>
           <ul className="space-y-3.5 text-[1.05rem]">
             {[
-              'Un asistente que cita las sentencias y las leyes',
+              'Papiniano, su asistente, que cita las sentencias y las leyes',
               'La página exacta del PDF oficial, sin salir de la app',
               'Sus documentos en el mismo buscador',
             ].map((t) => (

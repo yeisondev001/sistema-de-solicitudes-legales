@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom'
 import {
-  BookOpen, CalendarDays, FileText, FolderClosed, Gavel, LibraryBig, MessageCircle, PenLine, Scale, UserRound,
-  type LucideIcon,
+  BookOpen, CalendarDays, FileText, FolderClosed, Gavel, LibraryBig, PenLine, Scale, UserRound, type LucideIcon,
 } from 'lucide-react'
+import { Papiniano } from '@/components/papiniano'
 import { Antetitulo, CabeceraPublica, PiePublico } from '@/components/publico'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { cn } from '@/lib/utils'
 
 const DIAS_PRUEBA = 14
 
-/** Lo que el asistente lee: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
+/** Lo que Papiniano lee: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
 const FUENTES: { icono: LucideIcon; titulo: string; texto: string; lista?: string[] }[] = [
   {
     icono: Gavel,
@@ -31,17 +31,24 @@ const FUENTES: { icono: LucideIcon; titulo: string; texto: string; lista?: strin
   {
     icono: UserRound,
     titulo: 'Sus documentos',
-    texto: 'Las sentencias, resoluciones y escritos que usted sube. Solo usted los ve, y el asistente los busca junto con lo demás.',
+    texto: 'Las sentencias, resoluciones y escritos que usted sube. Solo usted los ve, y Papiniano los busca junto con lo demás.',
   },
 ]
 
-const SALAS: { icono: LucideIcon; nombre: string; texto: string; pronto?: boolean }[] = [
+const SALAS: {
+  icono: React.ComponentType<{ className?: string }>
+  nombre: string
+  texto: string
+  pronto?: boolean
+  retrato?: boolean
+}[] = [
   {
-    icono: MessageCircle,
-    nombre: 'Asistente',
-    texto: 'Su pasante. Le pregunta como a un colega y le responde con la jurisprudencia, la ley que aplica y su análisis. También saca las prestaciones laborales con las reglas del Código de Trabajo.',
+    icono: Papiniano,
+    nombre: 'Papiniano',
+    retrato: true,
+    texto: 'Su asistente. Le pregunta como a un colega y le responde con la jurisprudencia, la ley que aplica y su análisis. También saca las prestaciones laborales con las reglas del Código de Trabajo.',
   },
-  { icono: LibraryBig, nombre: 'Biblioteca', texto: 'Todo lo que el asistente lee, y sus propios documentos. Abre la página del PDF ahí mismo.' },
+  { icono: LibraryBig, nombre: 'Biblioteca', texto: 'Todo lo que Papiniano lee, y sus propios documentos. Abre la página del PDF ahí mismo.' },
   { icono: FolderClosed, nombre: 'Expedientes', texto: 'Cada cliente con sus documentos, conversaciones, escritos y plazos, en una carpeta.', pronto: true },
   { icono: PenLine, nombre: 'Redacción', texto: 'Sus modelos de escritos y solicitudes, listos en Word o PDF.', pronto: true },
   { icono: CalendarDays, nombre: 'Agenda', texto: 'Audiencias y vencimientos. El escritorio le avisa lo que vence esta semana.', pronto: true },
@@ -51,11 +58,11 @@ const SALAS: { icono: LucideIcon; nombre: string; texto: string; pronto?: boolea
 const PLANES = [
   {
     nombre: 'Prueba', precio: 'Gratis', periodo: `${DIAS_PRUEBA} días`,
-    puntos: ['20 consultas por día al asistente', 'Toda la biblioteca', 'Sin tarjeta'], boton: 'Empezar prueba', a: '/entrar',
+    puntos: ['20 consultas por día a Papiniano', 'Toda la biblioteca', 'Sin tarjeta'], boton: 'Empezar prueba', a: '/entrar',
   },
   {
     nombre: 'Abogado', precio: '[PRECIO]', periodo: 'al mes', destacado: true,
-    puntos: ['Asistente sin límite diario', 'Sus documentos en el buscador', 'Expedientes y agenda, cuando estén listos'],
+    puntos: ['Papiniano sin límite diario', 'Sus documentos en el buscador', 'Expedientes y agenda, cuando estén listos'],
     boton: 'Elegir plan', a: '/entrar',
   },
   {
@@ -65,10 +72,10 @@ const PLANES = [
 ]
 
 const PREGUNTAS: [string, string][] = [
-  ['¿El asistente reemplaza al abogado?',
+  ['¿Papiniano reemplaza al abogado?',
     'No. Es una herramienta de apoyo: busca, lee y resume por usted, pero el criterio es suyo. Por eso cada respuesta trae sus citas, para que las verifique en la fuente oficial antes de usarlas.'],
   ['¿De dónde salen las sentencias y las leyes?',
-    'Las sentencias salen del Boletín Judicial de la Suprema Corte de Justicia y las leyes de sus textos oficiales. Cuando el asistente cita algo, usted puede abrir la página exacta del PDF sin salir de la app.'],
+    'Las sentencias salen del Boletín Judicial de la Suprema Corte de Justicia y las leyes de sus textos oficiales. Cuando Papiniano cita algo, usted puede abrir la página exacta del PDF sin salir de la app.'],
   ['¿Se puede equivocar?',
     'Sí, como cualquier herramienta de inteligencia artificial. Por eso responde con lo que encontró en las fuentes y le muestra de dónde lo sacó. Los montos de prestaciones no los calcula la IA: salen de las fórmulas fijas del Código de Trabajo.'],
   ['¿Quién ve los documentos que subo?',
@@ -77,6 +84,8 @@ const PREGUNTAS: [string, string][] = [
     `La prueba dura ${DIAS_PRUEBA} días y no pide tarjeta. Al terminar, elige un plan para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
   ['¿Cómo se paga y cómo cancelo?',
     'Con tarjeta, a través de Lemon Squeezy. Puede cancelar cuando quiera desde su cuenta y conserva el acceso hasta el final del mes pagado.'],
+  ['¿Por qué se llama Papiniano?',
+    'Por Emilio Papiniano (siglo III), el jurista más respetado de Roma: cuando los grandes juristas no se ponían de acuerdo, la ley mandaba seguir su opinión.'],
   ['¿Funciona en el celular?', 'Sí. Funciona en el navegador de la computadora, la tableta y el celular, sin instalar nada.'],
 ]
 
@@ -98,8 +107,8 @@ export default function Inicio() {
               Todo su trabajo, en una sola oficina.
             </h1>
             <p className="max-w-[34rem] text-lg leading-relaxed text-ink-soft md:text-[1.25rem]">
-              Pregúntele a su asistente como a un colega: le responde con las sentencias de la Suprema Corte y las leyes, y le
-              muestra la página exacta de cada cita.
+              Pregúntele a Papiniano, su asistente, como a un colega: le responde con las sentencias de la Suprema Corte y
+              las leyes, y le muestra la página exacta de cada cita.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link to="/entrar" className="rounded-lg bg-boton px-6 py-4 text-[1.05rem] font-bold text-sobre-boton hover:bg-boton/90">
@@ -139,12 +148,16 @@ export default function Inicio() {
         <section id="salas" className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
           <Encabezado antetitulo="QUÉ HAY ADENTRO" titulo="Cada sala de su oficina, a un clic." />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {SALAS.map(({ icono: Icono, nombre, texto, pronto }) => (
+            {SALAS.map(({ icono: Icono, nombre, texto, pronto, retrato }) => (
               <div key={nombre} className="space-y-2.5 rounded-xl border border-papel-borde bg-card p-6">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="flex size-[46px] items-center justify-center rounded-[9px] bg-panel text-[#F1E8DA]">
-                    <Icono className="size-[22px]" />
-                  </span>
+                  {retrato ? (
+                    <Icono className="size-[46px]" />
+                  ) : (
+                    <span className="flex size-[46px] items-center justify-center rounded-[9px] bg-panel text-[#F1E8DA]">
+                      <Icono className="size-[22px]" />
+                    </span>
+                  )}
                   {pronto && <span className="rounded-full bg-aviso px-2.5 py-0.5 text-[0.8rem] font-bold text-aviso-texto">Pronto</span>}
                 </div>
                 <h3 className="font-heading text-[1.4rem] font-semibold">{nombre}</h3>
@@ -262,6 +275,11 @@ function Encabezado({ antetitulo, titulo, claro = false }: { antetitulo: string;
 function EjemploRespuesta() {
   return (
     <div aria-hidden="true" className="space-y-3.5 rounded-2xl border border-papel-borde bg-card p-5 shadow-[0_24px_60px_-20px_color-mix(in_oklab,var(--t-ink)_25%,transparent)] md:p-6">
+      <div className="flex items-center gap-2.5 border-b border-papel-borde pb-3.5">
+        <Papiniano className="size-9" decorativo />
+        <span className="font-heading text-lg font-medium">Papiniano</span>
+        <span className="text-[0.85rem] text-ink-soft">· su asistente</span>
+      </div>
       <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-panel px-4 py-3 text-sobre-panel">
         ¿Qué pasa si se aprobó un deslinde sin citar a los colindantes?
       </p>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, Gavel, Loader2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -16,7 +17,7 @@ export function BurbujaUsuario({ texto }: { texto: string }) {
   )
 }
 
-/** Una respuesta del asistente: el texto (Markdown), copiar, y las fuentes citadas con su página. */
+/** Una respuesta de Papiniano, el asistente: el texto (Markdown), copiar, y las fuentes citadas con su página. */
 export function Burbuja({ turno }: { turno: Turno }) {
   const citadas = new Set(turno.citadas ?? [])
   // si respondió la IA se muestran solo las fuentes que citó; si no, todas las encontradas
@@ -38,8 +39,8 @@ export function Burbuja({ turno }: { turno: Turno }) {
   return (
     <div className="mr-6 space-y-1.5">
       <div className="flex items-center gap-2 text-[0.82rem] font-bold text-ink-soft">
-        <Gavel className="size-4 text-marca-texto" />
-        <span className="flex-1">Asistente</span>
+        <Papiniano className="size-7" decorativo />
+        <span className="flex-1 text-[0.9rem] text-ink">{NOMBRE_ASISTENTE}</span>
         {(turno.fuentes || turno.ia) && (
           <Button variant="ghost" size="sm" className="h-8 text-ink-soft" onClick={copiar}>
             <Copy /> Copiar

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Burbuja, BurbujaUsuario } from '@/components/respuesta'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -24,7 +25,7 @@ const EJEMPLOS = [
 
 /**
  * La consulta es una conversación: cada mensaje del abogado y cada respuesta (con las fuentes que usó)
- * se guardan en la base, así las vuelve a abrir desde la lista (/asistente/:id).
+ * se guardan en la base, así las vuelve a abrir desde la lista (/papiniano/:id).
  */
 export default function Asistente() {
   const { id } = useParams()
@@ -67,7 +68,7 @@ export default function Asistente() {
       .then((r) => setMensajes(r.mensajes))
       .catch((e: ErrorApi) => {
         toast.error(e.message)
-        navegar('/asistente', { replace: true })
+        navegar('/papiniano', { replace: true })
       })
       .finally(() => setCargando(false))
   }, [convId, navegar])
@@ -87,7 +88,7 @@ export default function Asistente() {
       setMensajes((m) => [...m, r.turno])
       if (r.conv_id && r.conv_id !== convActual.current) {
         anterior.current = r.conv_id
-        navegar(`/asistente/${r.conv_id}`, { replace: true })
+        navegar(`/papiniano/${r.conv_id}`, { replace: true })
       }
       cargarLista()
       refrescar() // el contador de consultas de la prueba
@@ -102,7 +103,7 @@ export default function Asistente() {
     try {
       await api.borrar(`/api/conversaciones/${c.id}`)
       toast.success('Conversación borrada.')
-      if (c.id === convId) navegar('/asistente')
+      if (c.id === convId) navegar('/papiniano')
       cargarLista()
     } catch (e) {
       toast.error((e as ErrorApi).message)
@@ -125,7 +126,7 @@ export default function Asistente() {
               disabled={Boolean(pendiente)}
               onClick={() => {
                 setListaAbierta(false)
-                navegar(`/asistente/${c.id}`)
+                navegar(`/papiniano/${c.id}`)
               }}
               className={cn('line-clamp-2 flex-1 px-3 py-2.5 text-left text-[0.92rem] text-ink', c.id === convId && 'font-bold')}
             >
@@ -157,11 +158,14 @@ export default function Asistente() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-3 border-b border-papel-borde px-4 py-3 md:px-8">
-          <div>
-            <h1 className="font-heading text-2xl font-medium text-ink">Asistente</h1>
-            <p className="hidden text-[0.88rem] text-ink-soft sm:block">
-              Pregúntele como a un colega; cada respuesta cita sus fuentes.
-            </p>
+          <div className="flex items-center gap-3">
+            <Papiniano className="size-11" decorativo />
+            <div>
+              <h1 className="font-heading text-2xl font-medium text-ink">{NOMBRE_ASISTENTE}</h1>
+              <p className="hidden text-[0.88rem] text-ink-soft sm:block">
+                Su asistente. Pregúntele como a un colega; cada respuesta cita sus fuentes.
+              </p>
+            </div>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" className="h-10 text-ink-soft xl:hidden" onClick={() => setListaAbierta(true)}>
@@ -171,7 +175,7 @@ export default function Asistente() {
               variant="ghost"
               className="h-10 text-ink-soft"
               disabled={!mensajes.length || Boolean(pendiente)}
-              onClick={() => navegar('/asistente')}
+              onClick={() => navegar('/papiniano')}
             >
               <MessageSquarePlus /> <span className="hidden sm:inline">Nueva conversación</span>
             </Button>
@@ -194,7 +198,7 @@ export default function Asistente() {
                   turno={{
                     rol: 'asistente',
                     texto:
-                      'Hola. Soy su asistente de jurisprudencia: busco en las sentencias de la Suprema Corte (Boletín Judicial), ' +
+                      `Hola. Soy ${NOMBRE_ASISTENTE}, su asistente de jurisprudencia: busco en las sentencias de la Suprema Corte (Boletín Judicial), ` +
                       'en las leyes y reglamentos y en sus documentos, y le doy mi análisis con las citas para que las verifique.' +
                       '\n\nPuede empezar con una de estas:',
                   }}
