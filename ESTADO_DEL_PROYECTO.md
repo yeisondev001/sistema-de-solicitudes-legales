@@ -180,9 +180,13 @@ El concepto: **la app es la oficina del abogado** (nombre de entonces; hoy es Pa
   - **El asistente se llama Papiniano** (lo decidió el dueño el 11 nov), por Emilio Papiniano, el jurista más respetado de Roma. En la app nueva reemplaza a «Asistente» en el menú, en los títulos y en la página pública; la sala está en `/papiniano`. Su ícono (`web/src/components/papiniano.tsx`) es un camafeo: su perfil sin barba en marfil sobre vino, con corona de laurel, toga y borde de perlas doradas (lo eligió el dueño entre varios estilos), igual en todos los temas. La IA también se presenta como Papiniano (`jurisprudencia/ia.py`, también en la app de Flet).
   - **Colores:** salen de `temas.py`. `/api/sesion` manda los del tema de la persona y `web/src/lib/tema.ts` los pone en las variables `--t-*` de `web/src/index.css`.
   - **Letras:** Literata y Atkinson Hyperlegible desde npm (Fontsource), con negrita y cursiva de verdad.
-  - **Falta para cambiar en Render:**
-    1. Que Render arme las pantallas (`npm run build`) y arranque con `uvicorn servidor:app`.
-    2. Probar con la base real: el asistente, la biblioteca y la entrada con Google.
+  - **Cambiar Render a la app nueva** (se hace a mano en el panel de Render, Settings del servicio):
+    1. **Build Command:** `bash render-build.sh` (instala Python y arma las pantallas en `web/dist`; Render trae Node).
+    2. **Start Command:** `uvicorn servidor:app --host 0.0.0.0 --port $PORT`.
+    3. **Environment:** agregar `NODE_VERSION` = `22` (Vite 8 pide Node 22.12 o más nuevo).
+    4. Las demás variables quedan igual. Google Cloud no se toca: la vuelta sigue siendo `/oauth_callback`.
+    5. **Para volver a Flet:** poner los comandos de antes, que están anotados arriba en `render.yaml`.
+    6. Después, probar con la base real: Papiniano, la biblioteca, Redacción y la entrada con Google. Las sesiones de Flet no pasan a la app nueva: cada quien entra otra vez.
   - **Mientras tanto, la app de Flet (`main.py`) sigue siendo la que está en Render, sin cambios.**
   - **En local:** ver `web/README.md`. Vite va en el puerto 5180, porque el 5173 lo usa otro proyecto del dueño.
 - **Lo que se descartó:** azul marino con dorado (es el estándar del sector y fue lo que no le gustó al dueño), el verde y la pizarra azul.

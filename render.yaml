@@ -1,12 +1,18 @@
+# Ojo: este servicio se creó a mano en Render y este archivo NO se aplica solo; es la referencia de cómo
+# debe estar configurado. App de antes (Flet), por si hay que volver:
+#   build: pip install -r requirements.txt && python -c "import shutil,pathlib,flet_web; w=pathlib.Path(flet_web.__file__).parent/'web'; shutil.copy('assets/favicon.png',str(w/'favicon.png')); shutil.copy('assets/icons/loading-animation.png',str(w/'icons'/'loading-animation.png')); print('Assets OK')"
+#   start: flet run --web --port $PORT main.py
 services:
   - type: web
     name: solicitud-informe-tecnico
     runtime: python
-    buildCommand: pip install -r requirements.txt && python -c "import shutil,pathlib,flet_web; w=pathlib.Path(flet_web.__file__).parent/'web'; shutil.copy('assets/favicon.png',str(w/'favicon.png')); shutil.copy('assets/icons/loading-animation.png',str(w/'icons'/'loading-animation.png')); print('Assets OK')"
-    startCommand: flet run --web --port $PORT main.py
+    buildCommand: bash render-build.sh
+    startCommand: uvicorn servidor:app --host 0.0.0.0 --port $PORT
     plan: free
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
+      - key: NODE_VERSION
+        value: "22"
       - key: DATABASE_URL
         sync: false
