@@ -119,7 +119,7 @@ Los archivos están en `jurisprudencia/`.
 
 ## Diseño y marca (decidido el 10 nov 2026)
 
-El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisional). Cada parte es una sala: Escritorio (inicio), Asistente (el chat), Biblioteca (sentencias, leyes y documentos), Expedientes (una carpeta por cliente), Redacción (plantillas) y Agenda. Las pantallas, el recorrido del abogado y la marca están en un lienzo de diseño privado del dueño (pedírselo).
+El concepto: **la app es la oficina del abogado** (nombre de entonces; hoy es Papiniano). Cada parte es una sala: Escritorio (inicio), Asistente (el chat), Biblioteca (sentencias, leyes y documentos), Expedientes (una carpeta por cliente), Redacción (plantillas) y Agenda. Las pantallas, el recorrido del abogado y la marca están en un lienzo de diseño privado del dueño (pedírselo).
 
 - **Paleta de la marca: «Vino y madera».** Es la de la página pública, la entrada, los correos y el pago, y el tema por defecto adentro. El vino son los libros y la madera el escritorio. Todos los contrastes pasan 4,5:1.
 
@@ -158,7 +158,7 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - La cuenta, con **Apariencia** y **Cerrar sesión**.
     - En plan `prueba`, los días que quedan y las consultas del día.
   - **Entrada nueva («recepción»):** a la izquierda qué es el despacho; a la derecha, Google y usuario/contraseña, los dos a la vista. En el celular la entrada va primero.
-  - **El nombre «Despacho» es provisional:** está en `NOMBRE_APP` en `main.py` y en `web/src/lib/tema.ts`. El dueño está pensando otro (ideas: Estrado, Toga, Considerando, Foja).
+  - **El nombre:** era «Despacho», provisional; el 11 nov pasó a ser **Papiniano** (ver abajo).
 - **Falta:**
   - El tamaño de letra.
   - **Funciones nuevas:** Expedientes (una carpeta por cliente) y Agenda (audiencias y plazos).
@@ -175,6 +175,7 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
   - **Página pública (antes de entrar), al estilo de clerk.do pero con la marca:** en `/` (`web/src/pages/inicio.tsx`): lo principal con un ejemplo de respuesta, qué lee (solo lo que de verdad está cargado), qué hay adentro, cómo funciona, planes, preguntas frecuentes, un último botón y el pie con columnas. **La entrada es otra página**, `/entrar` (`web/src/pages/entrada.tsx`); «Entrar» y «Empiece gratis» llevan allí, y Google vuelve allí si hay error. Los precios dicen [PRECIO] en `PLANES` hasta que el dueño los decida. No se nombran las obras comentadas de la Escuela Nacional de la Judicatura (licencia no comercial) hasta tener su permiso.
   - **Páginas legales:** `/terminos`, `/privacidad`, `/reembolso` y `/contacto` (`web/src/pages/legal.tsx`). Son **borradores**: falta el titular, el correo, el WhatsApp, la fecha y los días de reembolso (entre corchetes), y que los revise un abogado antes de cobrar.
   - **Escritorio sin caja de preguntas** (lo pidió el dueño el 11 nov): para preguntar se va directo al Asistente, por el menú o por el mosaico «Preguntar al asistente». La app de Flet todavía la tiene.
+  - **El producto se llama Papiniano** (decidido el 11 nov, tras un análisis de competencia): igual que su asistente, una sola figura y un solo nombre. «Despacho» quedó atrás. En `NOMBRE_APP` (`web/src/lib/tema.ts` y `main.py`). El logo es el camafeo con el nombre (`web/src/components/logo.tsx`); el ícono de la pestaña es `web/public/favicon.svg`. Se descartaron Digesto y Toga (ya son software legal en Brasil, Bélgica e Italia) y Estrado («Estrados» existe). **Pendiente del dueño:** buscar «Papiniano» en ONAPI y registrarlo (clases 9 y 42), y reservar papiniano.do y .com.
   - **El asistente se llama Papiniano** (lo decidió el dueño el 11 nov), por Emilio Papiniano, el jurista más respetado de Roma. En la app nueva reemplaza a «Asistente» en el menú, en los títulos y en la página pública; la sala está en `/papiniano`. Su ícono (`web/src/components/papiniano.tsx`) es un camafeo: su perfil sin barba en marfil sobre vino, con corona de laurel, toga y borde de perlas doradas (lo eligió el dueño entre varios estilos), igual en todos los temas. La IA también se presenta como Papiniano (`jurisprudencia/ia.py`, también en la app de Flet).
   - **Colores:** salen de `temas.py`. `/api/sesion` manda los del tema de la persona y `web/src/lib/tema.ts` los pone en las variables `--t-*` de `web/src/index.css`.
   - **Letras:** Literata y Atkinson Hyperlegible desde npm (Fontsource), con negrita y cursiva de verdad.

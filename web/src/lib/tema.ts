@@ -1,6 +1,6 @@
 import type { Colores } from './tipos'
 
-export const NOMBRE_APP = 'Despacho' // nombre provisional del producto
+export const NOMBRE_APP = 'Papiniano' // el producto se llama igual que su asistente
 
 /**
  * Pone los colores de un tema (de temas.py) en las variables --t-* de index.css.

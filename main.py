@@ -46,7 +46,7 @@ FUENTES = {
     FONT_BODY:    "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@5.3.0/latin-400-normal.ttf",
 }
 ANCHO_MAX    = 1200       # ancho máximo del contenido en pantallas grandes
-NOMBRE_APP   = "Despacho"   # nombre provisional del producto
+NOMBRE_APP   = "Papiniano"  # nombre del producto (igual que su asistente)
 ZONA_RD      = timezone(timedelta(hours=-4))   # República Dominicana no cambia la hora en verano
 DIAS_SEMANA  = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 MESES_ANIO   = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",

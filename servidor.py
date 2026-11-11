@@ -45,7 +45,7 @@ FUENTES_PERMITIDAS = (
     "https://cdn.jsdelivr.net/gh/yeisondev001/sistema-de-solicitudes-legales@",   # leyes/ de este repo
 )
 
-app = FastAPI(title="Despacho", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Papiniano", docs_url=None, redoc_url=None, openapi_url=None)
 
 
 # ── SESIÓN ───────────────────────────────────────
