@@ -72,6 +72,8 @@
   --font-heading: "Literata Variable", Georgia, serif;
   --font-serif: "Literata Variable", Georgia, serif;
 
+  /* el roble de la marca: antetítulos de la página pública */
+  --color-roble: #8A5A36;
   --color-ink: var(--t-ink);
   --color-ink-soft: var(--t-ink-soft);
   --color-marca: var(--t-accent);

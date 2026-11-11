@@ -163,7 +163,7 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
   - El tamaño de letra.
   - **Funciones nuevas:** Expedientes (una carpeta por cliente) y Agenda (audiencias y plazos).
   - El botón «Elegir plan» con Lemon Squeezy.
-  - La página pública completa: qué hay adentro, planes y textos legales.
+  - Completar los borradores legales y los precios de la página pública.
 - **App nueva: pantallas en React, Python detrás (empezó el 11 nov).** El dueño decidió pasar todas las pantallas a React porque el diseño se hace mucho más fácil que en Flet. Lo de fondo se queda en Python.
   - **Stack:** React + TypeScript + Vite + Tailwind + shadcn/ui en `web/`; Python con FastAPI en `servidor.py`. Se descartó Next.js: con Vite, el mismo servicio de Render da la API y las pantallas, sin un segundo servidor que se duerma.
   - **`servidor.py`** usa lo mismo que la app de Flet: `cuentas`, `historial`, `temas`, `jurisprudencia/*` y `generators/*`. La sesión es la de la tabla `sesiones`, guardada en una cookie que JavaScript no puede leer.
@@ -172,6 +172,8 @@ El concepto: **la app es la oficina del abogado** ("Despacho", nombre provisiona
     - **Visor de páginas:** solo abre PDFs de las fuentes oficiales (`FUENTES_PERMITIDAS`), no cualquier dirección.
   - **Ya hechas:** entrada (Google, usuario y crear administrador), menú de salas con panel en el celular, Escritorio, Asistente (lista de conversaciones, fuentes, visor de la página, copiar), Biblioteca (subir y quitar documentos), Apariencia (los 4 temas, cambian al instante), Redacción (las 7 plantillas en Word y PDF, y el historial: buscar, editar, usar como base, borrar y descargar todo en Word) y Usuarios (solo administradores, en el menú de la cuenta).
   - **Redacción:** `redaccion.py` tiene lo de cada plantilla (valores iniciales, campos obligatorios, generadores, nombre del archivo) y las listas de tribunales, salas y asuntos, que antes estaban en `main.py`. Los campos de cada formulario en pantalla están en `web/src/lib/plantillas.ts`. Lo escrito se conserva al cambiar de sala mientras la app esté abierta.
+  - **Página pública (antes de entrar):** la del diseño (lienzo «Despacho jurídico digital», tablero 1): menú, la entrada a la vista, qué hay adentro, cómo trabaja el asistente, planes y el pie. Está en `web/src/pages/entrada.tsx`; los precios dicen [PRECIO] en `PLANES` hasta que el dueño los decida. Se quitó «5 años del Boletín» y la sala de Calculadoras; Expedientes, Redacción y Agenda dicen «Pronto».
+  - **Páginas legales:** `/terminos`, `/privacidad`, `/reembolso` y `/contacto` (`web/src/pages/legal.tsx`). Son **borradores**: falta el titular, el correo, el WhatsApp, la fecha y los días de reembolso (entre corchetes), y que los revise un abogado antes de cobrar.
   - **Colores:** salen de `temas.py`. `/api/sesion` manda los del tema de la persona y `web/src/lib/tema.ts` los pone en las variables `--t-*` de `web/src/index.css`.
   - **Letras:** Literata y Atkinson Hyperlegible desde npm (Fontsource), con negrita y cursiva de verdad.
   - **Falta para cambiar en Render:**

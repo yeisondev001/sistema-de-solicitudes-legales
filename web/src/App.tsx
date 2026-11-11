@@ -9,6 +9,7 @@ import Asistente from '@/pages/asistente'
 import Biblioteca from '@/pages/biblioteca'
 import Entrada from '@/pages/entrada'
 import Escritorio from '@/pages/escritorio'
+import Legal from '@/pages/legal'
 import Pronto from '@/pages/pronto'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
@@ -53,8 +54,13 @@ export default function App() {
 
   if (perfil === undefined) return <div className="min-h-dvh bg-background" aria-busy="true" />
 
-  if (!sesion)
-    return (
+  // las páginas legales se ven con o sin sesión
+  const legales = (['terminos', 'privacidad', 'reembolso', 'contacto'] as const).map((p) => (
+    <Route key={p} path={p} element={<Legal pagina={p} />} />
+  ))
+
+  if (!sesion) {
+    const recepcion = (
       <Entrada
         alEntrar={(p) => {
           setPerfil(p)
@@ -62,10 +68,18 @@ export default function App() {
         }}
       />
     )
+    return (
+      <Routes>
+        {legales}
+        <Route path="*" element={recepcion} />
+      </Routes>
+    )
+  }
 
   return (
     <ContextoSesion.Provider value={sesion}>
       <Routes>
+        {legales}
         <Route element={<Oficina />}>
           <Route index element={<Escritorio />} />
           <Route path="asistente" element={<Asistente />} />
