@@ -177,7 +177,7 @@ def google_ir(request: Request):
 @app.get("/oauth_callback")
 def google_vuelta(request: Request, code: str = "", state: str = "", error: str = ""):
     def volver(motivo):
-        r = RedirectResponse("/?error=" + quote(motivo), 302)
+        r = RedirectResponse("/entrar?error=" + quote(motivo), 302)
         r.delete_cookie("google_estado", path="/")
         return r
 

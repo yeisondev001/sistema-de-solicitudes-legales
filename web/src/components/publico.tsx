@@ -1,44 +1,78 @@
 import { Link } from 'react-router-dom'
 import { Logo } from '@/components/logo'
+import { NOMBRE_APP } from '@/lib/tema'
 
-/** Arriba de las páginas públicas: el logo y el menú. En las páginas legales, el menú lleva al inicio. */
-export function CabeceraPublica({ enInicio = false, alEntrar }: { enInicio?: boolean; alEntrar?: () => void }) {
-  const a = (ancla: string) => (enInicio ? ancla : `/${ancla}`)
+/** Arriba de las páginas públicas: el logo, el menú y los botones para entrar o empezar. */
+export function CabeceraPublica({ conMenu = true }: { conMenu?: boolean }) {
   return (
-    <header className="border-b border-papel-borde bg-background">
-      <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-4 px-5 py-4 md:px-6">
+    <header className="sticky top-0 z-30 border-b border-papel-borde bg-background/95 backdrop-blur">
+      <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-5 py-3.5 md:px-6">
         <Link to="/" aria-label="Inicio">
           <Logo />
         </Link>
-        <nav aria-label="Principal" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[0.95rem]">
-          <a href={a('#salas')} className="hidden text-ink hover:text-marca-texto md:inline">Qué hay adentro</a>
-          <a href={a('#asistente')} className="hidden text-ink hover:text-marca-texto md:inline">Cómo trabaja el asistente</a>
-          <a href={a('#planes')} className="text-ink hover:text-marca-texto">Planes</a>
-          {enInicio ? (
-            <button type="button" onClick={alEntrar} className="rounded-lg bg-boton px-5 py-3 font-bold text-sobre-boton hover:bg-boton/90">
-              Entrar
-            </button>
-          ) : (
-            <Link to="/" className="rounded-lg bg-boton px-5 py-3 font-bold text-sobre-boton hover:bg-boton/90">
-              Entrar
-            </Link>
-          )}
-        </nav>
+        {conMenu && (
+          <nav aria-label="Principal" className="hidden items-center gap-7 text-[0.95rem] whitespace-nowrap xl:flex">
+            <a href="/#fuentes" className="text-ink hover:text-marca-texto">Qué lee</a>
+            <a href="/#salas" className="text-ink hover:text-marca-texto">Qué hay adentro</a>
+            <a href="/#como" className="text-ink hover:text-marca-texto">Cómo funciona</a>
+            <a href="/#planes" className="text-ink hover:text-marca-texto">Planes</a>
+            <a href="/#preguntas" className="text-ink hover:text-marca-texto">Preguntas</a>
+          </nav>
+        )}
+        <div className="flex items-center gap-2 whitespace-nowrap sm:gap-3">
+          <Link to="/entrar" className="rounded-lg border border-regla px-4 py-2.5 font-bold text-ink hover:border-marca hover:text-marca-texto sm:border-transparent sm:px-3">
+            Entrar
+          </Link>
+          {/* en el celular no cabe: el botón grande está justo debajo */}
+          <Link to="/entrar" className="hidden rounded-lg bg-boton px-5 py-2.5 font-bold text-sobre-boton hover:bg-boton/90 sm:inline-block">
+            Empiece gratis
+          </Link>
+        </div>
       </div>
     </header>
   )
 }
 
+const ANIO = new Date().getFullYear()
+
+const COLUMNAS: [string, [string, string][]][] = [
+  ['Producto', [['Qué lee', '/#fuentes'], ['Qué hay adentro', '/#salas'], ['Cómo funciona', '/#como'], ['Planes', '/#planes']]],
+  ['Ayuda', [['Preguntas frecuentes', '/#preguntas'], ['Contacto', '/contacto']]],
+  ['Legal', [['Términos de servicio', '/terminos'], ['Privacidad', '/privacidad'], ['Política de reembolso', '/reembolso']]],
+]
+
 export function PiePublico() {
   return (
-    <footer className="mx-auto flex max-w-[1240px] flex-wrap justify-between gap-4 px-5 pt-8 pb-12 text-[0.92rem] text-ink-soft md:px-6">
-      <span>Herramienta de apoyo: no sustituye el criterio del abogado. Datos protegidos según la Ley 172-13.</span>
-      <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2">
-        <Link to="/terminos" className="text-marca-texto hover:underline">Términos de servicio</Link>
-        <Link to="/privacidad" className="text-marca-texto hover:underline">Privacidad</Link>
-        <Link to="/reembolso" className="text-marca-texto hover:underline">Política de reembolso</Link>
-        <Link to="/contacto" className="text-marca-texto hover:underline">Contacto</Link>
-      </nav>
+    <footer className="border-t border-papel-borde bg-card">
+      <div className="mx-auto grid max-w-[1240px] gap-10 px-5 py-12 md:grid-cols-[1.4fr_repeat(3,1fr)] md:px-6">
+        <div className="space-y-3">
+          <Logo />
+          <p className="max-w-xs text-[0.92rem] text-ink-soft">
+            La oficina digital del abogado dominicano. Herramienta de apoyo: no sustituye el criterio del abogado.
+          </p>
+        </div>
+        {COLUMNAS.map(([titulo, enlaces]) => (
+          <nav key={titulo} aria-label={titulo} className="space-y-3">
+            <h2 className="text-[0.85rem] font-bold tracking-wide text-ink-soft uppercase">{titulo}</h2>
+            <ul className="space-y-2">
+              {enlaces.map(([texto, a]) => (
+                <li key={texto}>
+                  {a.startsWith('/#') ? (
+                    <a href={a} className="text-ink hover:text-marca-texto">{texto}</a>
+                  ) : (
+                    <Link to={a} className="text-ink hover:text-marca-texto">{texto}</Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+      <div className="border-t border-papel-borde">
+        <p className="mx-auto max-w-[1240px] px-5 py-5 text-[0.85rem] text-ink-soft md:px-6">
+          © {ANIO} {NOMBRE_APP}. Hecho en República Dominicana. Datos protegidos según la Ley 172-13.
+        </p>
+      </div>
     </footer>
   )
 }

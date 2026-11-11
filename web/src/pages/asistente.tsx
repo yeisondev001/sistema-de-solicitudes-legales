@@ -42,7 +42,9 @@ export default function Asistente() {
 
   // la conversación abierta (la respuesta puede llegar después de cambiar de dirección)
   const convActual = useRef(convId)
-  convActual.current = convId
+  useEffect(() => {
+    convActual.current = convId
+  }, [convId])
   // la última conversación que se pintó: así no se vuelve a leer la que se acaba de crear
   const anterior = useRef<number | null | undefined>(undefined)
   const fin = useRef<HTMLDivElement>(null)

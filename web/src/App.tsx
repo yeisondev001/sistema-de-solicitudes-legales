@@ -9,6 +9,7 @@ import Asistente from '@/pages/asistente'
 import Biblioteca from '@/pages/biblioteca'
 import Entrada from '@/pages/entrada'
 import Escritorio from '@/pages/escritorio'
+import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
 import Pronto from '@/pages/pronto'
 import Redaccion from '@/pages/redaccion'
@@ -59,22 +60,26 @@ export default function App() {
     <Route key={p} path={p} element={<Legal pagina={p} />} />
   ))
 
-  if (!sesion) {
-    const recepcion = (
-      <Entrada
-        alEntrar={(p) => {
-          setPerfil(p)
-          navegar('/', { replace: true })
-        }}
-      />
-    )
+  // sin sesión: la página pública en /, la entrada en /entrar; cualquier otra dirección pide entrar
+  if (!sesion)
     return (
       <Routes>
         {legales}
-        <Route path="*" element={recepcion} />
+        <Route index element={<Inicio />} />
+        <Route
+          path="entrar"
+          element={
+            <Entrada
+              alEntrar={(p) => {
+                setPerfil(p)
+                navegar('/', { replace: true })
+              }}
+            />
+          }
+        />
+        <Route path="*" element={<Navigate to="/entrar" replace />} />
       </Routes>
     )
-  }
 
   return (
     <ContextoSesion.Provider value={sesion}>
