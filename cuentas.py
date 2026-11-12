@@ -83,6 +83,16 @@ _MIGRACIONES = {
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS letra TEXT",
         # el escrito que Papiniano redacta al lado de la conversación (JSON: texto y versiones anteriores)
         "ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS escrito TEXT",
+        # los modelos de escritos que sube cada abogado: solo los ve él (los de todos están en modelos/)
+        """CREATE TABLE IF NOT EXISTS modelos_propios (
+            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            nombre TEXT NOT NULL,
+            grupo TEXT NOT NULL DEFAULT '',
+            materia TEXT NOT NULL DEFAULT '',
+            texto TEXT NOT NULL,
+            actualizado BIGINT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS modelos_propios_usuario ON modelos_propios (usuario_id)",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -106,6 +116,15 @@ _MIGRACIONES = {
         "ALTER TABLE usuarios ADD COLUMN tema TEXT",
         "ALTER TABLE usuarios ADD COLUMN letra TEXT",
         "ALTER TABLE conversaciones ADD COLUMN escrito TEXT",
+        """CREATE TABLE IF NOT EXISTS modelos_propios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            nombre TEXT NOT NULL,
+            grupo TEXT NOT NULL DEFAULT '',
+            materia TEXT NOT NULL DEFAULT '',
+            texto TEXT NOT NULL,
+            actualizado INTEGER NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS modelos_propios_usuario ON modelos_propios (usuario_id)",
     ],
 }
 _tablas_listas = False
@@ -405,6 +424,43 @@ def guardar_escrito(usuario_id: int, conv_id: int, texto: str):
         actual = {"texto": texto, "anteriores": anteriores[-MAX_VERSIONES:]}
         _poner_escrito(usuario_id, conv_id, actual)
     return _publico(actual)
+
+
+MAX_MODELOS_PROPIOS = 100
+
+
+# ── Los modelos que sube cada abogado ────────────
+def listar_modelos_propios(usuario_id: int) -> list:
+    return _ejecutar("SELECT id, nombre, grupo, materia FROM modelos_propios WHERE usuario_id = %s ORDER BY nombre",
+                     (usuario_id,), leer=True)
+
+
+def leer_modelo_propio(usuario_id: int, modelo_id: int):
+    filas = _ejecutar("SELECT id, nombre, grupo, materia, texto FROM modelos_propios WHERE id = %s AND usuario_id = %s",
+                      (modelo_id, usuario_id), leer=True)
+    return filas[0] if filas else None
+
+
+def guardar_modelo_propio(usuario_id: int, modelo_id, nombre: str, grupo: str, materia: str, texto: str) -> int:
+    """Crea el modelo (modelo_id None) o lo cambia; devuelve su id."""
+    ahora = int(time.time())
+    if modelo_id:
+        if not leer_modelo_propio(usuario_id, modelo_id):
+            raise ValueError("Ese modelo ya no existe.")
+        _ejecutar("UPDATE modelos_propios SET nombre = %s, grupo = %s, materia = %s, texto = %s, actualizado = %s "
+                  "WHERE id = %s AND usuario_id = %s", (nombre, grupo, materia, texto, ahora, modelo_id, usuario_id))
+        return modelo_id
+    if len(listar_modelos_propios(usuario_id)) >= MAX_MODELOS_PROPIOS:
+        raise ValueError(f"Ya tiene {MAX_MODELOS_PROPIOS} modelos. Borre alguno para subir otro.")
+    _ejecutar("INSERT INTO modelos_propios (usuario_id, nombre, grupo, materia, texto, actualizado) "
+              "VALUES (%s, %s, %s, %s, %s, %s)", (usuario_id, nombre, grupo, materia, texto, ahora))
+    filas = _ejecutar("SELECT id FROM modelos_propios WHERE usuario_id = %s ORDER BY id DESC LIMIT 1",
+                      (usuario_id,), leer=True)
+    return filas[0]["id"]
+
+
+def borrar_modelo_propio(usuario_id: int, modelo_id: int):
+    _ejecutar("DELETE FROM modelos_propios WHERE id = %s AND usuario_id = %s", (modelo_id, usuario_id))
 
 
 def deshacer_escrito(usuario_id: int, conv_id: int):

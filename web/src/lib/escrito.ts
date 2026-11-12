@@ -71,6 +71,34 @@ export function llenar(texto: string, datos: Record<string, string>): string {
   return texto.replace(ESPACIO, (todo, dentro: string) => (esEspacio(dentro) && datos[dentro]?.trim()) || todo)
 }
 
+/**
+ * Los datos del abogado ([NOMBRE DEL ABOGADO], [MATRÍCULA DEL ABOGADO]…) sirven para todos sus escritos.
+ * Solo los que terminan así: [ABOGADOS DE LA PARTE CONTRARIA] o [MATRÍCULA DEL TÍTULO] son del caso.
+ */
+export const esDelAbogado = (espacio: string) => /\bDEL? (?:LOS )?ABOGADOS?$/.test(espacio)
+
+/** La fecha en que se firma: la pone la app con la del día en que se descarga */
+export const FECHA_DE_HOY = 'FECHA DE HOY'
+
+/**
+ * Los datos del caso, agrupados para pedirlos en orden. Se prueban en este orden (así «FECHA DE LA SENTENCIA»
+ * va con los actos y no con el tribunal) y se muestran en el de GRUPOS; lo que no encaja va en «Otros datos».
+ */
+const PRUEBAS: [string, RegExp][] = [
+  ['Actos, sentencias y fechas', /ACTO|ALGUACIL|SENTENCIA|FECHA|AUDIENCIA|NOTARIO|CONTRATO|COMPROBANTE|FOJAS|RESOLUCI[ÓO]N|RECIBE|D[ÍI]A DEL|MES DEL|AÑO DEL/],
+  ['El tribunal y el expediente', /SALA|TRIBUNAL|JUZGADO|CORTE|DEPARTAMENTO|DISTRITO JUDICIAL|EXPEDIENTE|JUEZ/],
+  ['Las partes', /CLIENTE|DEMANDANTE|DEMANDAD|RECURRENTE|RECURRID|SOLICITANTE|INTERVINIENTE|PARTE CONTRARIA|SUCESOR|IMPETRANTE|DESTINATARIO/],
+  ['El inmueble', /PARCELA|CATASTRAL|MATR[IÍ]CULA|INMUEBLE|[ÁA]REA|SOLAR|MANZANA|POSICIONAL|DESIGNACI[ÓO]N|T[ÍI]TULO/],
+]
+const GRUPOS = ['El tribunal y el expediente', 'Las partes', 'El inmueble', 'Actos, sentencias y fechas', 'Otros datos']
+
+/** [[grupo, datos]] sin grupos vacíos; los datos van en el orden en que aparecen en el escrito */
+export function agrupar(datos: string[]): [string, string[]][] {
+  const grupos = new Map<string, string[]>(GRUPOS.map((g) => [g, []]))
+  for (const d of datos) grupos.get(PRUEBAS.find(([, patron]) => patron.test(d))?.[0] ?? 'Otros datos')!.push(d)
+  return [...grupos].filter(([, lista]) => lista.length)
+}
+
 /** «NOMBRE DEL SOLICITANTE» → «Nombre del solicitante», para la etiqueta del campo */
 export const etiqueta = (espacio: string) => espacio.charAt(0) + espacio.slice(1).toLowerCase()
 

@@ -11,7 +11,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api, descargar, ErrorApi } from '@/lib/api'
-import { espacios, etiqueta, llenar, parrafos, piezas, titulo as tituloDe, type TipoParrafo } from '@/lib/escrito'
+import {
+  agrupar, espacios, esDelAbogado, etiqueta, FECHA_DE_HOY, llenar, parrafos, piezas, titulo as tituloDe,
+  type TipoParrafo,
+} from '@/lib/escrito'
+import { fechaLarga } from '@/lib/fechas'
 import type { Escrito } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
@@ -20,7 +24,6 @@ import { cn } from '@/lib/utils'
  * sigue con los espacios en blanco (Ley 172-13). Los del abogado (nombre, matrícula) sirven para todos sus
  * escritos; los demás, solo para el escrito de esa conversación.
  */
-const DEL_ABOGADO = /ABOGAD|MATR[IÍ]CULA/
 const claveDatos = (usuario: number, conv: number) => `papiniano.datos.${usuario}.${conv}`
 const claveAbogado = (usuario: number) => `papiniano.abogado.${usuario}`
 
@@ -85,7 +88,13 @@ function resumen(m: Marcas) {
 }
 
 /** La hoja: el escrito con el formato del Word. Lo que acaba de cambiar se resalta un momento. */
-function Hoja({ texto, datos, marcas }: { texto: string; datos: Record<string, string>; marcas: Marcas }) {
+export function Hoja({
+  texto, datos = {}, marcas = SIN_MARCAS,
+}: {
+  texto: string
+  datos?: Record<string, string>
+  marcas?: Marcas
+}) {
   const lista = parrafos(texto)
   const quitado = (i: number) =>
     marcas.quitados.has(i) && (
@@ -130,7 +139,8 @@ function Hoja({ texto, datos, marcas }: { texto: string; datos: Record<string, s
  * En el celular (compacto) la barra es de una sola fila y «Corregir a mano» queda debajo de la hoja.
  */
 export function PanelEscrito({
-  escrito, convId, usuarioId, trabajando, borrador, setBorrador, alCambiar, alOcultar, compacto, pulso,
+  escrito, convId, usuarioId, trabajando, borrador, setBorrador, alCambiar, alOcultar, compacto, pulso, pedirDatos = false,
+  alPedirDatos,
 }: {
   escrito: Escrito | null
   convId: number | null
@@ -145,10 +155,15 @@ export function PanelEscrito({
   compacto: boolean
   /** cambia cada vez que piden ver el escrito desde la conversación: se vuelve a mostrar el último cambio */
   pulso: number
+  /** acaba de poner un modelo: se abren los datos por llenar (y se avisa con alPedirDatos que ya se pidieron) */
+  pedirDatos?: boolean
+  alPedirDatos?: () => void
 }) {
   const [delEscrito, setDelEscrito] = useState(() => (convId ? leer(claveDatos(usuarioId, convId)) : {}))
   const [delAbogado, setDelAbogado] = useState(() => leer(claveAbogado(usuarioId)))
   const [verDatos, setVerDatos] = useState(false)
+  // faltan datos y pidió descargar: se le avisa antes, con lo que falta
+  const [porBajar, setPorBajar] = useState<'docx' | 'pdf' | null>(null)
   const [descartar, setDescartar] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [bajando, setBajando] = useState<'docx' | 'pdf' | null>(null)
@@ -160,8 +175,9 @@ export function PanelEscrito({
 
   const texto = escrito?.texto ?? ''
   const titulo = tituloDe(texto)
-  const datos = { ...delEscrito, ...delAbogado }
-  const todos = espacios(texto)
+  const datos: Record<string, string> = { [FECHA_DE_HOY]: fechaLarga(), ...delEscrito, ...delAbogado }
+  // la fecha de hoy la pone la app: no se pide
+  const todos = espacios(texto).filter((e) => e !== FECHA_DE_HOY)
   const faltan = todos.filter((e) => !datos[e]?.trim())
   const editando = borrador !== null
 
@@ -179,6 +195,13 @@ export function PanelEscrito({
     setMarcas(m)
     setAviso(resumen(m))
   }, [texto])
+
+  // los datos se abren si los pide el abogado o si acaba de poner un modelo
+  const datosAbiertos = verDatos || pedirDatos
+  function cerrarDatos() {
+    setVerDatos(false)
+    if (pedirDatos) alPedirDatos?.()
+  }
 
   // «Ver el cambio en el escrito» desde la conversación: se vuelve a marcar el último cambio
   useEffect(() => {
@@ -203,7 +226,7 @@ export function PanelEscrito({
   }, [marcas])
 
   function ponerDato(espacio: string, valor: string) {
-    if (DEL_ABOGADO.test(espacio)) {
+    if (esDelAbogado(espacio)) {
       const nuevos = { ...delAbogado, [espacio]: valor }
       setDelAbogado(nuevos)
       guardar(claveAbogado(usuarioId), nuevos)
@@ -214,17 +237,22 @@ export function PanelEscrito({
     }
   }
 
-  async function bajar(formato: 'docx' | 'pdf') {
+  /** Si faltan datos, primero se avisa cuáles; «Descargar así» lo baja igual (con confirmar) */
+  async function bajar(formato: 'docx' | 'pdf', confirmar = false) {
+    if (faltan.length && !confirmar) {
+      setPorBajar(formato)
+      return
+    }
+    setPorBajar(null)
     setBajando(formato)
     try {
       await descargar(`/api/escrito/${formato}`, { texto: llenar(texto, datos) })
-      if (faltan.length)
-        toast.warning(
-          `Descargado. ${faltan.length === 1 ? 'Falta 1 dato por llenar' : `Faltan ${faltan.length} datos por llenar`}: ` +
-            (formato === 'docx' ? 'salen marcados en amarillo.' : 'salen entre corchetes.'),
-          { action: { label: 'Llenar datos', onClick: () => setVerDatos(true) } },
-        )
-      else toast.success('Escrito descargado.')
+      toast.success(
+        faltan.length
+          ? `Descargado con ${faltan.length === 1 ? '1 dato' : `${faltan.length} datos`} sin llenar: ` +
+              (formato === 'docx' ? 'salen marcados en amarillo.' : 'salen entre corchetes.')
+          : 'Escrito descargado.',
+      )
     } catch (e) {
       toast.error((e as ErrorApi).message)
     } finally {
@@ -414,7 +442,7 @@ export function PanelEscrito({
         </div>
       )}
 
-      <Dialog open={verDatos} onOpenChange={setVerDatos}>
+      <Dialog open={datosAbiertos} onOpenChange={(a) => (a ? setVerDatos(true) : cerrarDatos())}>
         <DialogContent className="flex max-h-[88dvh] flex-col sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl font-medium">Datos por llenar</DialogTitle>
@@ -425,16 +453,18 @@ export function PanelEscrito({
           </DialogHeader>
           <div className="-mx-1 min-h-0 flex-1 space-y-6 overflow-y-auto px-1 pb-1">
             {todos.length ? (
-              (
-                [
-                  ['De este escrito', '', todos.filter((e) => !DEL_ABOGADO.test(e))],
-                  ['Suyos', 'Se guardan para todos sus escritos.', todos.filter((e) => DEL_ABOGADO.test(e))],
-                ] as const
-              ).map(
-                ([grupo, nota, lista]) =>
+              [
+                ...agrupar(todos.filter((e) => !esDelAbogado(e))).map(([grupo, lista]) => [grupo, '', lista] as const),
+                ['Suyos', 'Se guardan para todos sus escritos.', todos.filter(esDelAbogado)] as const,
+              ].map(([grupo, nota, lista]) => {
+                const vacios = lista.filter((e) => !datos[e]?.trim()).length
+                return (
                   lista.length > 0 && (
                     <fieldset key={grupo} className="space-y-3">
-                      <legend className="mb-1 font-bold text-ink">{grupo}</legend>
+                      <legend className="mb-1 font-bold text-ink">
+                        {grupo}
+                        {vacios > 0 && <span className="ml-2 font-normal text-ink-soft">(faltan {vacios})</span>}
+                      </legend>
                       {nota && <p className="-mt-2 text-[0.88rem] text-ink-soft">{nota}</p>}
                       {lista.map((e) => (
                         <div key={e} className="space-y-1.5">
@@ -449,17 +479,51 @@ export function PanelEscrito({
                         </div>
                       ))}
                     </fieldset>
-                  ),
-              )
+                  )
+                )
+              })
             ) : (
               <p className="text-ink">El escrito no tiene datos por llenar.</p>
             )}
           </div>
           <DialogFooter>
-            <Button size="grande" onClick={() => setVerDatos(false)}>Listo</Button>
+            <Button size="grande" onClick={cerrarDatos}>Listo</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(porBajar)} onOpenChange={(abierto) => !abierto && setPorBajar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-xl font-medium">
+              {faltan.length === 1 ? 'Falta 1 dato' : `Faltan ${faltan.length} datos`} por llenar
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Si lo descarga así, {porBajar === 'pdf' ? 'salen entre corchetes' : 'salen marcados en amarillo'}:</p>
+                <ul className="list-disc space-y-0.5 pl-5 text-ink">
+                  {faltan.slice(0, 6).map((e) => <li key={e}>{etiqueta(e)}</li>)}
+                  {faltan.length > 6 && <li>y {faltan.length - 6} más</li>}
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel size="grande" onClick={() => porBajar && bajar(porBajar, true)}>
+              Descargar así
+            </AlertDialogCancel>
+            <AlertDialogAction
+              size="grande"
+              onClick={() => {
+                setPorBajar(null)
+                setVerDatos(true)
+              }}
+            >
+              <UserRound /> Llenar los datos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={descartar} onOpenChange={setDescartar}>
         <AlertDialogContent>

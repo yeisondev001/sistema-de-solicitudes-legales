@@ -15,6 +15,11 @@ export function fechaDeHoy() {
   return new Intl.DateTimeFormat('es-DO', { timeZone: ZONA, weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
 }
 
+/** «12 de noviembre de 2026», para la fecha de un escrito */
+export function fechaLarga() {
+  return new Intl.DateTimeFormat('es-DO', { timeZone: ZONA, day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())
+}
+
 export function saludo() {
   const { hora } = partes(new Date())
   return hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'

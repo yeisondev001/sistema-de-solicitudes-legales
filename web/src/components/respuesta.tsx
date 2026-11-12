@@ -3,11 +3,12 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FilePen, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ModelosSugeridos } from '@/components/modelos'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Fuente, Turno } from '@/lib/tipos'
+import type { Fuente, Modelo, Turno } from '@/lib/tipos'
 
 export function BurbujaUsuario({ texto }: { texto: string }) {
   return (
@@ -20,14 +21,21 @@ export function BurbujaUsuario({ texto }: { texto: string }) {
 /**
  * Una respuesta de Papiniano, el asistente: el texto (Markdown), copiar, y las fuentes citadas con su página.
  * Si en esa respuesta escribió o cambió el escrito de al lado, un botón lleva a él (y, si fue el último
- * cambio, lo vuelve a marcar en la hoja).
+ * cambio, lo vuelve a marcar en la hoja). Si ofreció modelos para un escrito, van con sus botones.
  */
 export function Burbuja({
-  turno, alVerEscrito, esUltimoCambio = false,
+  turno, alVerEscrito, esUltimoCambio = false, modelos,
 }: {
   turno: Turno
   alVerEscrito?: () => void
   esUltimoCambio?: boolean
+  /** qué hacer con los modelos que ofrece: verlos, usar uno o redactarlo sin modelo */
+  modelos?: {
+    ocupado: boolean
+    alVer: (m: Modelo) => void
+    alUsar: (m: Modelo) => void
+    alSinModelo: (pedido: string) => void
+  }
 }) {
   const citadas = new Set(turno.citadas ?? [])
   // si respondió la IA se muestran solo las fuentes que citó; si no, todas las encontradas
@@ -73,6 +81,15 @@ export function Burbuja({
             {turno.texto}
           </Markdown>
         </div>
+        {turno.modelos?.length && modelos ? (
+          <ModelosSugeridos
+            modelos={turno.modelos}
+            ocupado={modelos.ocupado}
+            alVer={modelos.alVer}
+            alUsar={modelos.alUsar}
+            alSinModelo={turno.pedido ? () => modelos.alSinModelo(turno.pedido!) : undefined}
+          />
+        ) : null}
         {turno.escrito && alVerEscrito && (
           <Button variant="outline" className="h-11 border-regla text-ink" onClick={alVerEscrito}>
             <FilePen className="text-marca-texto" />

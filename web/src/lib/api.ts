@@ -57,6 +57,8 @@ export async function preguntarAlAsistente(
   texto: string,
   convId: number | null,
   alAvanzar: (texto: string, escrito: boolean) => void,
+  /** el modelo que eligió para el escrito; «ninguno» si lo quiere sin modelo */
+  modelo?: string,
 ): Promise<{ turno: Turno; conv_id: number | null; escrito?: Escrito }> {
   let r: Response
   try {
@@ -64,7 +66,7 @@ export async function preguntarAlAsistente(
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texto, conv_id: convId }),
+      body: JSON.stringify({ texto, conv_id: convId, modelo }),
     })
   } catch {
     throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
@@ -117,6 +119,22 @@ export async function descargar(ruta: string, cuerpo?: unknown): Promise<Headers
 }
 
 /** Sube un PDF o Word a la parte del buscador de la persona */
+/** El Word de un modelo propio convertido en texto (sin guardarlo): ya trae cambiados los datos que se reconocen */
+export async function leerModelo(archivo: File): Promise<{ nombre: string; texto: string; cambios: number }> {
+  let r: Response
+  try {
+    r = await fetch('/api/modelos/leer', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Nombre': encodeURIComponent(archivo.name), 'Content-Type': 'application/octet-stream' },
+      body: archivo,
+    })
+  } catch {
+    throw new ErrorApi(`«${archivo.name}» no se pudo subir: revise su internet.`, 0)
+  }
+  return (await respuesta(r, '/api/modelos/leer')).json()
+}
+
 export async function subirDocumento(archivo: File): Promise<{ titulo: string; numero: string; paginas: number }> {
   let r: Response
   try {

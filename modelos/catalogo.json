@@ -1,0 +1,468 @@
+[
+  {
+    "clave": "acto-citacion-apelacion-deslinde",
+    "nombre": "Acto de citación a audiencia de apelación en deslinde",
+    "grupo": "actos",
+    "materia": "tierras",
+    "tribunal": "Tribunal Superior de Tierras",
+    "cuando": "Acto de alguacil con el que una de las partes del deslinde (recurrente o recurrida) cita a las demás partes, colindantes y terceros interesados a la audiencia del Tribunal Superior de Tierras que conocerá el recurso de apelación contra la sentencia de deslinde y subdivisión.",
+    "palabras": [
+      "acto de citación",
+      "citación a audiencia",
+      "apelación de deslinde",
+      "deslinde y subdivisión",
+      "citar colindantes",
+      "Tribunal Superior de Tierras",
+      "acto de alguacil",
+      "emplazamiento en apelación"
+    ]
+  },
+  {
+    "clave": "acto-intervencion-forzosa-justiprecio",
+    "nombre": "Acto de citación en intervención forzosa en demanda en justiprecio",
+    "grupo": "actos",
+    "materia": "administrativo",
+    "tribunal": "Tribunal Superior Administrativo",
+    "cuando": "Cuando su cliente es parte en una demanda en justiprecio (por lo general la demandada) y llama por acto de alguacil a un tercero en intervención forzosa para que comparezca a la audiencia, informe al tribunal y forme parte del expediente.",
+    "palabras": [
+      "intervención forzosa",
+      "acto de citación",
+      "justiprecio",
+      "expropiación",
+      "llamar a un tercero al proceso",
+      "artículo 339 Código de Procedimiento Civil",
+      "Tribunal Superior Administrativo"
+    ]
+  },
+  {
+    "clave": "acto-notificacion-memorial-defensa",
+    "nombre": "Acto de constitución de abogado y notificación de memorial de defensa",
+    "grupo": "actos",
+    "materia": "civil",
+    "tribunal": "Suprema Corte de Justicia",
+    "cuando": "Cuando su cliente es el recurrido en casación y debe notificar a los abogados del recurrente su constitución de abogado y el memorial de defensa depositado.",
+    "palabras": [
+      "acto de alguacil",
+      "notificación",
+      "memorial de defensa",
+      "constitución de abogado",
+      "casación",
+      "recurrido",
+      "emplazamiento"
+    ]
+  },
+  {
+    "clave": "demanda-intervencion-voluntaria",
+    "nombre": "Demanda en intervención voluntaria en litis sobre derechos registrados",
+    "grupo": "demandas",
+    "materia": "tierras",
+    "tribunal": "Tribunal de Tierras de Jurisdicción Original",
+    "cuando": "La presenta, como interviniente voluntario, el titular registrado de un inmueble que se disputan otras dos partes en una litis sobre derechos registrados, para que se rechace esa litis, se sobresea mientras se falla otra litis conexa o se declare inadmisible.",
+    "palabras": [
+      "intervención voluntaria",
+      "demanda en intervención",
+      "litis sobre derechos registrados",
+      "titular registrado",
+      "certificado de título",
+      "sobreseimiento",
+      "falta de derecho registrado",
+      "violación de propiedad"
+    ]
+  },
+  {
+    "clave": "demanda-rescision-contrato-desalojo",
+    "nombre": "Demanda en rescisión de contrato de venta y desalojo",
+    "grupo": "demandas",
+    "materia": "civil",
+    "tribunal": "Cámara Civil y Comercial del Juzgado de Primera Instancia",
+    "cuando": "Cuando su cliente vendió un inmueble en venta condicional con cláusula resolutoria, los compradores dejaron de pagar las cuotas y los emplaza por acto de alguacil para que se rescinda el contrato, se les desaloje y se les condene a daños y perjuicios.",
+    "palabras": [
+      "demanda en rescisión de contrato",
+      "desalojo",
+      "venta condicional de inmueble",
+      "falta de pago de cuotas",
+      "cláusula resolutoria",
+      "resolución de contrato de venta",
+      "intimación de pago",
+      "emplazamiento en octava franca"
+    ]
+  },
+  {
+    "clave": "conclusiones-demanda-laboral",
+    "nombre": "Escrito ampliatorio de conclusiones en demanda laboral (exclusión de codemandado)",
+    "grupo": "conclusiones",
+    "materia": "laboral",
+    "tribunal": "Juzgado de Trabajo",
+    "cuando": "Cuando a su cliente lo demandan junto al empleador en una demanda laboral alegando que es su continuador jurídico o parte del mismo conjunto económico, y pide que lo excluyan y, en subsidio, que se rechace la demanda y toda condenación en su contra.",
+    "palabras": [
+      "escrito ampliatorio de conclusiones",
+      "demanda laboral",
+      "exclusión del codemandado",
+      "continuador jurídico",
+      "conjunto económico",
+      "artículo 13 Código de Trabajo",
+      "falta de calidad",
+      "desahucio y prestaciones laborales"
+    ]
+  },
+  {
+    "clave": "conclusiones-deslinde",
+    "nombre": "Escrito ampliatorio de conclusiones en deslinde (a favor)",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal de Tierras de Jurisdicción Original",
+    "cuando": "Cuando su cliente vendió una porción del inmueble e interviene para apoyar el deslinde del comprador y que se le expida su título.",
+    "palabras": [
+      "conclusiones",
+      "deslinde",
+      "escrito ampliatorio",
+      "interviniente",
+      "apoyar el deslinde",
+      "rebajar del certificado de título",
+      "jurisdicción original",
+      "compraventa"
+    ]
+  },
+  {
+    "clave": "conclusiones-deslinde-oposicion",
+    "nombre": "Escrito ampliatorio de conclusiones en deslinde (en oposición)",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal de Tierras de Jurisdicción Original",
+    "cuando": "Lo presenta la parte citada al deslinde (copropietario, colindante o titular de una anotación en el registro complementario) que se opone a él, para pedir que se rechacen los trabajos porque afectan sus derechos registrados y no se le notificaron.",
+    "palabras": [
+      "oposición al deslinde",
+      "rechazo de deslinde",
+      "conclusiones deslinde",
+      "escrito ampliatorio de conclusiones",
+      "registro complementario",
+      "anotación",
+      "trabajos de mensura",
+      "designación posicional",
+      "deslinde",
+      "oponerme al deslinde",
+      "oponerse al deslinde",
+      "me opongo al deslinde"
+    ]
+  },
+  {
+    "clave": "conclusiones-contencioso-administrativo",
+    "nombre": "Escrito de conclusiones al fondo en recurso contencioso administrativo",
+    "grupo": "conclusiones",
+    "materia": "administrativo",
+    "tribunal": "Tribunal Superior Administrativo",
+    "cuando": "Cuando su cliente es el recurrido en un recurso contencioso administrativo, el tribunal lo intima por auto a concluir al fondo y se adhiere al escrito de defensa de otra parte recurrida para pedir el rechazo del recurso.",
+    "palabras": [
+      "conclusiones al fondo",
+      "recurso contencioso administrativo",
+      "intimación a concluir",
+      "auto del tribunal",
+      "adherirse al escrito de defensa",
+      "parte recurrida",
+      "Tribunal Superior Administrativo"
+    ]
+  },
+  {
+    "clave": "conclusiones-litis-sucesores",
+    "nombre": "Escrito de conclusiones del interviniente en litis de sucesores",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal de Tierras de Jurisdicción Original",
+    "cuando": "Lo presenta el interviniente voluntario con oposición inscrita en una litis que los sucesores de un de cujus siguen contra los derechos registrados de otro, para mantener su oposición y, además, plantear la excepción de inconstitucionalidad contra la orden de depositar las conclusiones por escrito.",
+    "palabras": [
+      "litis de sucesores",
+      "sucesores del de cujus",
+      "intervención voluntaria",
+      "mantener oposición",
+      "excepción de inconstitucionalidad",
+      "artículo 60 Ley 108-05",
+      "conclusiones por escrito",
+      "juicio oral"
+    ]
+  },
+  {
+    "clave": "conclusiones-intervencion-voluntaria",
+    "nombre": "Escrito de conclusiones del interviniente voluntario",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal de Tierras de Jurisdicción Original",
+    "cuando": "Lo presenta el interviniente voluntario que tiene una oposición inscrita sobre el inmueble en litis, para que se rechace el medio de inadmisión contra su intervención, se admita esta, se mantenga su oposición sea cual sea el resultado de la litis y no se le condene a nada.",
+    "palabras": [
+      "conclusiones intervención voluntaria",
+      "interviniente voluntario",
+      "mantener oposición",
+      "oposición a transferencia",
+      "rechazo de medio de inadmisión",
+      "litis sobre derechos registrados",
+      "puesta en causa",
+      "artículo 339 del Código de Procedimiento Civil"
+    ]
+  },
+  {
+    "clave": "conclusiones-apelacion-tierras",
+    "nombre": "Escrito de conclusiones en apelación contra sentencia de saneamiento",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal Superior de Tierras",
+    "cuando": "Cuando su cliente es el recurrente contra la sentencia que aprobó un saneamiento a favor de otro y pide revocarla y que se le adjudique el inmueble o, subsidiariamente, un nuevo saneamiento.",
+    "palabras": [
+      "conclusiones",
+      "recurso de apelación",
+      "saneamiento",
+      "recurrente",
+      "revocar la sentencia",
+      "adjudicación del inmueble",
+      "nuevo saneamiento",
+      "mensuras catastrales",
+      "Tribunal Superior de Tierras"
+    ]
+  },
+  {
+    "clave": "conclusiones-apelacion-deslinde",
+    "nombre": "Escrito de conclusiones en apelación de deslinde (a favor del comprador)",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal Superior de Tierras",
+    "cuando": "Cuando su cliente vendió una porción del inmueble, se rechazó el deslinde del comprador y, en la apelación de este, su cliente como recurrido no se opone y pide aprobar el deslinde y expedir el título.",
+    "palabras": [
+      "conclusiones",
+      "recurso de apelación",
+      "deslinde",
+      "recurrido",
+      "no se opone",
+      "aprobar trabajos de deslinde",
+      "rebajar del certificado de título",
+      "contrato de venta",
+      "Tribunal Superior de Tierras"
+    ]
+  },
+  {
+    "clave": "conclusiones-intervencion-en-apelacion",
+    "nombre": "Escrito de conclusiones en intervención voluntaria en apelación",
+    "grupo": "conclusiones",
+    "materia": "tierras",
+    "tribunal": "Tribunal Superior de Tierras",
+    "cuando": "Cuando su cliente interviene voluntariamente en un recurso de apelación para que se le declare propietario y se anulen transferencias, títulos y gravámenes; subsidiariamente pide sobreseer o rechazar el recurso por una demanda en nulidad pendiente.",
+    "palabras": [
+      "conclusiones",
+      "intervención voluntaria",
+      "interviniente",
+      "recurso de apelación",
+      "nulidad de transferencias",
+      "cancelación de certificados de título",
+      "sobreseimiento",
+      "desalojo",
+      "Tribunal Superior de Tierras"
+    ]
+  },
+  {
+    "clave": "conclusiones-justiprecio",
+    "nombre": "Escrito justificativo de conclusiones en demanda en justiprecio",
+    "grupo": "conclusiones",
+    "materia": "administrativo",
+    "tribunal": "Tribunal Superior Administrativo",
+    "cuando": "Cuando su cliente es una entidad pública codemandada en justiprecio que no tiene la posesión del inmueble expropiado ni le corresponde pagarlo, y pide su exclusión, el rechazo de la demanda o, en subsidio, que se acoja el avalúo del Catastro Nacional y pague la entidad a cargo (solo sirve a entidades del Estado).",
+    "palabras": [
+      "conclusiones en justiprecio",
+      "justo precio",
+      "expropiación",
+      "exclusión de la demanda",
+      "avalúo del Catastro Nacional",
+      "utilidad pública",
+      "órgano sin personalidad jurídica",
+      "inmutabilidad del proceso"
+    ]
+  },
+  {
+    "clave": "escrito-defensa-casacion",
+    "nombre": "Escrito de defensa en casación (inadmisibilidad)",
+    "grupo": "defensas",
+    "materia": "civil",
+    "tribunal": "Suprema Corte de Justicia",
+    "cuando": "Para la parte recurrida que responde de forma breve un recurso de casación cuyos medios no precisan las violaciones alegadas, pidiendo que se declare inadmisible.",
+    "palabras": [
+      "escrito de defensa",
+      "defensa en casación",
+      "inadmisibilidad del recurso de casación",
+      "recurrido en casación",
+      "medios no desarrollados",
+      "Suprema Corte de Justicia"
+    ]
+  },
+  {
+    "clave": "defensa-justiprecio",
+    "nombre": "Escrito de defensa en demanda en justiprecio",
+    "grupo": "defensas",
+    "materia": "administrativo",
+    "tribunal": "Tribunal Superior Administrativo",
+    "cuando": "Cuando su cliente es la entidad pública que expropió y la demandan en justiprecio, y pide el rechazo de la demanda o, en subsidio, que se acoja el avalúo del Catastro Nacional y se rechace la tasación del demandante (solo sirve a entidades del Estado).",
+    "palabras": [
+      "escrito de defensa en justiprecio",
+      "justo precio",
+      "expropiación",
+      "declaratoria de utilidad pública",
+      "avalúo del Catastro Nacional",
+      "rechazo del informe de tasación",
+      "monto exagerado",
+      "índice de precios al consumidor"
+    ]
+  },
+  {
+    "clave": "defensa-litis-nulidad-contrato",
+    "nombre": "Escrito de defensa en litis de nulidad y rescisión de contrato de venta",
+    "grupo": "defensas",
+    "materia": "tierras",
+    "tribunal": "Tribunal de Tierras de Jurisdicción Original",
+    "cuando": "Lo presenta el comprador demandado en una litis sobre derechos registrados en nulidad o rescisión del contrato de venta por falta de pago del precio, para pedir el sobreseimiento por litispendencia, la inadmisibilidad por prescripción o el rechazo de la litis.",
+    "palabras": [
+      "defensa litis sobre derechos registrados",
+      "nulidad de contrato",
+      "rescisión de contrato de venta",
+      "falta de pago del precio",
+      "condición potestativa",
+      "sobreseimiento por litispendencia",
+      "prescripción de la acción",
+      "inadmisibilidad"
+    ]
+  },
+  {
+    "clave": "defensa-laboral-exclusion",
+    "nombre": "Escrito de defensa: exclusión de una demanda laboral",
+    "grupo": "defensas",
+    "materia": "laboral",
+    "tribunal": "Juzgado de Trabajo",
+    "cuando": "Cuando a su cliente lo citan en intervención forzosa en una demanda en cobro de prestaciones sin ser el empleador, y pide que lo excluyan por falta de calidad.",
+    "palabras": [
+      "escrito de defensa",
+      "demanda laboral",
+      "prestaciones laborales",
+      "intervención forzosa",
+      "exclusión",
+      "falta de calidad",
+      "inadmisibilidad",
+      "no es el empleador"
+    ]
+  },
+  {
+    "clave": "memorial-defensa-casacion",
+    "nombre": "Memorial de defensa en recurso de casación",
+    "grupo": "defensas",
+    "materia": "civil",
+    "tribunal": "Suprema Corte de Justicia",
+    "cuando": "Para la parte recurrida en un recurso de casación civil, sobre todo en materia de daños y perjuicios, que responde uno por uno los medios del recurrente y pide el rechazo del recurso.",
+    "palabras": [
+      "memorial de defensa",
+      "defensa en casación",
+      "recurrido en casación",
+      "rechazo del recurso de casación",
+      "responder medios de casación",
+      "daños y perjuicios",
+      "desnaturalización de los hechos"
+    ]
+  },
+  {
+    "clave": "regularizacion-recurso-apelacion",
+    "nombre": "Instancia en regularización de recurso de apelación",
+    "grupo": "recursos",
+    "materia": "tierras",
+    "tribunal": "Tribunal Superior de Tierras",
+    "cuando": "Cuando su cliente, como recurrente, consignó por error la sentencia, la fecha o el expediente en su recurso de apelación y pide que se regularice la instancia.",
+    "palabras": [
+      "regularización",
+      "recurso de apelación",
+      "corrección de error",
+      "error material",
+      "instancia en corrección",
+      "sentencia equivocada",
+      "recurrente",
+      "Tribunal Superior de Tierras"
+    ]
+  },
+  {
+    "clave": "memorial-casacion-justiprecio",
+    "nombre": "Memorial de casación en justiprecio",
+    "grupo": "recursos",
+    "materia": "administrativo",
+    "tribunal": "Suprema Corte de Justicia (Tercera Sala)",
+    "cuando": "Solo para la entidad pública expropiante que, como recurrente, impugna en casación la sentencia del Tribunal Superior Administrativo que la condenó al pago de un justiprecio con astreinte, alegando falta de personalidad jurídica, falta de motivación e improcedencia de la astreinte contra el Estado.",
+    "palabras": [
+      "memorial de casación",
+      "casación en justiprecio",
+      "expropiación",
+      "Tribunal Superior Administrativo",
+      "astreinte contra el Estado",
+      "falta de motivación",
+      "casación con envío",
+      "Tercera Sala"
+    ]
+  },
+  {
+    "clave": "recurso-casacion-civil",
+    "nombre": "Recurso de casación civil",
+    "grupo": "recursos",
+    "materia": "civil",
+    "tribunal": "Suprema Corte de Justicia",
+    "cuando": "Para la parte recurrente que impugna en casación una sentencia civil de corte de apelación que la condenó en una demanda sobre un contrato (rescisión de venta por falta de pago, daños y perjuicios), pidiendo casación sin envío y, de forma subsidiaria, con envío.",
+    "palabras": [
+      "recurso de casación",
+      "casación civil",
+      "memorial de casación",
+      "casación sin envío",
+      "medios de casación",
+      "rescisión de contrato de venta",
+      "prescripción de la acción",
+      "Ley 2-23"
+    ]
+  },
+  {
+    "clave": "carta-informe-expediente",
+    "nombre": "Carta: informe de expediente",
+    "grupo": "cartas",
+    "materia": "oficina",
+    "tribunal": "",
+    "cuando": "Para informar a un superior o al cliente del estado de un expediente en que su cliente fue demandado y condenado, y proponer los puntos de un acuerdo transaccional con la parte contraria.",
+    "palabras": [
+      "carta",
+      "informe de expediente",
+      "estado del caso",
+      "acuerdo transaccional",
+      "desistimiento",
+      "informe interno",
+      "memorándum"
+    ]
+  },
+  {
+    "clave": "carta-solicitud-existencia-contrato",
+    "nombre": "Carta: solicitud de confirmación de existencia de contrato",
+    "grupo": "cartas",
+    "materia": "oficina",
+    "tribunal": "",
+    "cuando": "Para pedir al departamento o a la persona que custodia los contratos que confirme si existe o no un contrato o adenda que se atribuye a su cliente.",
+    "palabras": [
+      "carta",
+      "existencia de contrato",
+      "confirmar contrato",
+      "adenda",
+      "verificación de contrato",
+      "oficio",
+      "departamento de contratos"
+    ]
+  },
+  {
+    "clave": "carta-solicitud-informe-tecnico",
+    "nombre": "Carta: solicitud de informe técnico sobre un inmueble",
+    "grupo": "cartas",
+    "materia": "oficina",
+    "tribunal": "",
+    "cuando": "Para pedir a una institución o a su departamento técnico un informe sobre un inmueble que se necesita como prueba en un expediente en curso.",
+    "palabras": [
+      "carta",
+      "solicitud de informe técnico",
+      "informe técnico",
+      "inmueble",
+      "catastro",
+      "oficio",
+      "inspección del inmueble"
+    ]
+  }
+]

@@ -63,6 +63,25 @@ export interface Turno {
   ia?: boolean
   /** en esta respuesta Papiniano escribió o cambió el escrito de al lado */
   escrito?: 'nuevo' | 'cambiado'
+  /** los modelos que Papiniano ofrece para el escrito que le pidieron (ver modelos/ en el servidor) */
+  modelos?: Modelo[]
+  /** lo que pidió el abogado, para redactarlo sin modelo si no quiere ninguno */
+  pedido?: string
+  /** puso un modelo en la hoja: se le piden los datos por llenar */
+  pedir_datos?: boolean
+}
+
+/** Un modelo de escrito: un escrito real convertido en formato, sin datos del caso */
+export interface Modelo {
+  clave: string
+  nombre: string
+  grupo: string
+  materia: string
+  tribunal: string
+  /** en qué caso se usa */
+  cuando: string
+  /** lo subió el abogado: solo lo ve él */
+  propio?: boolean
 }
 
 /** El escrito de una conversación (texto simple; ver lib/escrito.ts) */

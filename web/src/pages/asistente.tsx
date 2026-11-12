@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Tabs as TabsPrimitive } from 'radix-ui'
-import { FilePen, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
+import { FilePen, FileStack, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PanelEscrito } from '@/components/escrito'
+import { GaleriaModelos, VistaModelo } from '@/components/modelos'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Burbuja, BurbujaUsuario } from '@/components/respuesta'
 import {
@@ -16,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, ErrorApi, preguntarAlAsistente } from '@/lib/api'
 import { useAncho } from '@/lib/pantalla'
 import { useSesion } from '@/lib/sesion'
-import type { Conversacion, Escrito, Turno } from '@/lib/tipos'
+import type { Conversacion, Escrito, Modelo, Turno } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
 const EJEMPLOS = [
@@ -62,6 +63,7 @@ const PESTANAS = [
  * La consulta es una conversación: cada mensaje del abogado y cada respuesta (con las fuentes que usó)
  * se guardan en la base, así las vuelve a abrir desde la lista (/papiniano/:id).
  * Si le pide un escrito, Papiniano lo escribe en una hoja al lado y lo va cambiando según se le pida.
+ * Si hay modelos para ese escrito, primero los ofrece; al elegir uno lo pone en la hoja y pide los datos.
  */
 export default function Asistente() {
   const { id } = useParams()
@@ -83,6 +85,10 @@ export default function Asistente() {
   const [vista, setVista] = useState<'conversacion' | 'escrito'>('conversacion')
   const [oculto, setOculto] = useState(false)
   const [pulso, setPulso] = useState(0)
+  const [galeria, setGaleria] = useState(false)
+  const [viendo, setViendo] = useState<Modelo | null>(null)
+  // la conversación donde se acaba de poner un modelo: su hoja abre los datos por llenar
+  const [datosPara, setDatosPara] = useState<number | null | undefined>(undefined)
   const ancha = useAncho(ANCHO_LADO_A_LADO)
 
   // la conversación abierta (la respuesta puede llegar después de cambiar de dirección)
@@ -139,7 +145,8 @@ export default function Asistente() {
     if (mostrarCambio) setPulso((n) => n + 1)
   }
 
-  async function enviar(q: string) {
+  /** modelo: el que eligió para el escrito, o «ninguno» si lo quiere sin modelo */
+  async function enviar(q: string, modelo?: string) {
     q = q.trim()
     if (q.length < 2 || pendiente || correccion !== null) return
     const desde = convActual.current
@@ -147,16 +154,25 @@ export default function Asistente() {
     setMensajes((m) => [...m, { rol: 'usuario', texto: q }])
     setPendiente('Pensando…')
     try {
-      const r = await preguntarAlAsistente(q, desde, (avance, enEscrito) => {
-        setPendiente(avance)
-        if (enEscrito && convActual.current === desde) {
-          setEscribiendo(true)
-          verEscrito()
-        }
-      })
+      const r = await preguntarAlAsistente(
+        q,
+        desde,
+        (avance, enEscrito) => {
+          setPendiente(avance)
+          if (enEscrito && convActual.current === desde) {
+            setEscribiendo(true)
+            verEscrito()
+          }
+        },
+        modelo,
+      )
       setMensajes((m) => [...m, r.turno])
       if (convActual.current === desde) {
         if (r.escrito) setEscrito(r.escrito)
+        if (r.turno.pedir_datos) {
+          setDatosPara(r.conv_id ?? desde)
+          verEscrito()
+        }
         // en el celular se muestra donde quedó la respuesta: el escrito si lo cambió; si no, la conversación
         if (!ancha) setVista(r.escrito ? 'escrito' : 'conversacion')
       }
@@ -172,6 +188,20 @@ export default function Asistente() {
       setPendiente(null)
       setEscribiendo(false)
     }
+  }
+
+  function usarModelo(m: Modelo) {
+    setGaleria(false)
+    setViendo(null)
+    enviar(`Usar el modelo «${m.nombre}»`, m.clave)
+  }
+
+  const ocupado = Boolean(pendiente) || correccion !== null
+  const accionesModelos = {
+    ocupado,
+    alVer: setViendo,
+    alUsar: usarModelo,
+    alSinModelo: (pedido: string) => enviar(pedido, 'ninguno'),
   }
 
   async function borrar(c: Conversacion) {
@@ -206,6 +236,8 @@ export default function Asistente() {
       alOcultar={ancha ? () => setOculto(true) : undefined}
       compacto={!ancha}
       pulso={pulso}
+      pedirDatos={datosPara !== undefined && datosPara === convId}
+      alPedirDatos={() => setDatosPara(undefined)}
     />
   )
 
@@ -225,6 +257,7 @@ export default function Asistente() {
                 key={n}
                 turno={t}
                 esUltimoCambio={n === ultimoCambio}
+                modelos={accionesModelos}
                 alVerEscrito={escrito && (!alLado || n === ultimoCambio) ? () => verEscrito(n === ultimoCambio) : undefined}
               />
             ),
@@ -253,6 +286,9 @@ export default function Asistente() {
                 </button>
               ))}
             </div>
+            <Button variant="outline" className="h-11 self-start border-regla text-ink" onClick={() => setGaleria(true)}>
+              <FileStack className="text-marca-texto" /> Ver los modelos de escritos
+            </Button>
           </>
         )}
         {pendiente && (
@@ -335,6 +371,9 @@ export default function Asistente() {
                   <FilePen /> <span className={etiqueta}>Ver el escrito</span>
                 </Button>
               )}
+              <Button variant="ghost" className="h-11 min-w-11 text-ink-soft" onClick={() => setGaleria(true)} title="Modelos de escritos">
+                <FileStack /> <span className={etiqueta}>Modelos</span>
+              </Button>
               <Button
                 variant="ghost"
                 className={cn('h-11 min-w-11 text-ink-soft', !alLado && 'xl:hidden')}
@@ -431,6 +470,9 @@ export default function Asistente() {
       </div>
 
       {alLado && <div className="flex min-w-0 flex-1 flex-col border-l border-papel-borde">{panel}</div>}
+
+      <GaleriaModelos abierto={galeria} alCerrar={() => setGaleria(false)} alUsar={usarModelo} ocupado={ocupado} />
+      <VistaModelo key={viendo?.clave} modelo={viendo} ocupado={ocupado} alCerrar={() => setViendo(null)} alUsar={usarModelo} />
 
       <Sheet open={listaAbierta} onOpenChange={setListaAbierta}>
         <SheetContent side="right" className="w-[20rem] overflow-y-auto">
