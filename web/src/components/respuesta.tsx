@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FilePen, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,18 @@ export function BurbujaUsuario({ texto }: { texto: string }) {
   )
 }
 
-/** Una respuesta de Papiniano, el asistente: el texto (Markdown), copiar, y las fuentes citadas con su página. */
-export function Burbuja({ turno }: { turno: Turno }) {
+/**
+ * Una respuesta de Papiniano, el asistente: el texto (Markdown), copiar, y las fuentes citadas con su página.
+ * Si en esa respuesta escribió o cambió el escrito de al lado, un botón lleva a él (y, si fue el último
+ * cambio, lo vuelve a marcar en la hoja).
+ */
+export function Burbuja({
+  turno, alVerEscrito, esUltimoCambio = false,
+}: {
+  turno: Turno
+  alVerEscrito?: () => void
+  esUltimoCambio?: boolean
+}) {
   const citadas = new Set(turno.citadas ?? [])
   // si respondió la IA se muestran solo las fuentes que citó; si no, todas las encontradas
   const lista = (turno.fuentes ?? [])
@@ -63,6 +73,12 @@ export function Burbuja({ turno }: { turno: Turno }) {
             {turno.texto}
           </Markdown>
         </div>
+        {turno.escrito && alVerEscrito && (
+          <Button variant="outline" className="h-11 border-regla text-ink" onClick={alVerEscrito}>
+            <FilePen className="text-marca-texto" />
+            {turno.escrito === 'cambiado' && esUltimoCambio ? 'Ver el cambio en el escrito' : 'Ver el escrito'}
+          </Button>
+        )}
         {lista.length > 0 && (
           <Collapsible>
             <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md py-1.5 text-[0.88rem] font-bold text-ink-soft hover:text-ink">

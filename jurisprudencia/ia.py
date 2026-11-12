@@ -27,6 +27,7 @@ MAX_FUENTES = 6            # fragmentos que se le pasan a la IA
 CARACTERES_FUENTES = 7000  # texto total de las fuentes (~2.000 tokens)
 
 MAX_TOKENS_RESPUESTA = 1100   # deja lugar al análisis sin pasar de los 8.000 tokens por minuto de Groq
+MAX_TOKENS_ESCRITO = 3000     # un escrito completo (instancia, demanda) con su mensaje
 TURNOS_DE_MEMORIA = 4         # mensajes anteriores de la conversación que se le recuerdan a la IA
 
 _SISTEMA = (
@@ -184,12 +185,25 @@ def _normas_disponibles() -> str:
 _NORMAS_DISPONIBLES = _normas_disponibles()
 
 
-def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
+# por si la IA que prepara la búsqueda no contesta: «redácteme una instancia…», «quítele el segundo atendido»
+_PIDE_ESCRITO = re.compile(r"\b(red[aá]ct|prep[aá]r|elab[oó]r|h[aá]g|escr[ií]b|arm[ae])\w*\b.{0,60}\b(instancia|"
+                           r"solicitud|escrito|demanda|recurso|conclusiones|carta|contrato|acto|poder|intimaci|"
+                           r"querella|documento|borrador|modelo)", re.I)
+_CAMBIA_ESCRITO = re.compile(r"^\s*(qu[ií]t|p[oó]n|cambi|agreg|añad|corrig|elimin|borr|sustitu|reemplaz|acort|"
+                             r"ampl[ií]|mejor|redact|escrib)", re.I)
+
+
+def preparar_busqueda(pregunta: str, historial: list = None, hay_escrito: bool = False) -> dict:
     """Decide qué hacer con el mensaje, teniendo en cuenta la conversación:
       {"tipo": "nueva", "consulta": "...", "busquedas": [...]}   hay que buscar sentencias
       {"tipo": "seguimiento", ...}   pide explicar o resumir lo ya respondido: se usan las mismas fuentes
+      {"tipo": "escrito", ...}       pide redactar un escrito o cambiar el que está abierto al lado
       {"tipo": "no_juridica", ...}   saludo, agradecimiento o charla: no se busca"""
-    plan = {"tipo": "nueva", "consulta": pregunta, "busquedas": [pregunta]}
+    pide_escrito = bool(_PIDE_ESCRITO.search(pregunta) or (hay_escrito and _CAMBIA_ESCRITO.search(pregunta)))
+    plan = {"tipo": "escrito" if pide_escrito else "nueva", "consulta": pregunta,
+            "busquedas": [] if hay_escrito and pide_escrito else [pregunta]}
+    abierto = (" o hace algo con el escrito que ya está abierto al lado de la conversación (quitar, poner, "
+               "cambiar, agregar, corregir, acortar o revisar algo del escrito, o preguntar por él)") if hay_escrito else ""
     try:
         contexto = "\n".join(f"{'Abogado' if m['role'] == 'user' else 'Asistente'}: {m['content'][:300]}"
                              for m in _memoria(historial))
@@ -207,6 +221,12 @@ def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
                 "estás seguro del número, no lo agregues.\n"
                 "- tipo \"seguimiento\": solo pide explicar, resumir, simplificar o aclarar lo ya respondido, "
                 "sin tema nuevo. \"busquedas\": [].\n"
+                "- tipo \"escrito\": pide redactar, preparar o hacer un documento para presentar o enviar "
+                "(instancia, solicitud, escrito, demanda, recurso, conclusiones, carta, contrato, acto, poder, "
+                "intimación…)" + abierto + ". \"consulta\": qué documento es y para qué, en una oración que se "
+                "entienda sola. \"busquedas\": 2 a 4 búsquedas de las leyes y sentencias que lo fundamentan "
+                "(igual que en \"nueva\"); [] si solo cambia la forma, los datos o algo que no necesita fuentes "
+                "nuevas.\n"
                 "- tipo \"no_juridica\": un saludo, un agradecimiento, una pregunta sobre el asistente o sobre "
                 "la conversación (por ejemplo «¿me puede responder?», «¿qué puede hacer?», «¿está ahí?», "
                 "«ya funciona?»), una charla o algo sin sentido. \"busquedas\": [].\n"
@@ -216,11 +236,13 @@ def preparar_busqueda(pregunta: str, historial: list = None) -> dict:
                                         + f"Último mensaje: {pregunta}"}],
             para_busquedas=True, max_tokens=500, json_modo=True)
         datos = json.loads(salida)
-        tipo = datos.get("tipo") if datos.get("tipo") in ("nueva", "seguimiento", "no_juridica") else "nueva"
+        tipo = datos.get("tipo") if datos.get("tipo") in ("nueva", "seguimiento", "escrito", "no_juridica") else "nueva"
         busquedas = [b for b in datos.get("busquedas", []) if isinstance(b, str) and b.strip()][:7]
         consulta = (datos.get("consulta") or "").strip() or pregunta
-        if tipo != "nueva" and re.search(r"\d", pregunta) and not historial:
+        if tipo in ("seguimiento", "no_juridica") and re.search(r"\d", pregunta) and not historial:
             tipo = "nueva"   # puede ser un número de sentencia o expediente
+        if _PIDE_ESCRITO.search(pregunta):
+            tipo = "escrito"   # «redácteme una instancia…» siempre va al escrito
         if tipo == "nueva":
             # sin conversación previa, el mensaje mismo también sirve como búsqueda
             busquedas = (busquedas or [consulta]) + ([] if historial else [pregunta])
@@ -335,3 +357,143 @@ def responder(pregunta: str, fuentes: list, referencia, historial: list = None, 
     citadas = sorted({int(n) for n in re.findall(r"\[(\d+)\]", texto)} & validas)
     texto = re.sub(r"\[(\d+)\]", lambda m: m.group(0) if int(m.group(1)) in validas else "", texto)
     return {"texto": texto.strip(), "citadas": citadas}
+
+
+# ── El escrito al lado de la conversación ─────────
+# Papiniano redacta el escrito y lo cambia según lo que pida el abogado. Es texto simple: párrafos separados
+# por una línea en blanco; la app (web/src/lib/escrito.ts) y el Word y el PDF (generators/escrito.py) le
+# dan el formato: título centrado, ATENDIDO: y PRIMERO: en negrita, y los datos que faltan en amarillo.
+_SISTEMA_ESCRITO = (
+    "Eres Papiniano, un abogado asistente de colegas de República Dominicana. Trabajas en un escrito que el "
+    "abogado ve al lado de la conversación, como una hoja de Word: lo redactas y lo cambias según lo que te pida.\n\n"
+    "Devuelve solo JSON, de una de estas formas:\n"
+    "{\"mensaje\": \"...\", \"escrito\": \"...\"}   para un escrito nuevo o si el cambio toca casi todo el escrito;\n"
+    "{\"mensaje\": \"...\", \"cambios\": [{\"buscar\": \"...\", \"poner\": \"...\"}]}   para cambios puntuales;\n"
+    "{\"mensaje\": \"...\"}   si solo te preguntan algo sobre el escrito, sin cambiarlo.\n"
+    "- \"mensaje\": lo que le dices al abogado en la conversación, de 1 a 4 oraciones, tratando de usted: qué "
+    "hiciste o la respuesta. Si te apoyaste en una fuente, cítala con su número entre corchetes, por ejemplo [2]. "
+    "Si faltan datos importantes para el escrito, pídelos.\n"
+    "- \"escrito\": el documento completo.\n"
+    "- \"cambios\": \"buscar\" es un pedazo copiado EXACTO del escrito actual (una frase o un párrafo entero, "
+    "sin cambiarle nada y que aparezca una sola vez) y \"poner\" es lo que va en su lugar (\"\" para quitarlo). "
+    "Para agregar un párrafo, busca el párrafo que va antes y ponlo seguido del nuevo, separados por una línea en "
+    "blanco. No toques nada que el abogado no pidió.\n\n"
+    "Cómo se escribe el escrito (texto simple, sin Markdown: nada de **, #, tablas ni viñetas):\n"
+    "- La primera línea es el título en mayúsculas, por ejemplo «INSTANCIA EN SOLICITUD DE APROBACIÓN DE "
+    "TRABAJOS DE DESLINDE».\n"
+    "- Sigue la forma de los escritos dominicanos según el documento: a quién va dirigido (tribunal, juez u "
+    "órgano), quién lo presenta y su abogado, los hechos, los fundamentos de derecho («ATENDIDO: A que…»), las "
+    "conclusiones («POR TALES MOTIVOS, … tiene a bien solicitaros:» y «PRIMERO:», «SEGUNDO:»…), el cierre («Y "
+    "haréis justicia.»), el lugar y la fecha, y la firma del abogado con su matrícula del Colegio de Abogados.\n"
+    "- Separa cada párrafo con una línea en blanco. Las palabras que abren cada parte (ATENDIDO:, PRIMERO:, POR "
+    "TALES MOTIVOS,) van en mayúsculas al inicio del párrafo.\n"
+    "- Datos que el abogado no te dio (nombres, cédulas, domicilios, números de expediente, parcela, matrícula, "
+    "montos, fechas de los hechos): NUNCA los inventes. Pon entre corchetes y en MAYÚSCULAS qué va ahí, por "
+    "ejemplo [NOMBRE DEL SOLICITANTE], [CÉDULA DEL SOLICITANTE] o [MATRÍCULA DEL ABOGADO], y usa siempre el mismo "
+    "para el mismo dato. Los que ya están en el escrito déjalos igual: el abogado los llena aparte. Los del "
+    "abogado van siempre con estos nombres (la app los llena sola): [NOMBRE DEL ABOGADO], [CÉDULA DEL ABOGADO], "
+    "[MATRÍCULA DEL ABOGADO] y [DOMICILIO PROFESIONAL DEL ABOGADO].\n"
+    "- En los fundamentos usa las leyes y sentencias de las fuentes que sirven y nómbralas como en un escrito real "
+    "(«el artículo 130 de la Ley 108-05 de Registro Inmobiliario», «la sentencia núm. SCJ-TS-25-1451»), sin "
+    "números entre corchetes dentro del escrito. Nunca inventes sentencias, números, fechas ni artículos; si hace "
+    "falta una norma que no está en las fuentes, nómbrala solo si estás seguro y avisa en el mensaje que hay que "
+    "verificarla.\n"
+    "- Hoy es {fecha}. Eres una herramienta de apoyo: el abogado revisa y firma."
+)
+
+
+def _sin_formato(texto: str) -> str:
+    """El escrito es texto simple: sin citas [n], sin marcas de Markdown y sin líneas en blanco de más."""
+    texto = re.sub(r"【\s*\d+[^】]*】", "", texto)
+    texto = re.sub(r"[ \t]*\[\d+(?:\s*,\s*\d+)*\]", "", texto)
+    texto = texto.replace("**", "")
+    texto = re.sub(r"(?m)^[ \t]{0,3}#{1,6}[ \t]+", "", texto)
+    texto = re.sub(r"[ \t]+$", "", texto, flags=re.M)
+    return re.sub(r"\n{3,}", "\n\n", texto).strip()
+
+
+def _aplicar(texto: str, cambios: list) -> tuple:
+    """(texto con los cambios, los «buscar» que no se encontraron). Si no está tal cual, se busca sin
+    importar los espacios ni los saltos de línea."""
+    fallidos = []
+    for c in cambios:
+        if not isinstance(c, dict):
+            continue
+        buscar, poner = str(c.get("buscar") or "").strip(), str(c.get("poner") or "").strip()
+        if not buscar:
+            continue
+        if buscar in texto:
+            texto = texto.replace(buscar, poner, 1)
+            continue
+        patron = r"\s+".join(re.escape(p) for p in buscar.split())
+        texto, n = re.subn(patron, lambda m: poner, texto, count=1)
+        if not n:
+            fallidos.append(buscar)
+    return re.sub(r"\n{3,}", "\n\n", texto).strip(), fallidos
+
+
+def _json(salida: str) -> dict:
+    try:
+        return json.loads(salida)
+    except ValueError:
+        m = re.search(r"\{.*\}", salida, re.S)
+        if m:
+            return json.loads(m.group(0))
+        raise ValueError("La IA no devolvió el escrito.")
+
+
+def _texto_de(datos: dict):
+    e = datos.get("escrito")
+    return e if isinstance(e, str) and e.strip() else None
+
+
+def escribir(pedido: str, actual: str, fuentes: list, referencia, historial: list = None) -> dict:
+    """Redacta el escrito o le hace los cambios que pide el abogado.
+    {"mensaje": lo que se dice en la conversación, "escrito": el texto nuevo (None si no cambió), "citadas": [...]}"""
+    from datetime import datetime, timedelta, timezone
+    from generators.base import fecha_larga
+    fuentes = fuentes[:MAX_FUENTES]
+    por_fuente = CARACTERES_FUENTES // max(len(fuentes), 1)
+    bloque = "\n\n".join(f"[{n}] {referencia(f)}\n{f['texto'][:por_fuente]}" for n, f in enumerate(fuentes, 1))
+    hoy = fecha_larga(datetime.now(timezone(timedelta(hours=-4))).date())
+    mensajes = [{"role": "system", "content": _SISTEMA_ESCRITO.replace("{fecha}", hoy)},
+                *_memoria(historial),
+                {"role": "user", "content": (f"Fuentes:\n\n{bloque}\n\n" if fuentes else "")
+                                            + (f"Escrito actual:\n<<<\n{actual}\n>>>\n\n" if actual
+                                               else "Todavía no hay escrito.\n\n")
+                                            + f"Pedido del abogado: {pedido}"}]
+    datos = _json(_chat_en_cadena(mensajes, max_tokens=MAX_TOKENS_ESCRITO, json_modo=True))
+    nuevo = _texto_de(datos)
+    if nuevo is None and isinstance(datos.get("cambios"), list) and datos["cambios"] and actual:
+        nuevo, fallidos = _aplicar(actual, datos["cambios"])
+        if fallidos:
+            # copió mal el pedazo que quería cambiar: se le pide el escrito completo con el cambio hecho
+            datos = _json(_chat_en_cadena(mensajes + [
+                {"role": "assistant", "content": json.dumps(datos, ensure_ascii=False)},
+                {"role": "user", "content": "Estos pedazos no están tal cual en el escrito: "
+                                            + " | ".join(f"«{f[:120]}»" for f in fallidos)
+                                            + ". Devuelve el escrito completo con el cambio hecho, en \"escrito\"."}],
+                max_tokens=MAX_TOKENS_ESCRITO, json_modo=True))
+            nuevo = _texto_de(datos)
+            if nuevo is None:
+                raise ValueError("No se pudo hacer el cambio.")
+    if nuevo is not None:
+        nuevo = _sin_formato(sin_latex(nuevo))
+        if nuevo == actual.strip():
+            nuevo = None
+    mensaje = re.sub(r"【\s*(\d+)[^】]*】", r"[\1]", str(datos.get("mensaje") or "").strip())
+    if not mensaje:
+        mensaje = ("Listo, ya está el escrito." if nuevo and not actual else "Listo, hice el cambio." if nuevo
+                   else "No hice cambios al escrito.")
+    # plazos que no salen de ningún lado: se avisa en la conversación (el escrito no se toca)
+    if nuevo:
+        # la fecha de hoy («a los doce (12) días del mes…») no es un plazo
+        dudosas = cifras_sin_respaldo(nuevo, [bloque, pedido, actual, hoy]
+                                      + [m["content"] for m in _memoria(historial)])
+        if dudosas:
+            mensaje += ("\n\n> ⚠️ **Verifique estas cifras del escrito:** " + ", ".join(dudosas)
+                        + ". No aparecen en las fuentes encontradas; pueden ser un error.")
+    validas = set(range(1, len(fuentes) + 1))
+    citadas = sorted({int(n) for n in re.findall(r"\[(\d+)\]", mensaje)} & validas)
+    mensaje = re.sub(r"\[(\d+)\]", lambda m: m.group(0) if int(m.group(1)) in validas else "", mensaje)
+    return {"mensaje": mensaje, "escrito": nuevo, "citadas": citadas}

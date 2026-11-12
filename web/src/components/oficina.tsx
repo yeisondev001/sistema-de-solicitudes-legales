@@ -180,7 +180,7 @@ export function Oficina() {
         </Sheet>
       </header>
 
-      <main ref={contenido} className={cn('min-h-0 flex-1', conversacion ? 'flex flex-col' : 'overflow-y-auto')}>
+      <main ref={contenido} className={cn('min-h-0 min-w-0 flex-1', conversacion ? 'flex flex-col' : 'overflow-y-auto')}>
         <Outlet />
       </main>
 

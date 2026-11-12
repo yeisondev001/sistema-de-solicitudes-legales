@@ -81,6 +81,8 @@ _MIGRACIONES = {
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tema TEXT",
         # tamaño de letra que eligió en Apariencia (vacío: normal)
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS letra TEXT",
+        # el escrito que Papiniano redacta al lado de la conversación (JSON: texto y versiones anteriores)
+        "ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS escrito TEXT",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -103,6 +105,7 @@ _MIGRACIONES = {
         "CREATE INDEX IF NOT EXISTS conversaciones_usuario ON conversaciones (usuario_id, actualizada DESC)",
         "ALTER TABLE usuarios ADD COLUMN tema TEXT",
         "ALTER TABLE usuarios ADD COLUMN letra TEXT",
+        "ALTER TABLE conversaciones ADD COLUMN escrito TEXT",
     ],
 }
 _tablas_listas = False
@@ -366,3 +369,48 @@ def abrir_conversacion(usuario_id: int, conv_id: int) -> list:
 
 def borrar_conversacion(usuario_id: int, conv_id: int):
     _ejecutar("DELETE FROM conversaciones WHERE id = %s AND usuario_id = %s", (conv_id, usuario_id))
+
+
+# ── El escrito de cada conversación ──────────────
+MAX_VERSIONES = 20   # versiones anteriores que se guardan para «Deshacer»
+
+
+def _leer_escrito(usuario_id: int, conv_id: int):
+    import json
+    filas = _ejecutar("SELECT escrito FROM conversaciones WHERE id = %s AND usuario_id = %s",
+                      (conv_id, usuario_id), leer=True)
+    return json.loads(filas[0]["escrito"]) if filas and filas[0]["escrito"] else None
+
+
+def _poner_escrito(usuario_id: int, conv_id: int, escrito: dict):
+    import json
+    _ejecutar("UPDATE conversaciones SET escrito = %s, actualizada = %s WHERE id = %s AND usuario_id = %s",
+              (json.dumps(escrito, ensure_ascii=False), int(time.time()), conv_id, usuario_id))
+
+
+def _publico(escrito):
+    """Lo que ven las pantallas: el texto y si hay algo que deshacer."""
+    return {"texto": escrito["texto"], "deshacer": bool(escrito["anteriores"])} if escrito else None
+
+
+def leer_escrito(usuario_id: int, conv_id: int):
+    return _publico(_leer_escrito(usuario_id, conv_id))
+
+
+def guardar_escrito(usuario_id: int, conv_id: int, texto: str):
+    """Pone el texto nuevo del escrito; el anterior queda para «Deshacer»."""
+    actual = _leer_escrito(usuario_id, conv_id) or {"texto": "", "anteriores": []}
+    if texto != actual["texto"]:
+        anteriores = actual["anteriores"] + ([actual["texto"]] if actual["texto"] else [])
+        actual = {"texto": texto, "anteriores": anteriores[-MAX_VERSIONES:]}
+        _poner_escrito(usuario_id, conv_id, actual)
+    return _publico(actual)
+
+
+def deshacer_escrito(usuario_id: int, conv_id: int):
+    """Vuelve a la versión anterior del escrito (la de antes del último cambio)."""
+    actual = _leer_escrito(usuario_id, conv_id)
+    if actual and actual["anteriores"]:
+        actual = {"texto": actual["anteriores"][-1], "anteriores": actual["anteriores"][:-1]}
+        _poner_escrito(usuario_id, conv_id, actual)
+    return _publico(actual)

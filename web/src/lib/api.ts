@@ -1,4 +1,4 @@
-import type { Turno } from './tipos'
+import type { Escrito, Turno } from './tipos'
 
 /** Error con el mensaje que mandó el servidor (ya en palabras para el abogado) */
 export class ErrorApi extends Error {
@@ -43,19 +43,21 @@ export const api = {
   get: <T>(ruta: string) => pedir<T>(ruta),
   post: <T>(ruta: string, datos?: unknown) =>
     pedir<T>(ruta, { method: 'POST', body: datos === undefined ? undefined : JSON.stringify(datos) }),
+  put: <T>(ruta: string, datos: unknown) => pedir<T>(ruta, { method: 'PUT', body: JSON.stringify(datos) }),
   patch: <T>(ruta: string, datos: unknown) => pedir<T>(ruta, { method: 'PATCH', body: JSON.stringify(datos) }),
   borrar: <T>(ruta: string) => pedir<T>(ruta, { method: 'DELETE' }),
 }
 
 /**
  * Le pregunta al asistente. El servidor contesta por partes (una línea JSON por evento):
- * los avances («Buscando en las sentencias…») y al final la respuesta con la conversación guardada.
+ * los avances («Buscando en las sentencias…», con escrito: true si está escribiendo el escrito) y al final
+ * la respuesta con la conversación guardada (y el escrito, si lo escribió o lo cambió).
  */
 export async function preguntarAlAsistente(
   texto: string,
   convId: number | null,
-  alAvanzar: (texto: string) => void,
-): Promise<{ turno: Turno; conv_id: number | null }> {
+  alAvanzar: (texto: string, escrito: boolean) => void,
+): Promise<{ turno: Turno; conv_id: number | null; escrito?: Escrito }> {
   let r: Response
   try {
     r = await fetch('/api/asistente', {
@@ -79,7 +81,7 @@ export async function preguntarAlAsistente(
     for (const linea of lineas) {
       if (!linea.trim()) continue
       const evento = JSON.parse(linea)
-      if (evento.avance) alAvanzar(evento.avance)
+      if (evento.avance) alAvanzar(evento.avance, Boolean(evento.escrito))
       if (evento.turno) return evento
     }
   }

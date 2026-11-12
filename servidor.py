@@ -26,7 +26,7 @@ import cuentas
 import historial
 import redaccion
 import temas
-from generators import generar_expedientes
+from generators import generar_expedientes, generar_escrito, pdf_escrito, nombre_escrito
 from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
 from jurisprudencia import visor as juris_visor, prestaciones as juris_prestaciones
 
@@ -296,7 +296,7 @@ def conversacion(conv_id: int, u=Depends(usuario_actual)):
     mensajes = cuentas.abrir_conversacion(u["id"], conv_id)
     if not mensajes:
         raise HTTPException(404, "Esa conversación ya no existe.")
-    return {"id": conv_id, "mensajes": _con_referencia(mensajes)}
+    return {"id": conv_id, "mensajes": _con_referencia(mensajes), "escrito": cuentas.leer_escrito(u["id"], conv_id)}
 
 
 @app.delete("/api/conversaciones/{conv_id}")
@@ -310,11 +310,43 @@ class Pregunta(BaseModel):
     conv_id: int | None = None
 
 
-def _responder(q: str, historial_chat: list, u: dict, avance) -> dict:
-    """La respuesta del asistente a una pregunta (lo mismo que hacía la pantalla de Flet)."""
+def _escribir(q: str, plan: dict, historial_chat: list, actual: str, u: dict, avance) -> dict:
+    """Papiniano redacta el escrito o lo cambia. El texto nuevo va en turno["escrito_nuevo"]."""
     turno = {"rol": "asistente", "texto": "", "fuentes": [], "citadas": []}
-    plan = (juris_ia.preparar_busqueda(q, historial_chat) if juris_ia.disponible()
+    # «agréguele eso al escrito» justo después de una consulta: se usan las sentencias de esa respuesta
+    previa = next((t for t in reversed(historial_chat) if t.get("rol") == "asistente"), {})
+    fuentes = [] if previa.get("escrito") else (previa.get("fuentes") or [])
+    if plan["busquedas"]:
+        avance("Buscando las leyes y sentencias para el escrito…", True)
+        try:
+            fuentes = juris_buscar.buscar(plan["busquedas"], u["id"], limite=juris_ia.MAX_FUENTES,
+                                          pregunta=plan["consulta"]) or []
+        except Exception as ex:
+            print(f"La búsqueda falló: {ex}", flush=True)   # el escrito se arma igual, sin fuentes
+    avance("Cambiando el escrito…" if actual else "Escribiendo el escrito…", True)
+    try:
+        r = juris_ia.escribir(q, actual, fuentes, juris_buscar.referencia, historial_chat)
+    except juris_ia.LimiteAlcanzado:
+        turno["texto"] = "_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto._"
+        return turno
+    except (ValueError, KeyError) as ex:
+        print(f"El escrito falló: {ex}", flush=True)
+        turno["texto"] = "_No pude hacer eso en el escrito. Dígamelo con otras palabras o intente de nuevo._"
+        return turno
+    turno.update(texto=r["mensaje"], citadas=r["citadas"], fuentes=fuentes, ia=True)
+    if r["escrito"]:
+        turno["escrito_nuevo"] = r["escrito"]
+        turno["escrito"] = "cambiado" if actual else "nuevo"
+    return turno
+
+
+def _responder(q: str, historial_chat: list, u: dict, avance, escrito: str = "") -> dict:
+    """La respuesta del asistente a una pregunta (lo mismo que hacía la pantalla de Flet), o el escrito."""
+    turno = {"rol": "asistente", "texto": "", "fuentes": [], "citadas": []}
+    plan = (juris_ia.preparar_busqueda(q, historial_chat, hay_escrito=bool(escrito)) if juris_ia.disponible()
             else {"tipo": "nueva", "consulta": q, "busquedas": [q]})
+    if plan["tipo"] == "escrito":
+        return _escribir(q, plan, historial_chat, escrito, u, avance)
     anteriores = next((t["fuentes"] for t in reversed(historial_chat) if t.get("fuentes")), [])
     if plan["tipo"] == "no_juridica":
         turno["texto"] = juris_ia.no_es_consulta(q)
@@ -365,6 +397,10 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
     if not juris_db.configurada():
         raise HTTPException(503, "Falta configurar el buscador (variable JURIS_DATABASE_URL).")
     historial_chat = cuentas.abrir_conversacion(u["id"], datos.conv_id) if datos.conv_id else []
+    try:
+        escrito = (cuentas.leer_escrito(u["id"], datos.conv_id) or {}).get("texto", "") if datos.conv_id else ""
+    except Exception:
+        escrito = ""
 
     def linea(evento: dict) -> str:
         return json.dumps(evento, ensure_ascii=False, default=str) + "\n"
@@ -393,7 +429,9 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
 
                 def trabajo():
                     try:
-                        cola.put(("turno", _responder(q, historial_chat, u, lambda t: cola.put(("avance", t)))))
+                        # avance(texto, True): está trabajando en el escrito (la pantalla abre la hoja)
+                        cola.put(("turno", _responder(q, historial_chat, u,
+                                                      lambda t, e=False: cola.put(("avance", (t, e))), escrito)))
                     except Exception as ex:
                         print(f"La consulta falló: {ex}", flush=True)
                         cola.put(("turno", {"rol": "asistente",
@@ -405,16 +443,69 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
                     if tipo == "turno":
                         turno = valor
                         break
-                    yield linea({"avance": valor})
+                    yield linea({"avance": valor[0], **({"escrito": True} if valor[1] else {})})
         conv_id = datos.conv_id
+        # el escrito no va en los mensajes: se guarda aparte, con sus versiones para «Deshacer»
+        nuevo_escrito = turno.pop("escrito_nuevo", None)
+        escrito_listo = None
         if guardar:
             try:
                 conv_id = cuentas.guardar_conversacion(u["id"], conv_id, historial_chat + [pregunta, turno])
+                if nuevo_escrito:
+                    escrito_listo = cuentas.guardar_escrito(u["id"], conv_id, nuevo_escrito)
             except Exception:
                 pass   # si no se puede guardar, la respuesta igual se muestra
-        yield linea({"turno": _con_referencia([turno])[0], "conv_id": conv_id})
+        if nuevo_escrito and not escrito_listo:
+            escrito_listo = {"texto": nuevo_escrito, "deshacer": False}
+        yield linea({"turno": _con_referencia([turno])[0], "conv_id": conv_id,
+                     **({"escrito": escrito_listo} if escrito_listo else {})})
 
     return StreamingResponse(eventos(), media_type="application/x-ndjson")
+
+
+class TextoEscrito(BaseModel):
+    texto: str
+
+
+MAX_ESCRITO = 60_000   # caracteres: una demanda larga cabe de sobra
+
+
+def _texto_escrito(e: TextoEscrito) -> str:
+    texto = e.texto.replace("\r\n", "\n").strip()
+    if not texto:
+        raise HTTPException(400, "El escrito está vacío.")
+    if len(texto) > MAX_ESCRITO:
+        raise HTTPException(413, "El escrito es demasiado largo.")
+    return texto
+
+
+@app.put("/api/conversaciones/{conv_id}/escrito")
+def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(usuario_actual)):
+    """Lo que el abogado corrigió a mano en el escrito."""
+    if not cuentas.abrir_conversacion(u["id"], conv_id):
+        raise HTTPException(404, "Esa conversación ya no existe.")
+    return cuentas.guardar_escrito(u["id"], conv_id, _texto_escrito(e))
+
+
+@app.post("/api/conversaciones/{conv_id}/escrito/deshacer")
+def escrito_deshacer(conv_id: int, u=Depends(usuario_actual)):
+    escrito = cuentas.deshacer_escrito(u["id"], conv_id)
+    if not escrito:
+        raise HTTPException(404, "Esa conversación no tiene escrito.")
+    return escrito
+
+
+@app.post("/api/escrito/{formato}")
+def escrito_descargar(formato: str, e: TextoEscrito, u=Depends(usuario_actual)):
+    """El escrito en Word o PDF, ya con los datos que llenó el abogado (esos datos no pasan por la IA)."""
+    if formato not in ("docx", "pdf"):
+        raise HTTPException(404, "Ese formato no existe.")
+    texto = _texto_escrito(e)
+    try:
+        contenido = pdf_escrito(texto) if formato == "pdf" else generar_escrito(texto)
+    except Exception as ex:
+        raise HTTPException(500, f"No se pudo armar el documento: {ex}")
+    return _archivo(contenido, nombre_escrito(texto, formato))
 
 
 @app.get("/api/pagina")

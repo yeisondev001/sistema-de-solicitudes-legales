@@ -16,3 +16,4 @@ from .pdf_gen    import (
     pdf_informe_audiencia_provincial,
     pdf_conclusiones_saneamiento,
 )
+from .escrito    import generar as generar_escrito, generar_pdf as pdf_escrito, nombre as nombre_escrito

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { NavLink, useNavigate, useParams } from 'react-router-dom'
-import { Copy, FileDown, FileText, Loader2, PencilLine, RotateCcw } from 'lucide-react'
+import { Link, NavLink, useNavigate, useParams } from 'react-router-dom'
+import { Copy, FileDown, FilePen, FileText, Loader2, PencilLine, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Cargando } from '@/components/cargando'
 import { Formulario } from '@/components/formulario'
@@ -208,6 +208,20 @@ export default function Redaccion() {
           </NavLink>
         ))}
       </nav>
+
+      {/* lo que no está en las plantillas lo redacta Papiniano, en la hoja al lado de la conversación */}
+      {clave !== 'historial' && (
+        <div className="-mt-2 mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-regla bg-card px-4 py-3">
+          <p className="min-w-56 flex-1 text-[0.92rem] text-ink">
+            ¿Necesita un escrito que no está en las plantillas? Papiniano se lo redacta y usted le dice qué cambiar.
+          </p>
+          <Button variant="outline" className="h-11 border-regla" asChild>
+            <Link to="/papiniano">
+              <FilePen /> Escrito libre con Papiniano
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {error ? (
         <p className="text-destructive">{error}</p>

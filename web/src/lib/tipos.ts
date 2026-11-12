@@ -61,6 +61,15 @@ export interface Turno {
   fuentes?: Fuente[]
   citadas?: number[]
   ia?: boolean
+  /** en esta respuesta Papiniano escribió o cambió el escrito de al lado */
+  escrito?: 'nuevo' | 'cambiado'
+}
+
+/** El escrito de una conversación (texto simple; ver lib/escrito.ts) */
+export interface Escrito {
+  texto: string
+  /** si hay una versión anterior a la que volver */
+  deshacer: boolean
 }
 
 export interface Documento {

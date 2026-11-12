@@ -6,6 +6,8 @@
 @import "@fontsource/atkinson-hyperlegible/latin-400.css";
 @import "@fontsource/atkinson-hyperlegible/latin-700.css";
 @import "@fontsource/atkinson-hyperlegible/latin-400-italic.css";
+/* la hoja del escrito: Century Gothic donde está Office; si no, Didact Gothic, que se le parece */
+@import "@fontsource/didact-gothic/latin-400.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -182,4 +184,45 @@
   .lectura th, .lectura td { @apply border border-papel-borde px-3 py-2 text-left align-top; }
   .lectura th { @apply bg-muted font-bold; }
   .lectura .tabla { @apply overflow-x-auto; }
+}
+
+/*
+ * El escrito: una hoja blanca como la del Word, igual en todos los temas (también en «noche»).
+ * Los datos por llenar en amarillo, como salen en el Word; los que ya llenó el abogado, en verde.
+ * El relleno de la hoja va en la pantalla (cambia con el ancho del panel).
+ */
+@layer components {
+  .hoja {
+    @apply mx-auto w-full max-w-[46rem] rounded-sm bg-white text-[0.98rem] leading-[1.75];
+    color: #1d1a17;
+    font-family: "Century Gothic", "Didact Gothic", "Atkinson Hyperlegible", system-ui, sans-serif;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.06);
+    hyphens: auto;
+  }
+  .hoja > p + p { margin-top: 1em; }
+  .hoja strong { font-weight: 700; }
+  .hoja .por-llenar { @apply rounded-[3px] px-0.5; background: #fff1a3; color: #4a3b00; }
+  .hoja .lleno { @apply rounded-[3px] px-0.5; background: #e2f0e4; color: #173d22; }
+  .hoja .cambio { animation: resalte 4.5s ease-out; }
+  /* donde Papiniano quitó texto queda una marca unos segundos */
+  .hoja .quitado {
+    @apply rounded-sm py-1 text-center text-[0.85em] font-bold;
+    color: #7a1f2b;
+    background: #fbe9e9;
+    border: 1px dashed #d79a9a;
+    animation: resalte-quitado 4.5s ease-out;
+  }
+  @keyframes resalte {
+    0%, 35% { background: #f6e3b4; box-shadow: 0 0 0 6px #f6e3b4; }
+    100% { background: transparent; box-shadow: 0 0 0 6px transparent; }
+  }
+  @keyframes resalte-quitado {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  /* quien pidió menos movimiento ve el resaltado fijo, sin que se desvanezca */
+  @media (prefers-reduced-motion: reduce) {
+    .hoja .cambio { animation: none; background: #f6e3b4; box-shadow: 0 0 0 6px #f6e3b4; }
+    .hoja .quitado { animation: none; }
+  }
 }
