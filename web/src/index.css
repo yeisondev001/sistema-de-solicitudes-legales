@@ -226,3 +226,59 @@
     .hoja .quitado { animation: none; }
   }
 }
+
+/*
+  La entrada (/entrar): la foto de la izquierda con el tono de la marca encima, para que no parezca de
+  banco de imágenes, y Papiniano hablando en una burbuja de chat.
+*/
+@layer components {
+  .entrada-foto { filter: saturate(0.8) contrast(1.06) sepia(0.12); }
+  .entrada-tono { background: #4a2e1e; mix-blend-mode: multiply; opacity: 0.28; }
+  .entrada-sombra {
+    background: linear-gradient(180deg, rgb(30 20 14 / 0.7) 0%, rgb(30 20 14 / 0) 22%, rgb(30 20 14 / 0) 45%,
+      rgb(30 20 14 / 0.78) 72%, rgb(30 20 14 / 0.96) 100%);
+  }
+  .burbuja-papiniano {
+    position: relative;
+    border-radius: 18px 18px 18px 0;
+    filter: drop-shadow(0 14px 22px rgb(0 0 0 / 0.45));
+    animation: burbuja-llega 0.5s ease-out 0.3s both;
+  }
+  /* la puyita: sale de la esquina de abajo y apunta al camafeo */
+  .burbuja-papiniano::before {
+    content: "";
+    position: absolute;
+    left: -13px;
+    bottom: 0;
+    width: 14px;
+    height: 20px;
+    background: inherit;
+    clip-path: path("M14 0 C14 12 9 18 0 20 L14 20 Z");
+  }
+  .escribiendo-puntos i { @apply size-[7px] rounded-full bg-[#b9aa95]; animation: punto-salta 1s ease-in-out infinite; }
+  .escribiendo-puntos i:nth-child(2) { animation-delay: 0.15s; }
+  .escribiendo-puntos i:nth-child(3) { animation-delay: 0.3s; }
+  .mensaje-llega { animation: mensaje-llega 0.35s ease-out; }
+  @keyframes burbuja-llega { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes punto-salta { 0%, 60%, 100% { transform: none; opacity: 0.6; } 30% { transform: translateY(-4px); opacity: 1; } }
+  @keyframes mensaje-llega { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .burbuja-papiniano, .mensaje-llega { animation: none; }
+  }
+}
+
+/*
+  La página pública (/): la demostración de «Cómo funciona» y el cierre con la foto de la entrada.
+*/
+@layer components {
+  .demo-aparece { animation: demo-aparece 0.45s ease-out both; }
+  .demo-pagina { animation: demo-pagina 0.5s ease-out both; }
+  .inicio-cierre-sombra {
+    background: linear-gradient(90deg, rgb(30 20 14 / 0.92) 0%, rgb(30 20 14 / 0.72) 55%, rgb(30 20 14 / 0.4) 100%);
+  }
+  @keyframes demo-aparece { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes demo-pagina { from { opacity: 0; transform: translateY(16px) scale(0.98); } }
+  @media (prefers-reduced-motion: reduce) {
+    .demo-aparece, .demo-pagina { animation: none; }
+  }
+}

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  BookOpen, CalendarDays, FileText, FolderClosed, Gavel, LibraryBig, PenLine, Scale, UserRound, type LucideIcon,
+  Briefcase, CalendarDays, Check, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, PenLine, RotateCcw, Scale,
+  ShieldCheck, Trash2, UserRound, X, type LucideIcon,
 } from 'lucide-react'
 import { Papiniano } from '@/components/papiniano'
 import { Antetitulo, CabeceraPublica, PiePublico } from '@/components/publico'
@@ -14,30 +15,64 @@ import { cn } from '@/lib/utils'
 const PRUEBA_INICIAL = { dias: 5, preguntas: 20 }
 type Prueba = typeof PRUEBA_INICIAL
 
-/** Lo que Papiniano lee: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
-const FUENTES: { icono: LucideIcon; titulo: string; texto: string; lista?: string[] }[] = [
+/** La franja de cifras: redondeadas hacia abajo, para que sigan siendo ciertas cuando se cargue más (ESTADO_DEL_PROYECTO.md) */
+const cifras = (p: Prueba): [string, string][] => [
+  ['28.000+', 'sentencias de la Suprema Corte de Justicia'],
+  ['20+', 'códigos, leyes y reglamentos dominicanos'],
+  ['1 clic', 'para ver la página exacta de cada cita'],
+  [`${p.dias} días`, 'gratis para probarlo, sin tarjeta'],
+]
+
+/** Lo que Papiniano lee, por materia: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
+const MATERIAS: { icono: LucideIcon; nombre: string; pregunta: string; fuentes: string[]; nota?: string }[] = [
   {
-    icono: Gavel,
-    titulo: 'Sentencias de la Suprema Corte',
-    texto: 'Las del Boletín Judicial, de todas las salas y materias. Las nuevas se agregan solas cada mes.',
+    icono: Landmark,
+    nombre: 'Tierras',
+    pregunta: '¿Qué requisitos pide el reglamento para aprobar un deslinde?',
+    fuentes: [
+      'Ley 108-05 de Registro Inmobiliario y sus reglamentos de 2022',
+      'Constancias anotadas, condominios, urbanización y bien de familia',
+      'Sentencias de la Tercera Sala',
+    ],
+  },
+  {
+    icono: Briefcase,
+    nombre: 'Laboral',
+    pregunta: 'Mi cliente terminó por desahucio el contrato de una empleada con 6 años. ¿Qué le corresponde?',
+    fuentes: ['Código de Trabajo, artículo por artículo', 'Sentencias de la Tercera Sala'],
+    nota: 'Los montos de las prestaciones salen de las fórmulas del Código de Trabajo, no de la inteligencia artificial.',
   },
   {
     icono: Scale,
-    titulo: 'Códigos',
-    texto: 'Artículo por artículo, con su texto oficial.',
-    lista: ['Código Civil', 'Código de Procedimiento Civil', 'Código de Trabajo', 'Código Penal (nuevo y el anterior)'],
+    nombre: 'Civil',
+    pregunta: '¿Qué plazo tengo para apelar una sentencia civil?',
+    fuentes: ['Código Civil y Código de Procedimiento Civil', 'Ley 189-11 de fideicomiso e hipotecas', 'Sentencias de la Primera Sala'],
   },
   {
-    icono: BookOpen,
-    titulo: 'Leyes y reglamentos',
-    texto: 'Registro inmobiliario y otras leyes que se usan a diario.',
-    lista: ['Ley 108-05 de Registro Inmobiliario y sus reglamentos', 'Ley 189-11', 'Bien de Familia, Condominios, Urbanización', 'Municipios y medio ambiente'],
+    icono: Gavel,
+    nombre: 'Penal',
+    pregunta: '¿Qué cambió en la legítima defensa con el nuevo Código Penal?',
+    fuentes: ['Nuevo Código Penal (Ley 74-25)', 'El Código Penal anterior, para comparar', 'Sentencias de la Segunda Sala'],
   },
-  {
-    icono: UserRound,
-    titulo: 'Sus documentos',
-    texto: 'Las sentencias, resoluciones y escritos que usted sube. Solo usted los ve, y Papiniano los busca junto con lo demás.',
-  },
+]
+
+/** Frente a un chat general: solo diferencias ciertas y que el abogado puede comprobar */
+const DIFERENCIAS: [string, string, string][] = [
+  ['Las sentencias dominicanas',
+    'No tiene el Boletín Judicial cargado: busca en internet o responde de memoria.',
+    'Tiene más de 28.000 sentencias de la Suprema Corte, de todas las salas.'],
+  ['De dónde sale cada cosa',
+    'No le abre la página exacta de la fuente oficial.',
+    'Cada cita abre la página del PDF oficial, ahí mismo.'],
+  ['Sentencias que no existen',
+    'Puede inventar números de sentencia y fechas que parecen reales.',
+    'Cita lo que encontró en las fuentes, y usted lo verifica en un clic.'],
+  ['La ley que aplica',
+    'Puede mezclar leyes de otros países.',
+    'Solo derecho dominicano, con el nuevo Código Penal.'],
+  ['Las prestaciones laborales',
+    'Las calcula la inteligencia artificial, y se puede equivocar en los montos.',
+    'Salen de las fórmulas fijas del Código de Trabajo.'],
 ]
 
 const SALAS: {
@@ -51,12 +86,20 @@ const SALAS: {
     icono: Papiniano,
     nombre: 'Papiniano',
     retrato: true,
-    texto: 'Su asistente. Le pregunta como a un colega y le responde con la jurisprudencia, la ley que aplica y su análisis. También saca las prestaciones laborales con las reglas del Código de Trabajo.',
+    texto: 'Su asistente. Le pregunta como a un colega y le responde con la jurisprudencia, la ley que aplica y su análisis. Le redacta el escrito en una hoja al lado de la conversación y saca las prestaciones laborales con las reglas del Código de Trabajo.',
   },
   { icono: LibraryBig, nombre: 'Biblioteca', texto: 'Todo lo que Papiniano lee, y sus propios documentos. Abre la página del PDF ahí mismo.' },
   { icono: FolderClosed, nombre: 'Expedientes', texto: 'Cada cliente con sus documentos, conversaciones, escritos y plazos, en una carpeta.', pronto: true },
   { icono: PenLine, nombre: 'Redacción', texto: 'Sus modelos de escritos y solicitudes, listos en Word o PDF.', pronto: true },
   { icono: CalendarDays, nombre: 'Agenda', texto: 'Audiencias y vencimientos. El escritorio le avisa lo que vence esta semana.', pronto: true },
+]
+
+/** Su información: solo lo que es cierto hoy (ver /privacidad) */
+const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
+  { icono: UserRound, titulo: 'Sus documentos son suyos', texto: 'Solo usted los ve. Papiniano los usa para buscar cuando usted le pregunta.' },
+  { icono: Trash2, titulo: 'Los quita cuando quiera', texto: 'Quite un documento y deja de usarse en sus búsquedas.' },
+  { icono: ShieldCheck, titulo: 'Ley 172-13', texto: 'Sus datos se tratan según la ley dominicana de protección de datos personales.' },
+  { icono: Lock, titulo: 'Conexión cifrada', texto: 'Todo viaja cifrado entre su equipo y Papiniano.' },
 ]
 
 // Los precios todavía no están decididos: se cambian aquí
@@ -96,7 +139,7 @@ const preguntas = (p: Prueba): [string, string][] => [
 
 /**
  * La página pública: lo primero que ve quien llega. La entrada es otra página (/entrar).
- * Los colores son siempre los de la marca, «Vino y madera».
+ * Los colores son siempre los de la marca, «Vino y madera». Las secciones alternan el fondo para que no se vea todo igual.
  */
 export default function Inicio() {
   const [prueba, setPrueba] = useState(PRUEBA_INICIAL)
@@ -115,7 +158,16 @@ export default function Inicio() {
         {/* lo principal */}
         <section className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 pt-12 pb-16 md:px-6 md:pt-20 md:pb-24 lg:grid-cols-[1.05fr_1fr]">
           <div className="space-y-7">
-            <Antetitulo>PARA ABOGADOS DE REPÚBLICA DOMINICANA</Antetitulo>
+            <div className="space-y-5">
+              <a
+                href="#salas"
+                className="inline-flex items-center gap-2.5 rounded-full border border-papel-borde bg-card py-1 pr-4 pl-1 text-[0.95rem] text-ink hover:border-marca"
+              >
+                <span className="rounded-full bg-marca px-2.5 py-0.5 text-[0.75rem] font-bold tracking-wide text-white">NUEVO</span>
+                Ahora le redacta el escrito
+              </a>
+              <Antetitulo>PARA ABOGADOS DE REPÚBLICA DOMINICANA</Antetitulo>
+            </div>
             <h1 className="font-heading text-[2.7rem] leading-[1.05] font-medium tracking-tight md:text-[4rem]">
               Todo su trabajo, en una sola oficina.
             </h1>
@@ -136,71 +188,138 @@ export default function Inicio() {
           <EjemploRespuesta />
         </section>
 
-        {/* qué lee */}
+        {/* en cifras: lo que ya tiene cargado */}
+        <section aria-label="En cifras" className="border-y border-papel-borde bg-card">
+          <div className="mx-auto grid max-w-[1240px] grid-cols-2 gap-x-6 gap-y-8 px-5 py-10 md:px-6 md:py-12 lg:grid-cols-4">
+            {cifras(prueba).map(([cifra, texto], i) => (
+              <div key={texto} className={cn('space-y-1.5', i > 0 && 'lg:border-l lg:border-papel-borde lg:pl-8')}>
+                <p className="font-heading text-[2.3rem] leading-none font-medium text-marca-texto md:text-[2.9rem]">{cifra}</p>
+                <p className="max-w-[15rem] leading-snug text-ink-soft">{texto}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <ComoFunciona />
+
+        {/* qué lee, por materia */}
         <section id="fuentes" className="scroll-mt-20 border-y border-papel-borde bg-card">
           <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
-            <Encabezado antetitulo="QUÉ LEE POR USTED" titulo="El derecho dominicano que usted consulta todos los días, en una sola pregunta." />
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {FUENTES.map(({ icono: Icono, titulo, texto, lista }) => (
-                <div key={titulo} className="space-y-3 rounded-xl border border-papel-borde bg-background p-6">
-                  <Icono className="size-7 text-marca-texto" />
-                  <h3 className="font-heading text-[1.3rem] font-semibold">{titulo}</h3>
-                  <p className="leading-relaxed text-ink-soft">{texto}</p>
-                  {lista && (
-                    <ul className="space-y-1.5 border-t border-papel-borde pt-3 text-[0.92rem] text-ink">
-                      {lista.map((x) => <li key={x}>{x}</li>)}
+            <Encabezado antetitulo="QUÉ LEE POR USTED" titulo="El derecho dominicano que usted consulta todos los días, materia por materia." />
+            <div className="grid gap-5 md:grid-cols-2">
+              {MATERIAS.map(({ icono: Icono, nombre, pregunta, fuentes, nota }) => (
+                <div key={nombre} className="flex flex-col gap-4 rounded-xl border border-papel-borde bg-background p-6">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-11 items-center justify-center rounded-[9px] bg-panel text-[#F1E8DA]">
+                      <Icono className="size-[22px]" />
+                    </span>
+                    <h3 className="font-heading text-[1.4rem] font-semibold">{nombre}</h3>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[0.88rem] text-ink-soft">Pregúntele, por ejemplo:</p>
+                    <p className="rounded-2xl rounded-bl-sm bg-panel px-4 py-3 leading-snug text-sobre-panel">{pregunta}</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.8rem] font-bold tracking-[0.12em] text-marca-texto">LO QUE CONSULTA</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {fuentes.map((f) => (
+                        <li key={f} className="flex gap-2.5">
+                          <Check className="mt-1 size-4 shrink-0 text-marca-texto" />
+                          {f}
+                        </li>
+                      ))}
                     </ul>
-                  )}
+                  </div>
+                  {nota && <p className="mt-auto border-t border-papel-borde pt-3 text-[0.92rem] text-ink-soft">{nota}</p>}
                 </div>
               ))}
             </div>
+            <p className="flex items-start gap-3 text-[1.05rem] text-ink-soft">
+              <UserRound className="mt-1 size-5 shrink-0 text-marca-texto" />
+              <span>
+                <strong className="text-ink">Y en todas, sus documentos:</strong> las sentencias, resoluciones y escritos que
+                usted sube. Solo usted los ve. Además, las leyes de municipios, medio ambiente y áreas protegidas.
+              </span>
+            </p>
+          </div>
+        </section>
+
+        {/* frente a un chat general */}
+        <section id="diferencia" className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
+          <Encabezado antetitulo="¿POR QUÉ NO CHATGPT?" titulo="Un chat general responde de memoria. Papiniano le enseña la fuente." />
+          <div className="overflow-hidden rounded-2xl border border-papel-borde bg-card">
+            <div className="hidden grid-cols-[1fr_1.3fr_1.3fr] border-b border-papel-borde bg-background font-bold md:grid">
+              <span />
+              <span className="px-5 py-4 text-ink-soft">Un chat general (ChatGPT, Gemini…)</span>
+              <span className="flex items-center gap-2.5 bg-marca/5 px-5 py-4 text-marca-texto">
+                <Papiniano className="size-7" decorativo /> Papiniano
+              </span>
+            </div>
+            {DIFERENCIAS.map(([tema, general, nuestro]) => (
+              <div
+                key={tema}
+                className="grid gap-3 border-b border-papel-borde px-5 py-5 last:border-0 md:grid-cols-[1fr_1.3fr_1.3fr] md:gap-0 md:p-0"
+              >
+                <p className="font-heading text-[1.15rem] font-semibold md:px-5 md:py-5">{tema}</p>
+                <p className="flex gap-2.5 text-ink-soft md:px-5 md:py-5">
+                  <X className="mt-1 size-4 shrink-0" />
+                  <span><span className="font-bold md:sr-only">Un chat general: </span>{general}</span>
+                </p>
+                <p className="flex gap-2.5 text-ink md:bg-marca/5 md:px-5 md:py-5">
+                  <Check className="mt-1 size-4 shrink-0 text-marca-texto" />
+                  <span><span className="font-bold md:sr-only">Papiniano: </span>{nuestro}</span>
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
         {/* qué hay adentro */}
-        <section id="salas" className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
-          <Encabezado antetitulo="QUÉ HAY ADENTRO" titulo="Cada sala de su oficina, a un clic." />
-          <div className="grid gap-5 sm:grid-cols-2">
-            {SALAS.filter((s) => !s.pronto).map(({ icono: Icono, nombre, texto, retrato }) => (
-              <div key={nombre} className="space-y-2.5 rounded-xl border border-papel-borde bg-card p-6">
-                <div className="flex items-center justify-between gap-3">
-                  {retrato ? (
-                    <Icono className="size-[46px]" />
-                  ) : (
-                    <span className="flex size-[46px] items-center justify-center rounded-[9px] bg-panel text-[#F1E8DA]">
-                      <Icono className="size-[22px]" />
-                    </span>
-                  )}
+        <section id="salas" className="scroll-mt-20 border-y border-papel-borde bg-card">
+          <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
+            <Encabezado antetitulo="QUÉ HAY ADENTRO" titulo="Cada sala de su oficina, a un clic." />
+            <div className="grid gap-5 sm:grid-cols-2">
+              {SALAS.filter((s) => !s.pronto).map(({ icono: Icono, nombre, texto, retrato }) => (
+                <div key={nombre} className="space-y-2.5 rounded-xl border border-papel-borde bg-background p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    {retrato ? (
+                      <Icono className="size-[46px]" />
+                    ) : (
+                      <span className="flex size-[46px] items-center justify-center rounded-[9px] bg-panel text-[#F1E8DA]">
+                        <Icono className="size-[22px]" />
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-heading text-[1.4rem] font-semibold">{nombre}</h3>
+                  <p className="leading-relaxed text-ink-soft">{texto}</p>
                 </div>
-                <h3 className="font-heading text-[1.4rem] font-semibold">{nombre}</h3>
+              ))}
+            </div>
+            <p className="text-[1.05rem] text-ink-soft">
+              <strong className="text-ink">Muy pronto, en la misma oficina:</strong> Expedientes (una carpeta por cliente),
+              sus propios modelos de escritos y la Agenda de audiencias.
+            </p>
+          </div>
+        </section>
+
+        {/* su información */}
+        <section id="privacidad" className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
+          <Encabezado antetitulo="SU INFORMACIÓN" titulo="Su trabajo y sus documentos, protegidos." />
+          <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+            {PROTECCION.map(({ icono: Icono, titulo, texto }) => (
+              <div key={titulo} className="space-y-2.5">
+                <span className="flex size-11 items-center justify-center rounded-full bg-panel text-[#F1E8DA]">
+                  <Icono className="size-5" />
+                </span>
+                <h3 className="font-heading text-[1.25rem] font-semibold">{titulo}</h3>
                 <p className="leading-relaxed text-ink-soft">{texto}</p>
               </div>
             ))}
           </div>
-          <p className="text-[1.05rem] text-ink-soft">
-            <strong className="text-ink">Muy pronto, en la misma oficina:</strong> Expedientes (una carpeta por cliente),
-            Redacción de escritos y la Agenda de audiencias.
+          <p className="text-ink-soft">
+            Le pedimos no escribir en las consultas datos personales de sus clientes.{' '}
+            <Link to="/privacidad" className="font-bold text-marca-texto hover:underline">Lea la política de privacidad</Link>.
           </p>
-        </section>
-
-        {/* cómo funciona */}
-        <section id="como" className="scroll-mt-20 border-y border-papel-borde bg-card">
-          <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
-            <Encabezado antetitulo="CÓMO FUNCIONA" titulo="Pregunte como a un colega. Verifique cada cita." />
-            <ol className="grid gap-5 md:grid-cols-3">
-              {[
-                ['Usted pregunta', 'En sus palabras, o por número de sentencia, expediente o artículo.'],
-                ['Él busca y lee', 'Por palabras y por significado en las sentencias, los códigos, las leyes y sus documentos.'],
-                ['Le responde con citas', 'Lo que dice la jurisprudencia, la ley y su análisis. Cada cita abre la página del PDF oficial.'],
-              ].map(([titulo, texto], i) => (
-                <li key={titulo} className="space-y-3 rounded-xl border border-papel-borde bg-background p-6">
-                  <span className="flex size-10 items-center justify-center rounded-full bg-boton font-bold text-sobre-boton">{i + 1}</span>
-                  <h3 className="font-heading text-[1.3rem] font-semibold">{titulo}</h3>
-                  <p className="leading-relaxed text-ink-soft">{texto}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
         </section>
 
         {/* planes */}
@@ -259,16 +378,21 @@ export default function Inicio() {
           </Accordion>
         </section>
 
-        {/* el último empujón */}
+        {/* el último empujón, con la foto de la entrada */}
         <section className="px-5 pb-16 md:px-6 md:pb-20">
-          <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-6 rounded-2xl bg-boton px-7 py-10 text-sobre-boton md:flex-row md:items-center md:px-12">
-            <div className="space-y-2">
-              <h2 className="font-heading text-[2rem] leading-tight font-medium">Pruébelo con su próximo caso.</h2>
-              <p className="text-[1.05rem] opacity-90">{prueba.dias} días gratis. Sin tarjeta. Entra con su cuenta de Gmail.</p>
+          <div className="relative mx-auto max-w-[1240px] overflow-hidden rounded-2xl bg-panel px-7 py-12 text-sobre-panel md:px-12 md:py-16">
+            <img src="/entrada.webp" alt="" loading="lazy" className="entrada-foto absolute inset-0 size-full object-cover object-[50%_45%]" />
+            <div className="entrada-tono absolute inset-0" />
+            <div className="inicio-cierre-sombra absolute inset-0" />
+            <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+              <div className="space-y-2">
+                <h2 className="font-heading text-[2rem] leading-tight font-medium md:text-[2.4rem]">Pruébelo con su próximo caso.</h2>
+                <p className="text-[1.05rem] text-nav">{prueba.dias} días gratis. Sin tarjeta. Entra con su cuenta de Gmail.</p>
+              </div>
+              <Link to="/entrar" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
+                Empiece gratis
+              </Link>
             </div>
-            <Link to="/entrar" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
-              Empiece gratis
-            </Link>
           </div>
         </section>
       </main>
@@ -283,6 +407,163 @@ function Encabezado({ antetitulo, titulo, claro = false }: { antetitulo: string;
     <div className="max-w-[760px] space-y-2.5">
       <Antetitulo claro={claro}>{antetitulo}</Antetitulo>
       <h2 className="font-heading text-[2rem] leading-tight font-medium md:text-[2.6rem]">{titulo}</h2>
+    </div>
+  )
+}
+
+const PASOS: [string, string][] = [
+  ['Usted pregunta', 'En sus palabras, o por número de sentencia, expediente o artículo.'],
+  ['Él busca y lee', 'Por palabras y por significado en las sentencias, los códigos, las leyes y sus documentos.'],
+  ['Le responde con citas', 'Lo que dice la ley, la jurisprudencia y su análisis.'],
+  ['Usted verifica', 'Cada cita abre la página del PDF oficial, sin salir de Papiniano.'],
+]
+const ULTIMO_PASO = PASOS.length - 1
+const PASO_MS = 2300
+const sinMovimiento = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * Cómo funciona: los cuatro pasos y, al lado, la demostración que los va mostrando.
+ * Se reproduce una sola vez cuando se ve en pantalla; se puede tocar cada paso o verla de nuevo.
+ * Sin movimiento (preferencia del sistema), se ve directo el final.
+ */
+function ComoFunciona() {
+  // -1: todavía no empezó
+  const [paso, setPaso] = useState(() => (sinMovimiento() ? ULTIMO_PASO : -1))
+  const [auto, setAuto] = useState(false)
+  const seccion = useRef<HTMLElement>(null)
+  const andando = auto && paso < ULTIMO_PASO
+
+  useEffect(() => {
+    if (paso !== -1 || !seccion.current) return
+    const mirador = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return
+        setPaso(0)
+        setAuto(true)
+        mirador.disconnect()
+      },
+      { threshold: 0.35 },
+    )
+    mirador.observe(seccion.current)
+    return () => mirador.disconnect()
+  }, [paso])
+
+  useEffect(() => {
+    if (!andando) return
+    const t = setTimeout(() => setPaso((p) => p + 1), PASO_MS)
+    return () => clearTimeout(t)
+  }, [andando, paso])
+
+  return (
+    <section id="como" ref={seccion} className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
+      <Encabezado antetitulo="CÓMO FUNCIONA" titulo="Pregunte como a un colega. Verifique cada cita." />
+      <div className="grid items-start gap-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
+        <div className="space-y-4">
+          <ol className="space-y-2">
+            {PASOS.map(([titulo, texto], i) => (
+              <li key={titulo}>
+                <button
+                  type="button"
+                  aria-current={i === paso ? 'step' : undefined}
+                  onClick={() => {
+                    setAuto(false)
+                    setPaso(i)
+                  }}
+                  className={cn(
+                    'flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-colors',
+                    i === paso ? 'border-papel-borde bg-card shadow-sm' : 'border-transparent hover:bg-card/60',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex size-9 shrink-0 items-center justify-center rounded-full font-bold transition-colors',
+                      i <= paso ? 'bg-boton text-sobre-boton' : 'bg-papel-borde text-ink-soft',
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <span>
+                    <span className="block font-heading text-[1.2rem] font-semibold">{titulo}</span>
+                    <span className="leading-relaxed text-ink-soft">{texto}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          <button
+            type="button"
+            onClick={() => {
+              setPaso(0)
+              setAuto(true)
+            }}
+            className="inline-flex min-h-11 items-center gap-2 px-4 font-bold text-marca-texto hover:underline"
+          >
+            <RotateCcw className="size-4" /> Ver de nuevo
+          </button>
+        </div>
+        <Demostracion paso={paso} />
+      </div>
+    </section>
+  )
+}
+
+/**
+ * La demostración (ilustración, no es una consulta real): la pregunta, la búsqueda, la respuesta y la página del PDF.
+ * Lo que todavía no toca está invisible pero ocupa su lugar, así la tarjeta no cambia de alto mientras avanza
+ */
+function Demostracion({ paso }: { paso: number }) {
+  const aparece = (n: number) => (paso >= n ? 'demo-aparece' : 'invisible')
+  return (
+    <div
+      aria-hidden="true"
+      className="order-first space-y-3.5 rounded-2xl border border-papel-borde bg-card p-5 shadow-[0_24px_60px_-20px_color-mix(in_oklab,var(--t-ink)_25%,transparent)] md:p-6 lg:order-last"
+    >
+      <div className="flex items-center gap-2.5 border-b border-papel-borde pb-3.5">
+        <Papiniano className="size-9" decorativo />
+        <span className="font-heading text-lg font-medium">Papiniano</span>
+        <span className="text-[0.85rem] text-ink-soft">· su asistente</span>
+      </div>
+      <p className={cn('ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-panel px-4 py-3 text-sobre-panel', aparece(0))}>
+        Mi cliente terminó por desahucio el contrato de una empleada con 6 años. ¿Qué le corresponde?
+      </p>
+      <div className={cn('flex flex-wrap gap-2 text-[0.8rem] text-ink-soft', aparece(1))}>
+        {['Buscó en el Código de Trabajo y las sentencias', 'Leyó 4 artículos', '2 sentencias de la Tercera Sala'].map((t) => (
+          <span key={t} className="rounded-full bg-[#F1E6DE] px-3 py-1">{t}</span>
+        ))}
+      </div>
+      <div className={cn('space-y-3 rounded-2xl rounded-tl-sm border border-papel-borde bg-background p-5', aparece(2))}>
+        <p className="font-heading text-[1.05rem] leading-relaxed">
+          Le corresponden el preaviso y el auxilio de cesantía, más sus derechos adquiridos, como las vacaciones y el
+          salario de Navidad
+          {[1, 2].map((n) => (
+            <span key={n} className="ml-1.5 rounded bg-[#F1E6DE] px-1.5 py-px font-sans text-[0.8rem] font-bold text-roble">{n}</span>
+          ))}
+        </p>
+        <div className={cn('flex items-start gap-3 rounded-lg border bg-card p-3 transition-colors', paso >= 3 ? 'border-marca' : 'border-papel-borde')}>
+          <FileText className="mt-0.5 size-5 shrink-0 text-marca-texto" />
+          <div className="text-[0.88rem]">
+            <p className="font-bold text-ink">[1] Código de Trabajo, art. 80</p>
+            <p className="text-ink-soft">
+              <span className={cn(paso >= 3 && 'font-bold text-marca-texto underline')}>Ver la página aquí</span> · Abrir el PDF oficial
+            </p>
+          </div>
+        </div>
+      </div>
+      {/* la página del PDF que se abre al tocar la cita */}
+      <div className={cn('rounded-xl border border-papel-borde bg-white p-4 shadow-[0_14px_32px_-14px_rgb(0_0_0/0.3)]', paso >= 3 ? 'demo-pagina' : 'invisible')}>
+        <div className="flex items-center justify-between gap-3 border-b border-papel-borde pb-2.5 text-[0.85rem] text-ink-soft">
+          <span className="font-bold text-ink">Código de Trabajo · PDF oficial</span>
+          <span className="whitespace-nowrap">‹ página ›</span>
+        </div>
+        <div className="space-y-2 pt-3">
+          {[92, 64].map((w) => <i key={w} className="block h-2 rounded bg-[#E9E1D4]" style={{ width: `${w}%` }} />)}
+          <div className="space-y-2 rounded-md border-l-4 border-marca bg-[#F7EDE6] py-2.5 pr-3 pl-3.5">
+            <b className="block text-[0.85rem] text-marca-texto">Art. 80</b>
+            {[100, 95, 72].map((w) => <i key={w} className="block h-2 rounded bg-[#DCC9BA]" style={{ width: `${w}%` }} />)}
+          </div>
+          {[96, 58].map((w) => <i key={w} className="block h-2 rounded bg-[#E9E1D4]" style={{ width: `${w}%` }} />)}
+        </div>
+      </div>
     </div>
   )
 }

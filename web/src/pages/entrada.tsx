@@ -1,12 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/logo'
+import { Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api, ErrorApi } from '@/lib/api'
 import type { Entrada as DatosEntrada, Perfil } from '@/lib/tipos'
+import { cn } from '@/lib/utils'
+
+// En el plan gratis de Render el servidor se duerme: la primera entrada del día puede tardar hasta un minuto
+const AVISO_LENTO_MS = 4000
+const REINTENTOS = 10
+const ESPERA_REINTENTO_MS = 3000
 
 /**
  * La entrada (/entrar): Google y usuario/contraseña. La primera vez del sistema, crear el administrador.
@@ -16,42 +23,68 @@ export default function Entrada({ alEntrar }: { alEntrar: (p: Perfil) => void })
   const [datos, setDatos] = useState<DatosEntrada | null>(null)
   // si Google no dejó entrar, vuelve con ?error=…; se muestra y se limpia la dirección
   const [error, setError] = useState(() => new URLSearchParams(window.location.search).get('error') ?? '')
+  const [lento, setLento] = useState(false)
 
   useEffect(() => {
     if (window.location.search) window.history.replaceState(null, '', '/entrar')
-    api.get<DatosEntrada>('/api/entrada').then(setDatos).catch((e: ErrorApi) => setError(e.message))
+    let vigente = true
+    const aviso = setTimeout(() => setLento(true), AVISO_LENTO_MS)
+    // si el servidor está despertando puede fallar las primeras veces: se reintenta solo antes de mostrar el error
+    const pedir = (quedan: number) =>
+      api
+        .get<DatosEntrada>('/api/entrada')
+        .then((d) => {
+          if (vigente) setDatos(d)
+        })
+        .catch((e: ErrorApi) => {
+          if (!vigente) return
+          if (quedan > 0) setTimeout(() => vigente && void pedir(quedan - 1), ESPERA_REINTENTO_MS)
+          else setError(e.message)
+        })
+    pedir(REINTENTOS)
+    return () => {
+      vigente = false
+      clearTimeout(aviso)
+    }
   }, [])
 
   return (
-    <div className="grid min-h-dvh bg-background text-ink lg:grid-cols-[1fr_1.1fr]">
-      {/* a la izquierda, en pantallas grandes: qué le espera adentro */}
-      <aside className="hidden flex-col justify-between bg-panel p-12 text-sobre-panel lg:flex">
-        <Logo enPanel />
-        <div className="max-w-md space-y-6">
-          <h2 className="font-heading text-[2.4rem] leading-tight font-medium">Su despacho, listo para trabajar.</h2>
-          <ul className="space-y-3.5 text-[1.05rem]">
-            {[
-              'Papiniano, su asistente, que cita las sentencias y las leyes',
-              'La página exacta del PDF oficial, sin salir de la app',
-              'Sus documentos en el mismo buscador',
-            ].map((t) => (
-              <li key={t} className="flex items-start gap-3">
-                <Check className="mt-1 size-5 shrink-0 text-nav-linea" /> {t}
-              </li>
-            ))}
-          </ul>
+    <div className="grid min-h-dvh grid-rows-[auto_1fr] bg-background text-ink lg:grid-cols-[1fr_1.1fr] lg:grid-rows-1">
+      {/* la foto: en el celular, una franja arriba; en pantallas grandes, toda la izquierda */}
+      {/* en el celular la franja es baja, para que «Entrar» quede en la primera pantalla */}
+      <aside className="relative flex h-[270px] flex-col justify-between overflow-hidden bg-panel px-5 pt-3 pb-5 text-sobre-panel md:px-10 lg:h-auto lg:p-12">
+        {/* una abogada en su escritorio, con la PC y el expediente (Unsplash, de ergonofis; libre de uso) */}
+        <img
+          src="/entrada.webp"
+          alt=""
+          width={1100}
+          height={1300}
+          fetchPriority="high"
+          className="entrada-foto absolute inset-0 size-full object-cover"
+        />
+        <div className="entrada-tono absolute inset-0" />
+        <div className="entrada-sombra absolute inset-0" />
+        <div className="relative flex items-center justify-between">
+          <Logo enPanel />
+          <VolverAlInicio className="text-nav hover:text-sobre-panel lg:hidden" />
         </div>
-        <p className="text-[0.9rem] text-nav-sub">Hecho en República Dominicana · Ley 172-13</p>
+        <div className="relative">
+          <BurbujaPapiniano />
+          <h2 className="font-heading text-[1.5rem] leading-[1.12] font-medium lg:text-[2.5rem]">
+            Su despacho,<br />listo para trabajar.
+          </h2>
+          <p className="mt-3.5 hidden max-w-[30rem] text-[1.1rem] leading-relaxed text-nav lg:block">
+            Papiniano trabaja a su lado: busca las sentencias, cita las leyes y le redacta el escrito.
+          </p>
+          <p className="mt-9 hidden text-[0.9rem] text-nav-sub lg:block">Hecho en República Dominicana · Ley 172-13</p>
+        </div>
       </aside>
 
-      <main className="flex flex-col px-5 py-6 md:px-10">
-        <div className="flex items-center justify-between">
-          <span className="lg:invisible"><Logo /></span>
-          <Link to="/" className="flex items-center gap-1.5 text-[0.95rem] text-ink-soft hover:text-marca-texto">
-            <ArrowLeft className="size-4" /> Volver al inicio
-          </Link>
+      <main className="flex flex-col px-5 pt-6 pb-6 md:px-10 lg:py-6">
+        <div className="hidden justify-end lg:flex">
+          <VolverAlInicio className="text-ink-soft hover:text-marca-texto" />
         </div>
-        <div className="flex flex-1 items-center justify-center py-10">
+        <div className="flex flex-1 items-start justify-center pb-8 lg:items-center lg:py-10">
           <div className="w-full max-w-[420px]">
             {datos ? (
               datos.primera_vez ? (
@@ -62,8 +95,16 @@ export default function Entrada({ alEntrar }: { alEntrar: (p: Perfil) => void })
             ) : error ? (
               <p className="text-sm text-destructive" role="alert">{error}</p>
             ) : (
-              <div className="flex items-center gap-3 text-ink-soft">
-                <Loader2 className="size-5 animate-spin" /> Un momento…
+              <div className="flex items-start gap-3 text-ink-soft" role="status">
+                <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin" />
+                {lento ? (
+                  <div>
+                    <p className="text-ink">Despertando el servidor…</p>
+                    <p className="text-[0.9rem]">La primera entrada del día puede tardar hasta un minuto.</p>
+                  </div>
+                ) : (
+                  'Un momento…'
+                )}
               </div>
             )}
           </div>
@@ -77,6 +118,50 @@ export default function Entrada({ alEntrar }: { alEntrar: (p: Perfil) => void })
   )
 }
 
+/**
+ * En el celular va sobre la foto; en pantallas grandes, arriba del formulario. Alto de 44 px para el dedo.
+ * En los celulares angostos dice solo «Inicio», para que no se parta en dos líneas junto al logo
+ */
+function VolverAlInicio({ className }: { className: string }) {
+  return (
+    <Link to="/" className={cn('-mr-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-[0.95rem] whitespace-nowrap', className)}>
+      <ArrowLeft className="size-4" />
+      <span className="sm:hidden">Inicio</span>
+      <span className="hidden sm:inline">Volver al inicio</span>
+    </Link>
+  )
+}
+
+/** Papiniano en burbuja de chat sobre la foto: primero «escribiendo…» y luego el mensaje (ilustración) */
+function BurbujaPapiniano() {
+  const [listo, setListo] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+
+  useEffect(() => {
+    if (listo) return
+    const t = setTimeout(() => setListo(true), 2000)
+    return () => clearTimeout(t)
+  }, [listo])
+
+  return (
+    // va justo encima de la frase, en el mismo bloque, para que nunca la tape en las laptops de pantalla baja;
+    // en el celular, sin camafeo (ya está el del logo)
+    <div aria-hidden="true" className="mb-4 ml-3 flex max-w-[310px] items-end gap-4 lg:mb-9 lg:ml-0 lg:max-w-[370px]">
+      <Papiniano className="hidden size-[38px] drop-shadow-[0_6px_12px_rgb(0_0_0/0.45)] lg:block" decorativo />
+      <div className="burbuja-papiniano bg-sobre-panel px-3.5 pt-2 pb-2.5 text-[0.88rem] leading-snug text-ink lg:text-[0.95rem]">
+        <b className="block font-heading text-[0.82rem] font-medium text-marca-texto">Papiniano</b>
+        {listo ? (
+          <span className="mensaje-llega block">
+            Listo, le redacté la instancia. Faltan los datos del cliente.
+            <small className="mt-0.5 block text-right text-[0.7rem] text-pista">ahora</small>
+          </span>
+        ) : (
+          <span className="escribiendo-puntos inline-flex gap-1 pt-1.5 pb-1"><i /><i /><i /></span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Campo({
   id, etiqueta, clave = false, ...props
 }: { id: string; etiqueta: string; clave?: boolean } & React.ComponentProps<typeof Input>) {
@@ -85,10 +170,11 @@ function Campo({
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-[0.95rem] text-ink-soft">{etiqueta}</Label>
       <div className="relative">
+        {/* fondo blanco y borde marcado: que se vea bien dónde se escribe */}
         <Input
           id={id}
           type={clave && !ver ? 'password' : 'text'}
-          className="h-12 bg-background px-3.5 text-base md:text-base"
+          className="h-12 border-pista/80 bg-papel px-3.5 text-base md:text-base"
           {...props}
         />
         {clave && (
