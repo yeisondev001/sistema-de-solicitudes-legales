@@ -6,7 +6,8 @@ catalogo.json. Papiniano los sugiere cuando le piden un escrito, y el abogado ta
 Los datos por llenar van entre corchetes y en mayúsculas ([NOMBRE DE SU CLIENTE]); los del abogado
 ([NOMBRE DEL ABOGADO]…) y [FECHA DE HOY] los llena la app sola.
 
-Cada abogado también sube los suyos («Mis modelos»): se guardan en su cuenta (cuentas.py) y solo los ve él.
+Cada abogado también sube los suyos («Mis modelos»): se guardan en su cuenta (cuentas.py) y solo los ve él,
+o también su oficina si los comparte (plan Despacho).
 Su clave es «propio-<id>». Al subirlo, el Word se convierte aquí, sin la IA, y se le quitan solos los datos
 que se reconocen (cédulas, RNC, correos, teléfonos, montos y fechas); los nombres los marca el abogado.
 """
@@ -63,10 +64,16 @@ def _raices(t: str) -> list:
     return [p[:7] for p in re.findall(r"[a-z0-9]+", t)]
 
 
-def propio(fila: dict) -> dict:
-    """Un modelo del abogado (fila de cuentas.listar_modelos_propios) con la misma forma que los de todos."""
-    return {"clave": f"propio-{fila['id']}", "nombre": fila["nombre"], "grupo": fila["grupo"] or "",
-            "materia": fila["materia"] or "", "tribunal": "", "cuando": "Su modelo.", "propio": True}
+def propio(fila: dict, usuario_id=None) -> dict:
+    """Un modelo del abogado (fila de cuentas.listar_modelos_propios) con la misma forma que los de todos.
+    Si lo subió un colega de su oficina (usuario_id es el de quien lo ve), va como «oficina» y no lo puede cambiar."""
+    m = {"clave": f"propio-{fila['id']}", "nombre": fila["nombre"], "grupo": fila["grupo"] or "",
+         "materia": fila["materia"] or "", "tribunal": "", "cuando": "Su modelo.", "propio": True,
+         "compartido": bool(fila.get("compartido"))}
+    if usuario_id is not None and fila.get("usuario_id") not in (None, usuario_id):
+        autor = fila.get("autor") or "un colega"
+        m.update(propio=False, oficina=True, autor=autor, cuando=f"De la oficina: lo subió {autor}.")
+    return m
 
 
 def id_propio(clave: str):
@@ -101,8 +108,8 @@ def _tipo(raices: list):
 
 def sugerir(pedido: str, maximo: int = 3, propios: list = ()) -> list:
     """Los modelos que sirven para lo que pide el abogado («unas conclusiones para un deslinde»), del que
-    más se parece al que menos; [] si ninguno se parece lo suficiente. Los suyos (propios) van primero si
-    se parecen igual."""
+    más se parece al que menos; [] si ninguno se parece lo suficiente. Los suyos y los de su oficina
+    (propios, ya pasados por propio()) van primero si se parecen igual."""
     raices = _raices(pedido)
     frase = " " + " ".join(raices) + " "
     tipo = _tipo(raices)
@@ -110,7 +117,7 @@ def sugerir(pedido: str, maximo: int = 3, propios: list = ()) -> list:
     # lo que dice del caso (deslinde, laboral, justiprecio…), sin las palabras de relleno ni el tipo
     sueltas = {r for r in raices if len(r) > 3 and r not in vacias}
     puntos = []
-    for m in [propio(f) for f in propios] + CATALOGO:
+    for m in list(propios) + CATALOGO:
         nombre = _raices(f"{m['nombre']} {m['tribunal']}")
         # los del abogado sin tipo reconocible se ofrecen por su nombre, sea cual sea el tipo pedido
         tipo_modelo = _tipo(_raices(m["nombre"]))
@@ -123,7 +130,7 @@ def sugerir(pedido: str, maximo: int = 3, propios: list = ()) -> list:
             if propias and f" {' '.join(r)} " in frase:
                 p += 2 * len(propias)   # las frases largas que coinciden enteras pesan más
         # los del abogado no tienen palabras clave: cuenta su nombre, y una sola palabra que coincida basta
-        p += len(sueltas & set(nombre)) * (3 if m.get("propio") else 1)
+        p += len(sueltas & set(nombre)) * (3 if m.get("propio") or m.get("oficina") else 1)
         puntos.append((p, m))
     puntos.sort(key=lambda x: -x[0])
     # si dijo qué documento es, basta con que coincida algo del caso; si no, tiene que parecerse más
@@ -131,7 +138,8 @@ def sugerir(pedido: str, maximo: int = 3, propios: list = ()) -> list:
     if not puntos or puntos[0][0] < minimo:
         return []
     corte = max(minimo, puntos[0][0] * 0.6)
-    return [{k: m[k] for k in (*_FICHA, "propio") if k in m} for p, m in puntos[:maximo] if p >= corte]
+    return [{k: m[k] for k in (*_FICHA, "propio", "oficina", "autor") if k in m}
+            for p, m in puntos[:maximo] if p >= corte]
 
 
 # ── Un Word del abogado convertido en modelo ─────

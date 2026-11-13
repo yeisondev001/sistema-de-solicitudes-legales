@@ -268,9 +268,12 @@ export default function Asistente() {
               turno={{
                 rol: 'asistente',
                 texto:
+                  // el plan Básico no tiene escritos ni documentos propios: el saludo no los ofrece
                   `Hola. Soy ${NOMBRE_ASISTENTE}, su asistente de jurisprudencia: busco en las sentencias de la Suprema Corte (Boletín Judicial), ` +
-                  'en las leyes y reglamentos y en sus documentos, y le doy mi análisis con las citas para que las verifique. ' +
-                  'También le redacto instancias y otros escritos aquí al lado: usted me dice qué cambiar y lo descarga en Word o PDF.' +
+                  (perfil.escritos
+                    ? 'en las leyes y reglamentos y en sus documentos, y le doy mi análisis con las citas para que las verifique. ' +
+                      'También le redacto instancias y otros escritos aquí al lado: usted me dice qué cambiar y lo descarga en Word o PDF.'
+                    : 'y en las leyes y reglamentos, y le doy mi análisis con las citas para que las verifique.') +
                   '\n\nPuede empezar con una de estas:',
               }}
             />
@@ -286,9 +289,11 @@ export default function Asistente() {
                 </button>
               ))}
             </div>
-            <Button variant="outline" className="h-11 self-start border-regla text-ink" onClick={() => setGaleria(true)}>
-              <FileStack className="text-marca-texto" /> Ver los modelos de escritos
-            </Button>
+            {perfil.escritos && (
+              <Button variant="outline" className="h-11 self-start border-regla text-ink" onClick={() => setGaleria(true)}>
+                <FileStack className="text-marca-texto" /> Ver los modelos de escritos
+              </Button>
+            )}
           </>
         )}
         {pendiente && (
@@ -371,9 +376,11 @@ export default function Asistente() {
                   <FilePen /> <span className={etiqueta}>Ver el escrito</span>
                 </Button>
               )}
-              <Button variant="ghost" className="h-11 min-w-11 text-ink-soft" onClick={() => setGaleria(true)} title="Modelos de escritos">
-                <FileStack /> <span className={etiqueta}>Modelos</span>
-              </Button>
+              {perfil.escritos && (
+                <Button variant="ghost" className="h-11 min-w-11 text-ink-soft" onClick={() => setGaleria(true)} title="Modelos de escritos">
+                  <FileStack /> <span className={etiqueta}>Modelos</span>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 className={cn('h-11 min-w-11 text-ink-soft', !alLado && 'xl:hidden')}

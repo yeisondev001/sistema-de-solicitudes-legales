@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { api, ErrorApi } from '@/lib/api'
+import { useSesion } from '@/lib/sesion'
 import type { Documento } from '@/lib/tipos'
 
 const ESTANTES = [
@@ -21,6 +22,7 @@ const ESTANTES = [
 
 /** Qué hay en la biblioteca y los documentos propios de la persona. */
 export default function Biblioteca() {
+  const { perfil } = useSesion()
   const [datos, setDatos] = useState<{ configurada: boolean; documentos: Documento[] } | null>(null)
   const [error, setError] = useState('')
   const [porQuitar, setPorQuitar] = useState<Documento | null>(null)
@@ -67,13 +69,22 @@ export default function Biblioteca() {
 
         <Seccion titulo="Mis documentos">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="max-w-xl text-[0.95rem] text-ink-soft">
-              Suba sentencias, resoluciones o escritos en PDF digital o Word (hasta 20 MB). Solo usted los verá.
-            </p>
-            <Button size="grande" onClick={subida.abrir} disabled={subida.subiendo || datos?.configurada === false}>
-              {subida.subiendo ? <Loader2 className="animate-spin" /> : <Upload />}
-              {subida.subiendo ? 'Subiendo…' : 'Subir documentos'}
-            </Button>
+            {perfil.escritos ? (
+              <>
+                <p className="max-w-xl text-[0.95rem] text-ink-soft">
+                  Suba sentencias, resoluciones o escritos en PDF digital o Word (hasta 20 MB). Solo usted los verá.
+                </p>
+                <Button size="grande" onClick={subida.abrir} disabled={subida.subiendo || datos?.configurada === false}>
+                  {subida.subiendo ? <Loader2 className="animate-spin" /> : <Upload />}
+                  {subida.subiendo ? 'Subiendo…' : 'Subir documentos'}
+                </Button>
+              </>
+            ) : (
+              <p className="max-w-xl text-[0.95rem] text-ink-soft">
+                Subir sus propios documentos para que Papiniano también busque en ellos viene con el plan Abogado. Para
+                pasar al plan Abogado, escríbanos.
+              </p>
+            )}
           </div>
           {error ? (
             <p className="text-destructive">{error}</p>

@@ -3,13 +3,13 @@ import { CabeceraPublica, PiePublico } from '@/components/publico'
 import { NOMBRE_APP } from '@/lib/tema'
 
 /*
-  Las páginas legales del pie (Lemon Squeezy las pide para aprobar la tienda).
-  SON BORRADORES: los debe revisar un abogado antes de cobrar. Lo que falta va entre corchetes.
+  Las páginas legales del pie (Lemon Squeezy las pide para aprobar la tienda). Lemon Squeezy es el vendedor:
+  cobra, factura y reembolsa; por eso aquí no va empresa, solo el nombre del servicio. Las debe revisar un abogado
+  antes de cobrar.
 */
 
-const TITULAR = '[NOMBRE O RAZÓN SOCIAL DEL TITULAR]'
 const CORREO = '[CORREO DE CONTACTO]'
-const ACTUALIZADO = '[FECHA]'
+const ACTUALIZADO = '13 de noviembre de 2026'
 
 type Pagina = 'terminos' | 'privacidad' | 'reembolso' | 'contacto'
 
@@ -19,8 +19,8 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
     cuerpo: (
       <>
         <p>
-          Estos términos regulan el uso de {NOMBRE_APP}, un programa en línea para abogados de la República Dominicana,
-          ofrecido por {TITULAR}. Al crear una cuenta o usar el servicio, usted los acepta.
+          Estos términos regulan el uso de {NOMBRE_APP}, un programa en línea para abogados de la República Dominicana.
+          Al crear una cuenta o usar el servicio, usted los acepta.
         </p>
         <h2>1. Qué es el servicio</h2>
         <p>
@@ -37,8 +37,10 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         <h2>3. Prueba gratis, planes y pagos</h2>
         <p>
           La prueba gratis dura los días indicados en la página de planes y tiene un máximo de consultas por día. Los
-          planes pagos se cobran por adelantado cada mes a través de Lemon Squeezy, que actúa como vendedor y procesa el
-          pago. Puede cancelar cuando quiera: el acceso sigue hasta el final del período pagado.
+          planes pagos se cobran por adelantado, cada mes o cada año según elija, a través de Lemon Squeezy, que es el
+          vendedor: procesa el pago, le envía el recibo y aplica los impuestos que correspondan. El plan Despacho
+          incluye cuatro abogados y suma un cargo por cada abogado más. Puede cancelar cuando quiera: el acceso sigue hasta el
+          final del período pagado.
         </p>
         <h2>4. Uso aceptable</h2>
         <p>
@@ -58,7 +60,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         </p>
         <h2>7. Responsabilidad</h2>
         <p>
-          El servicio se ofrece tal como está. {TITULAR} no responde por decisiones tomadas solo con base en las
+          El servicio se ofrece tal como está. {NOMBRE_APP} no responde por decisiones tomadas solo con base en las
           respuestas del asistente, ni por interrupciones del servicio ajenas a su control.
         </p>
         <h2>8. Cambios y ley aplicable</h2>
@@ -74,8 +76,8 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
     cuerpo: (
       <>
         <p>
-          {TITULAR} trata sus datos personales conforme a la Ley 172-13 sobre protección integral de los datos personales
-          de la República Dominicana. Aquí explicamos qué datos usamos y para qué.
+          En {NOMBRE_APP} tratamos sus datos personales conforme a la Ley 172-13 sobre protección integral de los datos
+          personales de la República Dominicana. Aquí explicamos qué datos usamos y para qué.
         </p>
         <h2>Qué datos guardamos</h2>
         <ul>
@@ -96,6 +98,13 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
           (en Estados Unidos), los servicios de inteligencia artificial que leen la consulta y las fuentes encontradas para
           redactar la respuesta, Google para la entrada con su cuenta y Lemon Squeezy para los pagos. Por eso le pedimos
           no escribir en las consultas datos personales de sus clientes.
+        </p>
+        <h2>Si trabaja en una oficina (plan Despacho)</h2>
+        <p>
+          El dueño de la oficina ve su nombre, su correo, cuándo usó {NOMBRE_APP} por última vez y cuántas consultas hizo
+          en el mes. Nunca ve lo que usted pregunta, sus conversaciones, sus documentos ni sus escritos. Los modelos que
+          usted decida compartir los ven los abogados de su oficina. Si sale de la oficina, todo lo suyo sigue en su
+          cuenta.
         </p>
         <h2>Cookies</h2>
         <p>Usamos una sola cookie, la que mantiene abierta su sesión. No usamos cookies de publicidad ni de seguimiento.</p>
@@ -121,7 +130,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         </p>
         <h2>Reembolsos</h2>
         <p>
-          Si el servicio no le funcionó como esperaba, puede pedir el reembolso de su primer pago dentro de los [7] días
+          Si el servicio no le funcionó como esperaba, puede pedir el reembolso de su primer pago dentro de los 7 días
           siguientes, escribiendo a {CORREO}. Los pagos de meses siguientes no se reembolsan, salvo que el servicio haya
           estado sin funcionar por causa nuestra.
         </p>
@@ -134,11 +143,10 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
     cuerpo: (
       <>
         <p>¿Preguntas, el plan Despacho para varios abogados, o algo que no funciona? Escríbanos:</p>
-        <ul>
-          <li>Correo: {CORREO}</li>
-          <li>WhatsApp: [NÚMERO]</li>
-        </ul>
-        <p>Respondemos en días laborables. {TITULAR}, Santo Domingo, República Dominicana.</p>
+        <p>
+          Correo: <a href={`mailto:${CORREO}`}>{CORREO}</a>
+        </p>
+        <p>Respondemos en días laborables.</p>
       </>
     ),
   },
@@ -159,11 +167,6 @@ export default function Legal({ pagina }: { pagina: Pagina }) {
     <div className="min-h-dvh bg-background text-ink">
       <CabeceraPublica />
       <main className="mx-auto max-w-[760px] px-5 py-10 md:py-14">
-        {pagina !== 'contacto' && (
-          <p role="note" className="mb-6 rounded-lg border border-regla bg-aviso px-4 py-3 text-[0.9rem] text-aviso-texto">
-            Borrador para revisión legal: complete lo que está entre corchetes y hágalo revisar antes de cobrar.
-          </p>
-        )}
         <h1 className="mb-2 font-heading text-[2.2rem] leading-tight font-medium">{titulo}</h1>
         {pagina !== 'contacto' && <p className="mb-8 text-[0.9rem] text-ink-soft">Última actualización: {ACTUALIZADO}</p>}
         <div className="lectura max-w-none [&_h2]:mt-8 [&_h2]:font-heading [&_h2]:text-[1.3rem]">{cuerpo}</div>

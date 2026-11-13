@@ -11,6 +11,7 @@ import Entrada from '@/pages/entrada'
 import Escritorio from '@/pages/escritorio'
 import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
+import MiOficina from '@/pages/mi-oficina'
 import Pronto from '@/pages/pronto'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
@@ -102,6 +103,8 @@ export default function App() {
             <Route path="redaccion/*" element={<Pronto sala="redaccion" />} />
           )}
           {sesion.perfil.es_admin && <Route path="usuarios" element={<Usuarios />} />}
+          {/* siempre: al aceptar una invitación se llega aquí antes de que se vuelva a leer la cuenta */}
+          <Route path="oficina" element={<MiOficina />} />
           <Route path="expedientes" element={<Pronto sala="expedientes" />} />
           <Route path="agenda" element={<Pronto sala="agenda" />} />
           <Route path="*" element={<Navigate to="/" replace />} />

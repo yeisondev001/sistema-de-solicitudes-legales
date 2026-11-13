@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { api, ErrorApi } from '@/lib/api'
+import { useSesion } from '@/lib/sesion'
 import type { Modelo } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,8 @@ interface Catalogo {
   modelos: Modelo[]
   /** los que subió el abogado */
   propios: Modelo[]
+  /** los que comparten sus colegas de oficina (plan Despacho) */
+  oficina: Modelo[]
   /** clave → nombre, en el orden en que se muestran */
   grupos: Record<string, string>
   materias: Record<string, string>
@@ -42,6 +45,7 @@ export function GaleriaModelos({
   // subir uno nuevo (null) o editar uno suyo; undefined: no se está subiendo nada
   const [subiendo, setSubiendo] = useState<Borrador | null | undefined>(undefined)
   const [porBorrar, setPorBorrar] = useState<Modelo | null>(null)
+  const { perfil } = useSesion()
 
   useEffect(() => {
     if (!abierto || catalogo) return
@@ -54,15 +58,20 @@ export function GaleriaModelos({
   const deMateria = (m: Modelo) => !materia || m.materia === materia
   const lista = catalogo?.modelos.filter(deMateria) ?? []
   const propios = catalogo?.propios.filter(deMateria) ?? []
+  const deOficina = catalogo?.oficina.filter(deMateria) ?? []
   const materias = catalogo
-    ? Object.entries(catalogo.materias).filter(([k]) => [...catalogo.modelos, ...catalogo.propios].some((m) => m.materia === k))
+    ? Object.entries(catalogo.materias).filter(([k]) =>
+        [...catalogo.modelos, ...catalogo.propios, ...catalogo.oficina].some((m) => m.materia === k),
+      )
     : []
   const idDe = (m: Modelo) => Number(m.clave.replace('propio-', ''))
 
   async function editar(m: Modelo) {
     try {
       const r = await api.get<Modelo & { texto: string }>(`/api/modelos/${m.clave}`)
-      setSubiendo({ id: idDe(m), nombre: r.nombre, grupo: r.grupo, materia: r.materia, texto: r.texto })
+      setSubiendo({
+        id: idDe(m), nombre: r.nombre, grupo: r.grupo, materia: r.materia, texto: r.texto, compartido: Boolean(r.compartido),
+      })
     } catch (e) {
       toast.error((e as ErrorApi).message)
     }
@@ -138,10 +147,33 @@ export function GaleriaModelos({
                   <p className="text-[0.92rem] text-ink-soft">
                     {catalogo.propios.length
                       ? 'Ninguno de sus modelos es de esta materia.'
-                      : 'Suba sus propios escritos en Word para usarlos como modelo. Solo los ve usted.'}
+                      : perfil.oficina
+                        ? 'Suba sus propios escritos en Word para usarlos como modelo. Solo los ve usted, salvo los que comparta con su oficina.'
+                        : 'Suba sus propios escritos en Word para usarlos como modelo. Solo los ve usted.'}
                   </p>
                 )}
               </section>
+              {deOficina.length > 0 && (
+                <section className="space-y-2.5">
+                  <h3 className="font-heading text-lg font-medium text-ink">
+                    De la oficina <span className="font-sans text-[0.9rem] text-ink-soft">({deOficina.length})</span>
+                  </h3>
+                  <ul className="space-y-2.5">
+                    {deOficina.map((m) => (
+                      <li key={m.clave}>
+                        <FichaModelo
+                          modelo={m}
+                          materia={catalogo.materias[m.materia]}
+                          grupo={catalogo.grupos[m.grupo]}
+                          ocupado={ocupado}
+                          alVer={() => setViendo(m)}
+                          alUsar={() => alUsar(m)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               {Object.entries(catalogo.grupos).map(([grupo, nombre]) => {
                 const delGrupo = lista.filter((m) => m.grupo === grupo)
                 return (
@@ -239,6 +271,7 @@ function FichaModelo({
         <p className="font-bold text-ink">{modelo.nombre}</p>
         {donde && <p className="text-[0.85rem] text-ink-soft">{donde}</p>}
         {!modelo.propio && <p className="text-[0.92rem] leading-snug text-ink-soft">{modelo.cuando}</p>}
+        {modelo.propio && modelo.compartido && <p className="text-[0.85rem] text-marca-texto">Compartido con la oficina</p>}
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
         {alEditar && (

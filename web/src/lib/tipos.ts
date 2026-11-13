@@ -9,12 +9,57 @@ export interface Perfil {
   nombre: string
   es_admin: boolean
   email: string
-  plan: 'beta' | 'prueba' | 'activo' | 'vencido'
+  plan: 'beta' | 'prueba' | 'basico' | 'activo' | 'vencido'
   plantillas: boolean
   tema: string
   letra: 'normal' | 'grande' | 'muy_grande'
   colores: Colores
+  /** escritos, modelos y documentos propios: todos los planes menos el Básico */
+  escritos: boolean
   prueba: { dias: number; preguntas_hoy: number; tope: number } | null
+  /** en el plan Básico: las consultas de hoy y el máximo por día */
+  basico: { preguntas_hoy: number; tope: number } | null
+  /** su oficina del plan Despacho (el plan de la cuenta es el de la oficina) */
+  oficina: { id: number; nombre: string; es_dueno: boolean } | null
+}
+
+/** La oficina vista desde adentro: el dueño ve además el uso de cada abogado y los correos que agregó */
+export interface MiOficina {
+  id: number
+  nombre: string
+  plan: 'activo' | 'vencido'
+  es_dueno: boolean
+  /** los que paga la oficina: uno por abogado, el dueño incluido */
+  asientos: number
+  abogados: {
+    id: number
+    nombre: string
+    dueno: boolean
+    /** solo para el dueño */
+    email?: string
+    ultimo?: string | null
+    mes?: number
+  }[]
+  /** correos que agregó el dueño y todavía no aceptan */
+  pendientes: string[]
+}
+
+/** Una oficina que agregó a este abogado y espera que acepte */
+export interface Invitacion {
+  id: number
+  nombre: string
+  dueno: string
+}
+
+/** Una oficina en el panel del administrador */
+export interface OficinaAdmin {
+  id: number
+  nombre: string
+  plan: 'activo' | 'vencido'
+  asientos: number
+  dueno_id: number
+  dueno: string
+  abogados: number
 }
 
 export interface Entrada {
@@ -24,6 +69,7 @@ export interface Entrada {
   falta_codigo: boolean
   dias_prueba: number
   preguntas_prueba: number
+  preguntas_basico: number
   colores: Colores
 }
 
@@ -80,8 +126,13 @@ export interface Modelo {
   tribunal: string
   /** en qué caso se usa */
   cuando: string
-  /** lo subió el abogado: solo lo ve él */
+  /** lo subió el abogado: solo lo ve él (y su oficina, si lo comparte) */
   propio?: boolean
+  /** uno de los suyos que comparte con su oficina */
+  compartido?: boolean
+  /** lo compartió un colega de su oficina: lo puede usar, no cambiar */
+  oficina?: boolean
+  autor?: string
 }
 
 /** El escrito de una conversación (texto simple; ver lib/escrito.ts) */
@@ -127,6 +178,9 @@ export interface Usuario {
   plan: Perfil['plan']
   prueba_hasta: number | null
   plantillas: boolean
+  oficina_id: number | null
+  /** nombre de su oficina; si tiene, el plan que vale es el de la oficina */
+  oficina: string
 }
 
 export interface Audiencia {

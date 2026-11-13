@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, Users,
+  Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, Users,
 } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
 import { Logo } from '@/components/logo'
@@ -64,17 +64,20 @@ function MenuSalas({ alElegir }: { alElegir?: () => void }) {
   )
 }
 
-/** En la prueba gratis: los días que quedan y las consultas de hoy */
+/** En la prueba gratis: los días que quedan y las consultas de hoy. En el plan Básico, solo las consultas. */
 function CajaPrueba() {
   const { perfil } = useSesion()
-  if (!perfil.prueba) return null
-  const { dias, preguntas_hoy, tope } = perfil.prueba
+  const limite = perfil.prueba ?? perfil.basico
+  if (!limite) return null
+  const { preguntas_hoy, tope } = limite
   return (
     <div className="space-y-2 border-t border-sidebar-border px-2.5 pt-4">
-      <p className="text-[0.8rem] font-bold tracking-wide text-nav-sub">PRUEBA GRATIS</p>
-      <p className="font-heading text-xl text-sobre-panel">
-        Quedan {dias} día{dias === 1 ? '' : 's'}
-      </p>
+      <p className="text-[0.8rem] font-bold tracking-wide text-nav-sub">{perfil.prueba ? 'PRUEBA GRATIS' : 'PLAN BÁSICO'}</p>
+      {perfil.prueba && (
+        <p className="font-heading text-xl text-sobre-panel">
+          Quedan {perfil.prueba.dias} día{perfil.prueba.dias === 1 ? '' : 's'}
+        </p>
+      )}
       <Progress
         value={tope ? Math.min(100, (preguntas_hoy / tope) * 100) : 0}
         className="h-1.5 bg-sidebar-accent [&>*]:bg-nav-linea"
@@ -98,7 +101,7 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-bold text-sobre-panel">{perfil.nombre}</span>
-          <span className="block truncate text-[0.85rem] text-nav-sub">Mi cuenta · Apariencia</span>
+          <span className="block truncate text-[0.85rem] text-nav-sub">{perfil.oficina?.nombre ?? 'Mi cuenta · Apariencia'}</span>
         </span>
         <ChevronsUpDown className="size-4 text-nav-sub" />
       </DropdownMenuTrigger>
@@ -107,6 +110,11 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
           {perfil.email || perfil.usuario}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {perfil.oficina && (
+          <DropdownMenuItem onSelect={() => navegar('/oficina')} className="h-10 text-[0.95rem]">
+            <Building2 /> Mi oficina
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={abrirApariencia} className="h-10 text-[0.95rem]">
           <Palette /> Apariencia
         </DropdownMenuItem>

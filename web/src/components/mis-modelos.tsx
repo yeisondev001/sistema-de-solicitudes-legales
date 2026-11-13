@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api, ErrorApi, leerModelo } from '@/lib/api'
 import { espacios, etiqueta } from '@/lib/escrito'
+import { useSesion } from '@/lib/sesion'
 import type { Modelo } from '@/lib/tipos'
 
 /** Lo que se está editando: un modelo nuevo (sin id) o uno suyo que ya existe */
@@ -17,6 +18,8 @@ export interface Borrador {
   grupo: string
   materia: string
   texto: string
+  /** lo ven y lo usan también los abogados de su oficina */
+  compartido?: boolean
 }
 
 const SELECT =
@@ -25,7 +28,8 @@ const SELECT =
 /**
  * Subir un modelo propio en dos pasos: elegir el Word y revisarlo. Al leerlo, la app ya cambió los datos que
  * reconoce (cédulas, montos, fechas…); los nombres los marca el abogado con «Convertir en dato», que cambia
- * ese texto en todo el modelo. Se guarda en su cuenta y solo lo ve él. El Word no se guarda ni pasa por la IA.
+ * ese texto en todo el modelo. Se guarda en su cuenta y solo lo ve él, salvo que lo comparta con su oficina.
+ * El Word no se guarda ni pasa por la IA.
  */
 export function SubirModelo({
   borrador, grupos, materias, alCerrar, alGuardar,
@@ -46,6 +50,7 @@ export function SubirModelo({
   const [seleccion, setSeleccion] = useState('')
   const [dato, setDato] = useState('')
   const area = useRef<HTMLTextAreaElement>(null)
+  const { perfil } = useSesion()
 
   async function leer(archivo: File) {
     setLeyendo(true)
@@ -86,7 +91,10 @@ export function SubirModelo({
     if (!actual) return
     setGuardando(true)
     try {
-      const cuerpo = { nombre: actual.nombre, grupo: actual.grupo, materia: actual.materia, texto: actual.texto }
+      const cuerpo = {
+        nombre: actual.nombre, grupo: actual.grupo, materia: actual.materia, texto: actual.texto,
+        compartido: Boolean(actual.compartido),
+      }
       const m = actual.id
         ? await api.put<Modelo>(`/api/modelos/propios/${actual.id}`, cuerpo)
         : await api.post<Modelo>('/api/modelos/propios', cuerpo)
@@ -109,7 +117,8 @@ export function SubirModelo({
             {actual?.id ? 'Editar mi modelo' : 'Subir mi modelo'}
           </DialogTitle>
           <DialogDescription>
-            Se guarda en su cuenta y solo lo ve usted. El Word no se guarda ni se le envía a la IA.
+            Se guarda en su cuenta y solo lo ve usted{perfil.oficina ? ', salvo que lo comparta con su oficina' : ''}. El Word no
+            se guarda ni se le envía a la IA.
           </DialogDescription>
         </DialogHeader>
 
@@ -220,6 +229,23 @@ export function SubirModelo({
                 style={{ fontFamily: '"Century Gothic", "Didact Gothic", sans-serif' }}
                 className="block min-h-[45dvh] w-full resize-y rounded-lg border border-pista/80 bg-papel p-4 text-[0.95rem] leading-relaxed text-ink outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
+            )}
+
+            {perfil.oficina && (
+              <label className="flex items-start gap-3 rounded-xl border border-regla bg-card px-4 py-3 text-ink">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-[1.15rem] accent-[var(--t-accent)]"
+                  checked={Boolean(actual.compartido)}
+                  onChange={(e) => setActual({ ...actual, compartido: e.target.checked })}
+                />
+                <span>
+                  <span className="block font-bold">Compartirlo con la oficina</span>
+                  <span className="block text-[0.9rem] text-ink-soft">
+                    Los abogados de {perfil.oficina.nombre} lo podrán ver y usar, pero no cambiar.
+                  </span>
+                </span>
+              </label>
             )}
 
             {datos.length > 0 && (

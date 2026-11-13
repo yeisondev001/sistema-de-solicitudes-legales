@@ -72,18 +72,23 @@ def _colores(clave) -> dict:
 
 def _perfil(u: dict) -> dict:
     """Lo que las pantallas necesitan saber de la cuenta: datos, tema y, en prueba, lo que le queda."""
-    perfil = {k: u[k] for k in ("id", "usuario", "nombre", "es_admin", "email", "plan", "plantillas")}
+    perfil = {k: u[k] for k in ("id", "usuario", "nombre", "es_admin", "email", "plan", "plantillas", "oficina")}
     perfil["tema"] = u["tema"] or temas.MARCA
     perfil["colores"] = _colores(u["tema"])
     perfil["letra"] = u.get("letra") or "normal"
-    perfil["prueba"] = None
-    if u["plan"] == "prueba":
+    perfil["escritos"] = cuentas.con_escritos(u["plan"])
+    perfil["prueba"] = perfil["basico"] = None
+    tope = cuentas.tope_diario(u["plan"])
+    if tope:
         try:
             hoy = cuentas.preguntas_de_hoy(u["id"])
         except Exception:
             hoy = 0
-        perfil["prueba"] = {"dias": max(0, int(((u.get("prueba_hasta") or 0) - time.time() + 86399) // 86400)),
-                            "preguntas_hoy": hoy, "tope": cuentas.PREGUNTAS_PRUEBA}
+        if u["plan"] == "prueba":
+            perfil["prueba"] = {"dias": max(0, int(((u.get("prueba_hasta") or 0) - time.time() + 86399) // 86400)),
+                                "preguntas_hoy": hoy, "tope": tope}
+        else:
+            perfil["basico"] = {"preguntas_hoy": hoy, "tope": tope}
     return perfil
 
 
@@ -113,7 +118,7 @@ def entrada():
     return {"primera_vez": primera_vez, "google": bool(_google()) and not primera_vez, "pide_codigo": pide_codigo,
             "falta_codigo": pide_codigo and not os.environ.get("CODIGO_INSTALACION", "").strip(),
             "dias_prueba": cuentas.DIAS_PRUEBA, "preguntas_prueba": cuentas.PREGUNTAS_PRUEBA,
-            "colores": _colores(temas.MARCA)}
+            "preguntas_basico": cuentas.PREGUNTAS_BASICO, "colores": _colores(temas.MARCA)}
 
 
 class Credenciales(BaseModel):
@@ -279,6 +284,13 @@ def audiencias(u=Depends(usuario_actual)):
 
 
 # ── ASISTENTE ────────────────────────────────────
+# el plan Básico es para consultar: escritos, modelos y documentos propios son del plan Abogado
+SIN_ESCRITOS = ("Los escritos, los modelos y sus propios documentos vienen con el plan Abogado. Con el plan "
+                "Básico puede consultar sentencias y leyes. Para pasar al plan Abogado, escríbanos.")
+SIN_ESCRITOS_CHAT = ("Con el plan Básico no puedo redactar escritos: eso viene con el plan Abogado. Sí le busco "
+                     "sentencias y leyes sobre el tema; dígame qué necesita saber.")
+
+
 def _con_referencia(mensajes: list) -> list:
     """Cada fuente lleva cómo se cita, así las pantallas no repiten esa regla."""
     for m in mensajes:
@@ -314,12 +326,21 @@ class Pregunta(BaseModel):
 
 
 def _modelo(clave: str, u: dict):
-    """(ficha, texto) de un modelo de todos o de los del abogado; (None, None) si no existe."""
+    """(ficha, texto) de un modelo de todos, de los del abogado o de los que comparte su oficina;
+    (None, None) si no existe."""
     propio = modelos.id_propio(clave)
     if propio is None:
         return modelos.ficha(clave), modelos.texto(clave)
-    fila = cuentas.leer_modelo_propio(u["id"], propio)
-    return (modelos.propio(fila), fila["texto"]) if fila else (None, None)
+    fila = cuentas.leer_modelo(u["id"], propio)
+    return (modelos.propio(fila, u["id"]), fila["texto"]) if fila else (None, None)
+
+
+def _modelos_del_abogado(u: dict) -> list:
+    """Los suyos y los que comparten sus colegas de oficina, con la misma forma que los de todos."""
+    filas = cuentas.listar_modelos_propios(u["id"])
+    if u.get("oficina"):
+        filas += cuentas.listar_modelos_oficina(u["id"])
+    return [modelos.propio(f, u["id"]) for f in filas]
 
 
 def _usar_modelo(clave: str, hay_escrito: bool, u: dict) -> dict:
@@ -335,9 +356,10 @@ def _usar_modelo(clave: str, hay_escrito: bool, u: dict) -> dict:
 
 
 def _sugerir_modelos(q: str, plan: dict, u: dict) -> dict | None:
-    """Antes de redactar un escrito nuevo, Papiniano ofrece los modelos que sirven para eso (también los suyos)."""
+    """Antes de redactar un escrito nuevo, Papiniano ofrece los modelos que sirven para eso (también los suyos
+    y los de su oficina)."""
     try:
-        propios = cuentas.listar_modelos_propios(u["id"])
+        propios = _modelos_del_abogado(u)
     except Exception:
         propios = []   # si no se pueden leer los suyos, se ofrecen los de todos
     sugeridos = modelos.sugerir(f"{q} {plan['consulta']}", propios=propios)
@@ -386,6 +408,9 @@ def _responder(q: str, historial_chat: list, u: dict, avance, escrito: str = "",
     plan = (juris_ia.preparar_busqueda(q, historial_chat, hay_escrito=bool(escrito)) if juris_ia.disponible()
             else {"tipo": "nueva", "consulta": q, "busquedas": [q]})
     if plan["tipo"] == "escrito":
+        if not cuentas.con_escritos(u["plan"]):
+            turno["texto"] = SIN_ESCRITOS_CHAT
+            return turno
         # un escrito nuevo: primero se ofrecen los modelos (salvo que ya dijo que lo quiere sin modelo)
         if not escrito and modelo != "ninguno":
             sugerencia = _sugerir_modelos(q, plan, u)
@@ -455,12 +480,13 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
         guardar = True
         # eligió un modelo: va a la hoja sin pasar por la IA (no cuenta como consulta)
         if datos.modelo and datos.modelo != "ninguno":
-            turno = _usar_modelo(datos.modelo, bool(escrito), u)
+            turno = (_usar_modelo(datos.modelo, bool(escrito), u) if cuentas.con_escritos(u["plan"])
+                     else {"rol": "asistente", "texto": SIN_ESCRITOS_CHAT})
         # un saludo o una prueba ("hola") no se busca: siempre saldría "lo más parecido"
         elif not juris_ia.parece_consulta(q):
             turno = {"rol": "asistente", "texto": juris_ia.no_es_consulta(q)}
         else:
-            # las cuentas de prueba tienen un máximo de preguntas por día
+            # la prueba y el plan Básico tienen un máximo de preguntas por día
             try:
                 cuentas.registrar_pregunta(u["id"], u["plan"])
                 limite = None
@@ -516,6 +542,13 @@ class TextoEscrito(BaseModel):
     texto: str
 
 
+def con_escritos(u=Depends(usuario_actual)) -> dict:
+    """Escritos, modelos y documentos propios: todos los planes menos el Básico."""
+    if not cuentas.con_escritos(u["plan"]):
+        raise HTTPException(403, SIN_ESCRITOS)
+    return u
+
+
 MAX_ESCRITO = 60_000   # caracteres: una demanda larga cabe de sobra
 
 
@@ -529,7 +562,7 @@ def _texto_escrito(e: TextoEscrito) -> str:
 
 
 @app.put("/api/conversaciones/{conv_id}/escrito")
-def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(usuario_actual)):
+def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(con_escritos)):
     """Lo que el abogado corrigió a mano en el escrito."""
     if not cuentas.abrir_conversacion(u["id"], conv_id):
         raise HTTPException(404, "Esa conversación ya no existe.")
@@ -537,7 +570,7 @@ def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(usuario_actual)):
 
 
 @app.post("/api/conversaciones/{conv_id}/escrito/deshacer")
-def escrito_deshacer(conv_id: int, u=Depends(usuario_actual)):
+def escrito_deshacer(conv_id: int, u=Depends(con_escritos)):
     escrito = cuentas.deshacer_escrito(u["id"], conv_id)
     if not escrito:
         raise HTTPException(404, "Esa conversación no tiene escrito.")
@@ -545,17 +578,19 @@ def escrito_deshacer(conv_id: int, u=Depends(usuario_actual)):
 
 
 @app.get("/api/modelos")
-def modelos_lista(u=Depends(usuario_actual)):
-    """Los modelos de escritos, para elegir uno por grupo y materia, y los que subió el abogado."""
+def modelos_lista(u=Depends(con_escritos)):
+    """Los modelos de escritos, para elegir uno por grupo y materia, los que subió el abogado y los que
+    comparten sus colegas de oficina."""
     try:
-        propios = [modelos.propio(f) for f in cuentas.listar_modelos_propios(u["id"])]
+        suyos = _modelos_del_abogado(u)
     except Exception:
-        propios = []
-    return {"modelos": modelos.lista(), "propios": propios, "grupos": modelos.GRUPOS, "materias": modelos.MATERIAS}
+        suyos = []
+    return {"modelos": modelos.lista(), "propios": [m for m in suyos if m["propio"]],
+            "oficina": [m for m in suyos if m.get("oficina")], "grupos": modelos.GRUPOS, "materias": modelos.MATERIAS}
 
 
 @app.get("/api/modelos/{clave}")
-def modelo_ver(clave: str, u=Depends(usuario_actual)):
+def modelo_ver(clave: str, u=Depends(con_escritos)):
     ficha, texto = _modelo(clave, u)
     if not texto:
         raise HTTPException(404, "Ese modelo no existe.")
@@ -566,7 +601,7 @@ MAX_MB_MODELO = 5
 
 
 @app.post("/api/modelos/leer")
-async def modelo_leer(request: Request, u=Depends(usuario_actual)):
+async def modelo_leer(request: Request, u=Depends(con_escritos)):
     """Convierte el Word que sube el abogado en el texto de un modelo, sin guardarlo todavía: primero lo
     revisa y marca los nombres. Los datos que se reconocen (cédulas, montos…) ya salen como datos por llenar.
     El Word no se guarda ni pasa por la IA."""
@@ -592,30 +627,32 @@ class ModeloPropio(BaseModel):
     grupo: str = ""
     materia: str = ""
     texto: str
+    # que lo vean y lo usen también los abogados de su oficina
+    compartido: bool = False
 
 
-def _modelo_propio(m: ModeloPropio) -> tuple:
+def _modelo_propio(m: ModeloPropio, u: dict) -> tuple:
     nombre = m.nombre.strip()[:120]
     if not nombre:
         raise HTTPException(400, "Póngale un nombre al modelo.")
     grupo = m.grupo if m.grupo in modelos.GRUPOS else ""
     materia = m.materia if m.materia in modelos.MATERIAS else ""
-    return nombre, grupo, materia, _texto_escrito(TextoEscrito(texto=m.texto))
+    return nombre, grupo, materia, _texto_escrito(TextoEscrito(texto=m.texto)), m.compartido and bool(u["oficina"])
 
 
 @app.post("/api/modelos/propios")
-def modelo_propio_crear(m: ModeloPropio, u=Depends(usuario_actual)):
+def modelo_propio_crear(m: ModeloPropio, u=Depends(con_escritos)):
     try:
-        modelo_id = cuentas.guardar_modelo_propio(u["id"], None, *_modelo_propio(m))
+        modelo_id = cuentas.guardar_modelo_propio(u["id"], None, *_modelo_propio(m, u))
     except ValueError as ex:
         raise HTTPException(400, str(ex))
     return modelos.propio(cuentas.leer_modelo_propio(u["id"], modelo_id))
 
 
 @app.put("/api/modelos/propios/{modelo_id}")
-def modelo_propio_cambiar(modelo_id: int, m: ModeloPropio, u=Depends(usuario_actual)):
+def modelo_propio_cambiar(modelo_id: int, m: ModeloPropio, u=Depends(con_escritos)):
     try:
-        cuentas.guardar_modelo_propio(u["id"], modelo_id, *_modelo_propio(m))
+        cuentas.guardar_modelo_propio(u["id"], modelo_id, *_modelo_propio(m, u))
     except ValueError as ex:
         raise HTTPException(404, str(ex))
     return modelos.propio(cuentas.leer_modelo_propio(u["id"], modelo_id))
@@ -628,7 +665,7 @@ def modelo_propio_borrar(modelo_id: int, u=Depends(usuario_actual)):
 
 
 @app.post("/api/escrito/{formato}")
-def escrito_descargar(formato: str, e: TextoEscrito, u=Depends(usuario_actual)):
+def escrito_descargar(formato: str, e: TextoEscrito, u=Depends(con_escritos)):
     """El escrito en Word o PDF, ya con los datos que llenó el abogado (esos datos no pasan por la IA)."""
     if formato not in ("docx", "pdf"):
         raise HTTPException(404, "Ese formato no existe.")
@@ -665,7 +702,7 @@ def documentos(u=Depends(usuario_actual)):
 
 
 @app.post("/api/documentos")
-async def subir_documento(request: Request, u=Depends(usuario_actual)):
+async def subir_documento(request: Request, u=Depends(con_escritos)):
     """El archivo llega tal cual en el cuerpo; el nombre, en el encabezado X-Nombre (codificado)."""
     if not juris_db.configurada():
         raise HTTPException(503, "Falta configurar el buscador.")
@@ -784,7 +821,8 @@ def solo_admin(u=Depends(usuario_actual)) -> dict:
 @app.get("/api/usuarios")
 def usuarios(u=Depends(solo_admin)):
     return [{**x, "es_admin": bool(x["es_admin"]), "activo": bool(x["activo"]), "plantillas": bool(x["plantillas"]),
-             "email": x["email"] or "", "plan": x["plan"] or "activo"} for x in cuentas.listar_usuarios()]
+             "email": x["email"] or "", "plan": x["plan"] or "activo", "oficina": x["oficina"] or ""}
+            for x in cuentas.listar_usuarios()]
 
 
 class NuevoUsuario(BaseModel):
@@ -811,6 +849,8 @@ class CambioUsuario(BaseModel):
     email: str | None = None
     activo: bool | None = None
     plantillas: bool | None = None
+    # la oficina en la que queda (null: sin oficina); solo cuenta si viene en el pedido
+    oficina_id: int | None = None
 
 
 @app.patch("/api/usuarios/{uid}")
@@ -827,8 +867,112 @@ def cambiar_usuario(uid: int, c: CambioUsuario, u=Depends(solo_admin)):
             cuentas.cambiar_activo(uid, c.activo)
         if c.plantillas is not None:
             cuentas.cambiar_plantillas(uid, c.plantillas)
+        if "oficina_id" in c.model_fields_set:
+            cuentas.poner_en_oficina(uid, c.oficina_id)
     except ValueError as ex:
         raise HTTPException(400, str(ex))
+    return {"ok": True}
+
+
+@app.get("/api/oficinas")
+def oficinas(u=Depends(solo_admin)):
+    return cuentas.listar_oficinas()
+
+
+class NuevaOficina(BaseModel):
+    nombre: str
+    dueno_id: int
+    # los que paga: uno por abogado, el dueño incluido
+    asientos: int = cuentas.ASIENTOS_MINIMOS
+
+
+@app.post("/api/oficinas")
+def oficina_crear(datos: NuevaOficina, u=Depends(solo_admin)):
+    try:
+        return {"id": cuentas.crear_oficina(datos.nombre, datos.dueno_id, datos.asientos)}
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+
+
+class CambioOficina(BaseModel):
+    nombre: str | None = None
+    plan: str | None = None
+    asientos: int | None = None
+
+
+@app.patch("/api/oficinas/{oid}")
+def oficina_cambiar(oid: int, c: CambioOficina, u=Depends(solo_admin)):
+    try:
+        cuentas.cambiar_oficina(oid, c.nombre, c.plan, c.asientos)
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+    return {"ok": True}
+
+
+@app.delete("/api/oficinas/{oid}")
+def oficina_borrar(oid: int, u=Depends(solo_admin)):
+    cuentas.borrar_oficina(oid)
+    return {"ok": True}
+
+
+# ── MI OFICINA (plan Despacho) ───────────────────
+def _mi_oficina(u: dict) -> dict:
+    """Su oficina (None si no tiene) y las oficinas que lo agregaron y esperan que acepte."""
+    return {"oficina": cuentas.mi_oficina(u["id"]), "invitaciones": cuentas.invitaciones_de(u)}
+
+
+def _en_oficina(accion):
+    """Hace el cambio; si no se puede, el motivo le llega al abogado como mensaje."""
+    try:
+        accion()
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+
+
+@app.get("/api/oficina")
+def oficina(u=Depends(usuario_actual)):
+    return _mi_oficina(u)
+
+
+class Correo(BaseModel):
+    email: str
+
+
+@app.post("/api/oficina/invitaciones")
+def oficina_invitar(datos: Correo, u=Depends(usuario_actual)):
+    _en_oficina(lambda: cuentas.invitar(u["id"], datos.email))
+    return _mi_oficina(u)
+
+
+@app.post("/api/oficina/invitaciones/cancelar")
+def oficina_cancelar(datos: Correo, u=Depends(usuario_actual)):
+    _en_oficina(lambda: cuentas.cancelar_invitacion(u["id"], datos.email))
+    return _mi_oficina(u)
+
+
+@app.delete("/api/oficina/abogados/{uid}")
+def oficina_quitar(uid: int, u=Depends(usuario_actual)):
+    _en_oficina(lambda: cuentas.quitar_abogado(u["id"], uid))
+    return _mi_oficina(u)
+
+
+@app.post("/api/oficina/unirme/{oid}")
+def oficina_unirme(oid: int, u=Depends(usuario_actual)):
+    _en_oficina(lambda: cuentas.aceptar_invitacion(u, oid))
+    return {"ok": True}
+
+
+@app.post("/api/oficina/rechazar/{oid}")
+def oficina_rechazar(oid: int, u=Depends(usuario_actual)):
+    cuentas.rechazar_invitacion(u, oid)
+    return {"ok": True}
+
+
+@app.post("/api/oficina/salir")
+def oficina_salir(u=Depends(usuario_actual)):
+    _en_oficina(lambda: cuentas.salir_de_oficina(u))
     return {"ok": True}
 
 

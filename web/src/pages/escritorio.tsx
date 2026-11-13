@@ -7,8 +7,9 @@ import { Renglon, Seccion } from '@/components/seccion'
 import { useSubida } from '@/components/subida'
 import { api } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
-import type { Audiencia, Conversacion, Documento } from '@/lib/tipos'
+import type { Audiencia, Conversacion, Documento, Invitacion } from '@/lib/tipos'
 import { cuando, fechaDeHoy, saludo } from '@/lib/fechas'
+import { InvitacionesOficina } from '@/pages/mi-oficina'
 
 /** El inicio: el saludo y lo del día. Para preguntar se va directo a Papiniano (no hay caja aquí). */
 export default function Escritorio() {
@@ -18,14 +19,19 @@ export default function Escritorio() {
   const [audiencias, setAudiencias] = useState<Audiencia[]>([])
   const [docs, setDocs] = useState<{ configurada: boolean; documentos: Documento[] } | null>(null)
   const [apariencia, setApariencia] = useState(false)
+  // las oficinas que le piden unirse (plan Despacho)
+  const [invitaciones, setInvitaciones] = useState<Invitacion[]>([])
 
   const contarDocumentos = () => api.get<typeof docs>('/api/documentos').then(setDocs).catch(() => {})
+  const buscarInvitaciones = () =>
+    api.get<{ invitaciones: Invitacion[] }>('/api/oficina').then((r) => setInvitaciones(r.invitaciones)).catch(() => {})
   const subida = useSubida(contarDocumentos)
 
   useEffect(() => {
     api.get<Conversacion[]>('/api/conversaciones').then(setConvs).catch(() => setConvs([]))
     if (perfil.plantillas) api.get<Audiencia[]>('/api/audiencias').then(setAudiencias).catch(() => {})
     contarDocumentos()
+    if (perfil.email && !perfil.oficina) buscarInvitaciones()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil.plantillas])
 
@@ -59,6 +65,12 @@ export default function Escritorio() {
         </div>
         {resumen && <p className="text-[0.95rem] text-ink-soft">{resumen}</p>}
       </header>
+
+      {invitaciones.length > 0 && (
+        <div className="mb-5 space-y-5">
+          <InvitacionesOficina invitaciones={invitaciones} alCambiar={buscarInvitaciones} />
+        </div>
+      )}
 
       <div className="grid gap-5 md:grid-cols-2">
         {perfil.plantillas && (
