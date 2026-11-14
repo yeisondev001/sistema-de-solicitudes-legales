@@ -16,12 +16,16 @@ import { cn } from '@/lib/utils'
 const PRUEBA_INICIAL = { dias: 7, preguntas: 20, basico: 20 }
 type Prueba = typeof PRUEBA_INICIAL
 
-/** La franja de cifras: redondeadas hacia abajo, para que sigan siendo ciertas cuando se cargue más (ESTADO_DEL_PROYECTO.md) */
-const cifras = (p: Prueba): [string, string][] => [
-  ['28.000+', 'sentencias de la Suprema Corte de Justicia'],
-  ['20+', 'códigos, leyes y reglamentos dominicanos'],
-  ['1 clic', 'para ver la página exacta de cada cita'],
-  [`${p.dias} días`, 'gratis para probarlo, sin tarjeta'],
+/**
+ * La franja de las fuentes oficiales: los nombres que el abogado reconoce, sin cantidades para comparar con otros.
+ * Solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín)
+ */
+const FUENTES: [string, string][] = [
+  ['Boletín Judicial', 'de la Suprema Corte de Justicia'],
+  ['Código de Trabajo', 'Ley 16-92'],
+  ['Código Civil', 'y el de Procedimiento Civil'],
+  ['Ley 108-05', 'de Registro Inmobiliario y sus reglamentos'],
+  ['Código Penal', 'el nuevo, Ley 74-25'],
 ]
 
 /** Lo que Papiniano lee, por materia: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
@@ -200,15 +204,21 @@ export default function Inicio() {
           <EjemploRespuesta />
         </section>
 
-        {/* en cifras: lo que ya tiene cargado */}
-        <section aria-label="En cifras" className="border-y border-papel-borde bg-card">
-          <div className="mx-auto grid max-w-[1240px] grid-cols-2 gap-x-6 gap-y-8 px-5 py-10 md:px-6 md:py-12 lg:grid-cols-4">
-            {cifras(prueba).map(([cifra, texto], i) => (
-              <div key={texto} className={cn('space-y-1.5', i > 0 && 'lg:border-l lg:border-papel-borde lg:pl-8')}>
-                <p className="font-heading text-[2.3rem] leading-none font-medium text-marca-texto md:text-[2.9rem]">{cifra}</p>
-                <p className="max-w-[15rem] leading-snug text-ink-soft">{texto}</p>
-              </div>
-            ))}
+        {/* las fuentes oficiales que lee */}
+        <section aria-label="Las fuentes oficiales" className="border-y border-papel-borde bg-card">
+          <div className="mx-auto max-w-[1240px] px-5 py-10 text-center md:px-6 md:py-12">
+            <Antetitulo>LEE DIRECTO DE LAS FUENTES OFICIALES</Antetitulo>
+            <ul className="mt-6 grid grid-cols-2 gap-y-6 lg:grid-cols-5">
+              {FUENTES.map(([nombre, detalle], i) => (
+                <li key={nombre} className={cn('space-y-1 px-3 last:col-span-2 lg:last:col-span-1', i > 0 && 'lg:border-l lg:border-papel-borde')}>
+                  <p className="font-heading text-[1.25rem] leading-tight font-medium md:text-[1.35rem] lg:whitespace-nowrap">{nombre}</p>
+                  <p className="text-[0.95rem] leading-snug text-ink-soft">{detalle}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-[0.95rem] text-ink-soft">
+              Y otras leyes y reglamentos dominicanos. Cada cita abre la página exacta del PDF oficial.
+            </p>
           </div>
         </section>
 
