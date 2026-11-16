@@ -36,11 +36,11 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         </p>
         <h2>3. Prueba gratis, planes y pagos</h2>
         <p>
-          La prueba gratis dura los días indicados en la página de planes y tiene un máximo de consultas por día. Los
-          planes pagos se cobran por adelantado, cada mes o cada año según elija, a través de Lemon Squeezy, que es el
-          vendedor: procesa el pago, le envía el recibo y aplica los impuestos que correspondan. El plan Despacho
-          incluye cuatro abogados y suma un cargo por cada abogado más. Puede cancelar cuando quiera: el acceso sigue hasta el
-          final del período pagado.
+          La prueba gratis dura los días indicados en la página de planes. Cada plan, y también la prueba, tiene un
+          máximo de consultas por día y de escritos por mes; la app le avisa cuando llega. Los planes pagos se cobran
+          por adelantado, cada mes o cada año según elija, a través de Lemon Squeezy, que es el vendedor: procesa el
+          pago, le envía el recibo y aplica los impuestos que correspondan. El plan Despacho es para hasta diez
+          abogados. Puede cancelar cuando quiera: el acceso sigue hasta el final del período pagado.
         </p>
         <h2>4. Uso aceptable</h2>
         <p>

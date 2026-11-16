@@ -16,8 +16,9 @@ import { useSesion } from '@/lib/sesion'
 import type { OficinaAdmin, Usuario } from '@/lib/tipos'
 
 const PLANES = ['beta', 'prueba', 'basico', 'activo', 'vencido'] as const
-// los asientos que paga una oficina: uno por abogado, el dueño incluido (de 4 a 30, como en cuentas.py)
-const ASIENTOS = Array.from({ length: 27 }, (_, i) => i + 4)
+// los asientos de una oficina: uno por abogado, el dueño incluido. El Despacho es para 10; más, por acuerdo
+// aparte (de 10 a 30, como en cuentas.py)
+const ASIENTOS = Array.from({ length: 21 }, (_, i) => i + 10)
 const casilla = 'size-[1.15rem] accent-[var(--t-accent)]'
 
 /** Administrar usuarios (solo administradores): plan, correo de Google, activo, plantillas y oficina. */
@@ -217,7 +218,7 @@ function NuevoUsuario({ alCrear }: { alCrear: () => void }) {
 function Oficinas({ oficinas, usuarios, alCambiar }: { oficinas: OficinaAdmin[]; usuarios: Usuario[]; alCambiar: () => void }) {
   const [nombre, setNombre] = useState('')
   const [dueno, setDueno] = useState('')
-  const [asientos, setAsientos] = useState(4)
+  const [asientos, setAsientos] = useState(10)
   const [creando, setCreando] = useState(false)
   const [porBorrar, setPorBorrar] = useState<OficinaAdmin | null>(null)
   const libres = usuarios.filter((u) => !u.oficina_id)
@@ -329,9 +330,9 @@ function Oficinas({ oficinas, usuarios, alCambiar }: { oficinas: OficinaAdmin[];
         </Button>
       </form>
       <p className="mt-3 text-[0.9rem] text-ink-soft">
-        El dueño agrega a sus abogados desde «Mi oficina» con el correo de cada uno, hasta llenar los asientos que
-        paga (él ocupa uno). Mientras la oficina esté activa, todos usan Papiniano sin límite; si la pone vencida,
-        ninguno puede entrar.
+        El dueño agrega a sus abogados desde «Mi oficina» con el correo de cada uno, hasta llenar los asientos (él
+        ocupa uno; el Despacho es para 10, y más solo por acuerdo aparte). Mientras la oficina esté activa, cada uno
+        usa Papiniano con los topes del plan Abogado; si la pone vencida, ninguno puede entrar.
       </p>
 
       <AlertDialog open={Boolean(porBorrar)} onOpenChange={(a) => !a && setPorBorrar(null)}>

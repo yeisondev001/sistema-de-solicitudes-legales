@@ -69,7 +69,7 @@ export default function Biblioteca() {
 
         <Seccion titulo="Mis documentos">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            {perfil.escritos ? (
+            {perfil.propios ? (
               <>
                 <p className="max-w-xl text-[0.95rem] text-ink-soft">
                   Suba sentencias, resoluciones o escritos en PDF digital o Word (hasta 20 MB). Solo usted los verá.

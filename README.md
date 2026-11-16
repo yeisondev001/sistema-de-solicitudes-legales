@@ -99,6 +99,9 @@ Los vectores atrasados se pueden calcular de una vez con la GPU gratis de Kaggle
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Opcional: botón "Continuar con Google". En Google Cloud, la URL de redirección es `<dirección de la app>/oauth_callback`. Quien entra por primera vez queda en plan de prueba |
 | `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (7) y preguntas por día (20) |
 | `BASICO_PREGUNTAS_DIA` | Opcional: preguntas por día del plan Básico (20) |
+| `BASICO_ESCRITOS_MES` | Opcional: escritos nuevos por mes del plan Básico (3) |
+| `ABOGADO_PREGUNTAS_DIA` | Opcional: preguntas por día del plan Abogado y de cada abogado de una oficina (50) |
+| `ABOGADO_ESCRITOS_MES` | Opcional: escritos nuevos por mes del plan Abogado, de cada abogado de una oficina y de la prueba (30) |
 | `APP_URL` | Opcional: dirección pública de la app para Google (en Render se toma sola de `RENDER_EXTERNAL_URL`) |
 | `FLET_SECRET_KEY` | Opcional: firma de las subidas de archivos (si falta, se genera una al arrancar) |
 

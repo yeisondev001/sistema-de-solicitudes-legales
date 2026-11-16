@@ -14,8 +14,8 @@ export interface Perfil {
   tema: string
   letra: 'normal' | 'grande' | 'muy_grande'
   colores: Colores
-  /** escritos, modelos y documentos propios: todos los planes menos el Básico */
-  escritos: boolean
+  /** sus propios modelos y documentos: todos los planes menos el Básico */
+  propios: boolean
   prueba: { dias: number; preguntas_hoy: number; tope: number } | null
   /** en el plan Básico: las consultas de hoy y el máximo por día */
   basico: { preguntas_hoy: number; tope: number } | null

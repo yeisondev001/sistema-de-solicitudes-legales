@@ -76,9 +76,10 @@ def _perfil(u: dict) -> dict:
     perfil["tema"] = u["tema"] or temas.MARCA
     perfil["colores"] = _colores(u["tema"])
     perfil["letra"] = u.get("letra") or "normal"
-    perfil["escritos"] = cuentas.con_escritos(u["plan"])
+    perfil["propios"] = cuentas.con_propios(u["plan"])
     perfil["prueba"] = perfil["basico"] = None
-    tope = cuentas.tope_diario(u["plan"])
+    # la cajita de lo que le queda: solo en la prueba y en el Básico (el Abogado no ve su tope)
+    tope = cuentas.tope_diario(u["plan"]) if u["plan"] in ("prueba", "basico") else None
     if tope:
         try:
             hoy = cuentas.preguntas_de_hoy(u["id"])
@@ -284,11 +285,26 @@ def audiencias(u=Depends(usuario_actual)):
 
 
 # ── ASISTENTE ────────────────────────────────────
-# el plan Básico es para consultar: escritos, modelos y documentos propios son del plan Abogado
-SIN_ESCRITOS = ("Los escritos, los modelos y sus propios documentos vienen con el plan Abogado. Con el plan "
-                "Básico puede consultar sentencias y leyes. Para pasar al plan Abogado, escríbanos.")
-SIN_ESCRITOS_CHAT = ("Con el plan Básico no puedo redactar escritos: eso viene con el plan Abogado. Sí le busco "
-                     "sentencias y leyes sobre el tema; dígame qué necesita saber.")
+# el plan Básico redacta pocos escritos al mes y solo con los modelos de todos: sus propios modelos y
+# documentos son del plan Abogado
+SIN_PROPIOS = ("Sus propios modelos y documentos vienen con el plan Abogado. Con el plan Básico puede usar "
+               "nuestros modelos. Para pasar al plan Abogado, escríbanos.")
+
+
+def _plan_topes(u: dict) -> str:
+    """El plan que manda en los topes de preguntas y escritos: los administradores no tienen."""
+    return "beta" if u.get("es_admin") else u["plan"]
+
+
+def _sin_escritos(u: dict) -> str | None:
+    """El aviso si ya hizo este mes los escritos nuevos de su plan; None si le quedan."""
+    try:
+        cuentas.revisar_escritos(u["id"], _plan_topes(u))
+    except ValueError as ex:
+        return str(ex)
+    except Exception:
+        pass   # si no se puede contar, no se le niega el escrito
+    return None
 
 
 def _con_referencia(mensajes: list) -> list:
@@ -408,8 +424,10 @@ def _responder(q: str, historial_chat: list, u: dict, avance, escrito: str = "",
     plan = (juris_ia.preparar_busqueda(q, historial_chat, hay_escrito=bool(escrito)) if juris_ia.disponible()
             else {"tipo": "nueva", "consulta": q, "busquedas": [q]})
     if plan["tipo"] == "escrito":
-        if not cuentas.con_escritos(u["plan"]):
-            turno["texto"] = SIN_ESCRITOS_CHAT
+        # cambiar el escrito que ya está no cuenta; uno nuevo, sí
+        aviso = None if escrito else _sin_escritos(u)
+        if aviso:
+            turno["texto"] = aviso
             return turno
         # un escrito nuevo: primero se ofrecen los modelos (salvo que ya dijo que lo quiere sin modelo)
         if not escrito and modelo != "ninguno":
@@ -480,15 +498,15 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
         guardar = True
         # eligió un modelo: va a la hoja sin pasar por la IA (no cuenta como consulta)
         if datos.modelo and datos.modelo != "ninguno":
-            turno = (_usar_modelo(datos.modelo, bool(escrito), u) if cuentas.con_escritos(u["plan"])
-                     else {"rol": "asistente", "texto": SIN_ESCRITOS_CHAT})
+            aviso = None if escrito else _sin_escritos(u)
+            turno = {"rol": "asistente", "texto": aviso} if aviso else _usar_modelo(datos.modelo, bool(escrito), u)
         # un saludo o una prueba ("hola") no se busca: siempre saldría "lo más parecido"
         elif not juris_ia.parece_consulta(q):
             turno = {"rol": "asistente", "texto": juris_ia.no_es_consulta(q)}
         else:
-            # la prueba y el plan Básico tienen un máximo de preguntas por día
+            # cada plan tiene un máximo de preguntas por día
             try:
-                cuentas.registrar_pregunta(u["id"], u["plan"])
+                cuentas.registrar_pregunta(u["id"], _plan_topes(u))
                 limite = None
             except ValueError as ex:
                 limite = str(ex)
@@ -522,6 +540,11 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
         conv_id = datos.conv_id
         # el escrito no va en los mensajes: se guarda aparte, con sus versiones para «Deshacer»
         nuevo_escrito = turno.pop("escrito_nuevo", None)
+        if nuevo_escrito and turno.get("escrito") == "nuevo":
+            try:
+                cuentas.contar_escrito(u["id"])
+            except Exception:
+                pass   # si no se puede contar, el escrito igual se entrega
         escrito_listo = None
         if guardar:
             try:
@@ -542,10 +565,10 @@ class TextoEscrito(BaseModel):
     texto: str
 
 
-def con_escritos(u=Depends(usuario_actual)) -> dict:
-    """Escritos, modelos y documentos propios: todos los planes menos el Básico."""
-    if not cuentas.con_escritos(u["plan"]):
-        raise HTTPException(403, SIN_ESCRITOS)
+def con_propios(u=Depends(usuario_actual)) -> dict:
+    """Sus propios modelos y documentos: todos los planes menos el Básico."""
+    if not cuentas.con_propios(u["plan"]):
+        raise HTTPException(403, SIN_PROPIOS)
     return u
 
 
@@ -562,7 +585,7 @@ def _texto_escrito(e: TextoEscrito) -> str:
 
 
 @app.put("/api/conversaciones/{conv_id}/escrito")
-def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(con_escritos)):
+def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(usuario_actual)):
     """Lo que el abogado corrigió a mano en el escrito."""
     if not cuentas.abrir_conversacion(u["id"], conv_id):
         raise HTTPException(404, "Esa conversación ya no existe.")
@@ -570,7 +593,7 @@ def escrito_guardar(conv_id: int, e: TextoEscrito, u=Depends(con_escritos)):
 
 
 @app.post("/api/conversaciones/{conv_id}/escrito/deshacer")
-def escrito_deshacer(conv_id: int, u=Depends(con_escritos)):
+def escrito_deshacer(conv_id: int, u=Depends(usuario_actual)):
     escrito = cuentas.deshacer_escrito(u["id"], conv_id)
     if not escrito:
         raise HTTPException(404, "Esa conversación no tiene escrito.")
@@ -578,7 +601,7 @@ def escrito_deshacer(conv_id: int, u=Depends(con_escritos)):
 
 
 @app.get("/api/modelos")
-def modelos_lista(u=Depends(con_escritos)):
+def modelos_lista(u=Depends(usuario_actual)):
     """Los modelos de escritos, para elegir uno por grupo y materia, los que subió el abogado y los que
     comparten sus colegas de oficina."""
     try:
@@ -590,7 +613,7 @@ def modelos_lista(u=Depends(con_escritos)):
 
 
 @app.get("/api/modelos/{clave}")
-def modelo_ver(clave: str, u=Depends(con_escritos)):
+def modelo_ver(clave: str, u=Depends(usuario_actual)):
     ficha, texto = _modelo(clave, u)
     if not texto:
         raise HTTPException(404, "Ese modelo no existe.")
@@ -601,7 +624,7 @@ MAX_MB_MODELO = 5
 
 
 @app.post("/api/modelos/leer")
-async def modelo_leer(request: Request, u=Depends(con_escritos)):
+async def modelo_leer(request: Request, u=Depends(con_propios)):
     """Convierte el Word que sube el abogado en el texto de un modelo, sin guardarlo todavía: primero lo
     revisa y marca los nombres. Los datos que se reconocen (cédulas, montos…) ya salen como datos por llenar.
     El Word no se guarda ni pasa por la IA."""
@@ -641,7 +664,7 @@ def _modelo_propio(m: ModeloPropio, u: dict) -> tuple:
 
 
 @app.post("/api/modelos/propios")
-def modelo_propio_crear(m: ModeloPropio, u=Depends(con_escritos)):
+def modelo_propio_crear(m: ModeloPropio, u=Depends(con_propios)):
     try:
         modelo_id = cuentas.guardar_modelo_propio(u["id"], None, *_modelo_propio(m, u))
     except ValueError as ex:
@@ -650,7 +673,7 @@ def modelo_propio_crear(m: ModeloPropio, u=Depends(con_escritos)):
 
 
 @app.put("/api/modelos/propios/{modelo_id}")
-def modelo_propio_cambiar(modelo_id: int, m: ModeloPropio, u=Depends(con_escritos)):
+def modelo_propio_cambiar(modelo_id: int, m: ModeloPropio, u=Depends(con_propios)):
     try:
         cuentas.guardar_modelo_propio(u["id"], modelo_id, *_modelo_propio(m, u))
     except ValueError as ex:
@@ -665,7 +688,7 @@ def modelo_propio_borrar(modelo_id: int, u=Depends(usuario_actual)):
 
 
 @app.post("/api/escrito/{formato}")
-def escrito_descargar(formato: str, e: TextoEscrito, u=Depends(con_escritos)):
+def escrito_descargar(formato: str, e: TextoEscrito, u=Depends(usuario_actual)):
     """El escrito en Word o PDF, ya con los datos que llenó el abogado (esos datos no pasan por la IA)."""
     if formato not in ("docx", "pdf"):
         raise HTTPException(404, "Ese formato no existe.")
@@ -702,7 +725,7 @@ def documentos(u=Depends(usuario_actual)):
 
 
 @app.post("/api/documentos")
-async def subir_documento(request: Request, u=Depends(con_escritos)):
+async def subir_documento(request: Request, u=Depends(con_propios)):
     """El archivo llega tal cual en el cuerpo; el nombre, en el encabezado X-Nombre (codificado)."""
     if not juris_db.configurada():
         raise HTTPException(503, "Falta configurar el buscador.")

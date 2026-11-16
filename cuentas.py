@@ -8,11 +8,14 @@ Se entra con usuario y contraseña (cuentas que crea el administrador) o con Goo
 Quien entra con Google por primera vez queda en plan "prueba": unos días y un máximo
 de preguntas por día. El administrador cambia el plan desde el panel de usuarios:
   beta     sin límites y sin cobro (primeros usuarios que prueban la app)
-  prueba   PRUEBA_DIAS días y PRUEBA_PREGUNTAS_DIA preguntas por día
-  basico   cliente del plan Básico: BASICO_PREGUNTAS_DIA preguntas por día, sin escritos, modelos ni
-           documentos propios
-  activo   cliente que paga, sin límites
+  prueba   PRUEBA_DIAS días, PRUEBA_PREGUNTAS_DIA preguntas por día y los escritos del plan Abogado
+  basico   cliente del plan Básico: BASICO_PREGUNTAS_DIA preguntas por día, BASICO_ESCRITOS_MES escritos
+           por mes y sin modelos ni documentos propios
+  activo   cliente del plan Abogado o de una oficina: ABOGADO_PREGUNTAS_DIA preguntas por día y
+           ABOGADO_ESCRITOS_MES escritos por mes
   vencido  no puede entrar
+Los administradores no tienen topes. La página de planes no dice los números: los planes se describen con
+palabras (lo decidió el dueño) y la app avisa cuando se llega al máximo.
 """
 
 import hashlib, hmac, os, re, secrets, sqlite3, time
@@ -26,15 +29,24 @@ PLANES = ("beta", "prueba", "basico", "activo", "vencido")
 DIAS_PRUEBA = int(os.environ.get("PRUEBA_DIAS", "7"))
 PREGUNTAS_PRUEBA = int(os.environ.get("PRUEBA_PREGUNTAS_DIA", "20"))
 PREGUNTAS_BASICO = int(os.environ.get("BASICO_PREGUNTAS_DIA", "20"))
+PREGUNTAS_ABOGADO = int(os.environ.get("ABOGADO_PREGUNTAS_DIA", "50"))
+# escritos nuevos por mes (cambiar uno que ya está no cuenta)
+ESCRITOS_BASICO = int(os.environ.get("BASICO_ESCRITOS_MES", "3"))
+ESCRITOS_ABOGADO = int(os.environ.get("ABOGADO_ESCRITOS_MES", "30"))
 
 
 def tope_diario(plan: str):
     """Cuántas preguntas por día deja el plan, o None si no tiene límite."""
-    return {"prueba": PREGUNTAS_PRUEBA, "basico": PREGUNTAS_BASICO}.get(plan)
+    return {"prueba": PREGUNTAS_PRUEBA, "basico": PREGUNTAS_BASICO, "activo": PREGUNTAS_ABOGADO}.get(plan)
 
 
-def con_escritos(plan: str) -> bool:
-    """Escritos, modelos y documentos propios: todos los planes menos el Básico."""
+def tope_escritos(plan: str):
+    """Cuántos escritos nuevos por mes deja el plan, o None si no tiene límite."""
+    return {"prueba": ESCRITOS_ABOGADO, "basico": ESCRITOS_BASICO, "activo": ESCRITOS_ABOGADO}.get(plan)
+
+
+def con_propios(plan: str) -> bool:
+    """Sus propios modelos y documentos: todos los planes menos el Básico."""
     return plan != "basico"
 
 _DDL = {
@@ -124,7 +136,11 @@ _MIGRACIONES = {
         # el abogado comparte un modelo suyo con su oficina
         "ALTER TABLE modelos_propios ADD COLUMN IF NOT EXISTS compartido BOOLEAN NOT NULL DEFAULT FALSE",
         # los asientos que paga la oficina: uno por abogado, el dueño incluido
-        "ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS asientos INTEGER NOT NULL DEFAULT 4",
+        "ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS asientos INTEGER NOT NULL DEFAULT 10",
+        # el Despacho pasó a ser para hasta 10 abogados (16 nov): las oficinas de antes suben a 10
+        "UPDATE oficinas SET asientos = 10 WHERE asientos < 10",
+        # los escritos nuevos del día, para el tope por mes
+        "ALTER TABLE uso ADD COLUMN IF NOT EXISTS escritos INT NOT NULL DEFAULT 0",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -171,7 +187,9 @@ _MIGRACIONES = {
             creada INTEGER NOT NULL,
             PRIMARY KEY (oficina_id, email))""",
         "ALTER TABLE modelos_propios ADD COLUMN compartido INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE oficinas ADD COLUMN asientos INTEGER NOT NULL DEFAULT 4",
+        "ALTER TABLE oficinas ADD COLUMN asientos INTEGER NOT NULL DEFAULT 10",
+        "UPDATE oficinas SET asientos = 10 WHERE asientos < 10",
+        "ALTER TABLE uso ADD COLUMN escritos INTEGER NOT NULL DEFAULT 0",
     ],
 }
 _tablas_listas = False
@@ -372,19 +390,47 @@ def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
     return _limpio(filas[0]), _nueva_sesion(filas[0]["id"])
 
 
+_MAXIMO_PREGUNTAS = {
+    "prueba": "Llegó al máximo de {tope} preguntas por día de la prueba gratis. Mañana puede seguir, o elija su "
+              "plan para seguir trabajando.",
+    "basico": "Llegó al máximo de preguntas por día del plan Básico. Mañana puede seguir, o pase al plan Abogado, "
+              "que trae muchas más.",
+    "activo": "Llegó al máximo de preguntas de hoy. Mañana puede seguir; si su trabajo necesita más, escríbanos.",
+}
+
+
 def registrar_pregunta(usuario_id: int, plan: str):
-    """Cuenta la pregunta del día. La prueba y el plan Básico tienen un máximo diario: ValueError si se pasa."""
+    """Cuenta la pregunta del día. Cada plan tiene un máximo diario (tope_diario): ValueError si se pasa."""
     dia = time.strftime("%Y-%m-%d")
     tope = tope_diario(plan)
     if tope:
         filas = _ejecutar("SELECT preguntas FROM uso WHERE usuario_id = %s AND dia = %s", (usuario_id, dia), leer=True)
         if filas and filas[0]["preguntas"] >= tope:
-            raise ValueError(f"Llegó al máximo de {tope} preguntas por día de la prueba gratis. "
-                             "Mañana puede seguir, o escríbanos para activar su cuenta." if plan == "prueba" else
-                             f"Llegó al máximo de {tope} preguntas por día del plan Básico. Mañana puede seguir, "
-                             "o pase al plan Abogado para consultar sin límite.")
+            raise ValueError(_MAXIMO_PREGUNTAS[plan].format(tope=tope))
     _ejecutar("INSERT INTO uso (usuario_id, dia, preguntas) VALUES (%s, %s, 1) "
               "ON CONFLICT (usuario_id, dia) DO UPDATE SET preguntas = uso.preguntas + 1", (usuario_id, dia))
+
+
+def revisar_escritos(usuario_id: int, plan: str):
+    """ValueError si ya hizo este mes los escritos nuevos que deja su plan (tope_escritos)."""
+    tope = tope_escritos(plan)
+    if not tope:
+        return
+    filas = _ejecutar("SELECT COALESCE(SUM(escritos), 0) AS n FROM uso WHERE usuario_id = %s AND dia LIKE %s",
+                      (usuario_id, time.strftime("%Y-%m") + "-%"), leer=True)
+    if filas and filas[0]["n"] >= tope:
+        raise ValueError(
+            "Este mes ya usó los escritos del plan Básico. El mes que viene puede redactar más, o pase al plan "
+            "Abogado, que trae muchos más. Mientras tanto le busco sentencias y leyes sobre el tema." if plan == "basico"
+            else "Este mes ya llegó al máximo de escritos de su plan. El mes que viene puede seguir; si su trabajo "
+                 "necesita más, escríbanos. Mientras tanto le busco sentencias y leyes sobre el tema.")
+
+
+def contar_escrito(usuario_id: int):
+    """Un escrito nuevo más en el día."""
+    _ejecutar("INSERT INTO uso (usuario_id, dia, preguntas, escritos) VALUES (%s, %s, 0, 1) "
+              "ON CONFLICT (usuario_id, dia) DO UPDATE SET escritos = uso.escritos + 1",
+              (usuario_id, time.strftime("%Y-%m-%d")))
 
 
 def preguntas_de_hoy(usuario_id: int) -> int:
@@ -564,10 +610,11 @@ def deshacer_escrito(usuario_id: int, conv_id: int):
 # Varios abogados con un dueño y un solo plan. El administrador crea la oficina; el dueño agrega abogados
 # por su correo y cada uno acepta desde su escritorio. El dueño ve quién usa Papiniano y cuánto, nunca lo
 # que pregunta: conversaciones, documentos y escritos siguen siendo de cada abogado.
-# La oficina paga asientos (uno por abogado, el dueño incluido, desde 4); los correos agregados que todavía no
-# aceptan ya ocupan el suyo.
+# El plan Despacho es para hasta 10 abogados (un asiento por abogado, el dueño incluido); los correos agregados
+# que todavía no aceptan ya ocupan el suyo. Una oficina más grande se arregla aparte: el administrador le sube
+# los asientos.
 PLANES_OFICINA = ("activo", "vencido")
-ASIENTOS_MINIMOS, ASIENTOS_MAXIMOS = 4, 30
+ASIENTOS_MINIMOS, ASIENTOS_MAXIMOS = 10, 30
 _NOMBRE = "COALESCE(NULLIF({0}.nombre, ''), {0}.usuario)"
 
 
@@ -648,8 +695,8 @@ def borrar_oficina(oficina_id: int):
 def _cupo(oficina_id: int):
     asientos = _oficina(oficina_id)["asientos"]
     if _ocupados(oficina_id) >= asientos:
-        raise ValueError(f"Los {asientos} asientos de la oficina están ocupados. "
-                         "Para agregar a otro abogado, escríbanos y le sumamos un asiento.")
+        raise ValueError(f"Los {asientos} lugares de la oficina están ocupados. "
+                         "Si necesita agregar a más abogados, escríbanos.")
 
 
 def poner_en_oficina(usuario_id: int, oficina_id):

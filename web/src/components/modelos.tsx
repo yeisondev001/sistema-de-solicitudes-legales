@@ -122,9 +122,11 @@ export function GaleriaModelos({
                   <h3 className="font-heading text-lg font-medium text-ink">
                     Mis modelos <span className="font-sans text-[0.9rem] text-ink-soft">({propios.length})</span>
                   </h3>
-                  <Button variant="outline" className="h-11 border-regla" onClick={() => setSubiendo(null)}>
-                    <Plus /> Subir mi modelo
-                  </Button>
+                  {perfil.propios && (
+                    <Button variant="outline" className="h-11 border-regla" onClick={() => setSubiendo(null)}>
+                      <Plus /> Subir mi modelo
+                    </Button>
+                  )}
                 </div>
                 {propios.length ? (
                   <ul className="space-y-2.5">
@@ -147,7 +149,9 @@ export function GaleriaModelos({
                   <p className="text-[0.92rem] text-ink-soft">
                     {catalogo.propios.length
                       ? 'Ninguno de sus modelos es de esta materia.'
-                      : perfil.oficina
+                      : !perfil.propios
+                        ? 'Subir sus propios escritos para usarlos como modelo viene con el plan Abogado. Para pasar al plan Abogado, escríbanos.'
+                        : perfil.oficina
                         ? 'Suba sus propios escritos en Word para usarlos como modelo. Solo los ve usted, salvo los que comparta con su oficina.'
                         : 'Suba sus propios escritos en Word para usarlos como modelo. Solo los ve usted.'}
                   </p>

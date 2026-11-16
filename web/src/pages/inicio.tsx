@@ -11,9 +11,8 @@ import { api } from '@/lib/api'
 import type { Entrada } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
-// La prueba gratis y el tope del Básico los decide el servidor (PRUEBA_DIAS, PRUEBA_PREGUNTAS_DIA y BASICO_PREGUNTAS_DIA
-// en cuentas.py); esto se ve mientras responde
-const PRUEBA_INICIAL = { dias: 7, preguntas: 20, basico: 20 }
+// La prueba gratis la decide el servidor (PRUEBA_DIAS y PRUEBA_PREGUNTAS_DIA en cuentas.py); esto se ve mientras responde
+const PRUEBA_INICIAL = { dias: 7, preguntas: 20 }
 type Prueba = typeof PRUEBA_INICIAL
 
 /**
@@ -108,24 +107,28 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 ]
 
 // Tres planes: el Básico para consultar, el Abogado que compra casi todos y el Despacho para oficinas. Los precios
-// se cambian aquí y en Lemon Squeezy, que es quien cobra. El Despacho incluye 4 asientos (ASIENTOS_MINIMOS en
-// cuentas.py) y suma de uno en uno; el administrador crea la oficina en Usuarios → Oficinas
+// se cambian aquí y en Lemon Squeezy, que es quien cobra. El uso se describe con palabras, sin números ni «sin
+// límite» (lo decidió el dueño): los topes están en cuentas.py y la app avisa al llegar. El Despacho es para hasta
+// 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
 const planes = (p: Prueba) => [
   {
     nombre: 'Básico', para: 'Para consultar sentencias y leyes.', precio: 'US$19', periodo: 'al mes', nota: 'O US$190 al año: dos meses gratis.',
-    puntos: [`${p.basico} consultas por día a Papiniano`, 'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
+    puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
+      'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
+    // lo que el Básico no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
+    faltan: ['Sus propios modelos de escritos', 'Subir sus propios documentos'],
     boton: 'Elegir Básico', a: '/entrar',
   },
   {
-    nombre: 'Abogado', para: 'Para el trabajo de todos los días.', precio: 'US$29', periodo: 'al mes', destacado: true,
-    nota: 'O US$290 al año: dos meses gratis.',
-    puntos: ['Todo lo del Básico, sin límite de consultas', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
+    nombre: 'Abogado', para: 'Para el trabajo de todos los días.', precio: 'US$50', periodo: 'al mes', destacado: true,
+    nota: 'O US$500 al año: dos meses gratis.',
+    puntos: ['Todo lo del Básico, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
       'Sus documentos en el buscador', 'Expedientes y agenda, cuando estén listos'],
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
-    nombre: 'Despacho', para: 'Para oficinas con varios abogados.', precio: 'US$89', periodo: 'al mes',
-    nota: 'Incluye 4 abogados. Cada abogado más, US$25 al mes.',
+    nombre: 'Despacho', para: 'Para oficinas con varios abogados.', precio: 'US$200', periodo: 'al mes',
+    nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
       'Expedientes y agenda compartidos, cuando estén listos'],
@@ -146,8 +149,10 @@ const preguntas = (p: Prueba): [string, string][] => [
     `La prueba dura ${p.dias} días, con todo incluido, y no pide tarjeta. Al terminar, elige Básico, Abogado o Despacho para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
   ['¿Cómo se paga y cómo cancelo?',
     'Con tarjeta, a través de Lemon Squeezy, cada mes o una vez al año (el año sale a precio de diez meses). Puede cancelar cuando quiera desde su cuenta y conserva el acceso hasta el final del período pagado.'],
+  ['¿Hay un límite de consultas?',
+    'Cada plan tiene un máximo de consultas por día y de escritos por mes, pensado para el trabajo normal de un abogado: el Básico es para consultar de vez en cuando y el Abogado alcanza para el trabajo de todos los días. Si llega al máximo, Papiniano le avisa y al día o al mes siguiente puede seguir.'],
   ['¿Cómo funciona el plan Despacho?',
-    'La oficina paga US$89 al mes con 4 abogados incluidos, el dueño entre ellos, y US$25 al mes por cada abogado más. El dueño agrega a sus abogados con su correo y ve cuánto usa Papiniano cada uno, nunca lo que pregunta.'],
+    'La oficina paga US$200 al mes y lo usan hasta 10 abogados, el dueño entre ellos. El dueño agrega a sus abogados con su correo y ve cuánto usa Papiniano cada uno, nunca lo que pregunta. Si su oficina tiene más de 10 abogados, escríbanos.'],
   ['¿Por qué se llama Papiniano?',
     'Por Emilio Papiniano (siglo III), el jurista más respetado de Roma: cuando los grandes juristas no se ponían de acuerdo, la ley mandaba seguir su opinión.'],
   ['¿Funciona en el celular?', 'Sí. Funciona en el navegador de la computadora, la tableta y el celular, sin instalar nada.'],
@@ -162,7 +167,7 @@ export default function Inicio() {
   useEffect(() => {
     api
       .get<Entrada>('/api/entrada')
-      .then((d) => setPrueba({ dias: d.dias_prueba, preguntas: d.preguntas_prueba, basico: d.preguntas_basico }))
+      .then((d) => setPrueba({ dias: d.dias_prueba, preguntas: d.preguntas_prueba }))
       .catch(() => {})
   }, [])
 
@@ -374,9 +379,27 @@ export default function Inicio() {
                     </p>
                     <p className="text-[0.92rem] text-[#E2C9A8]">{p.nota}</p>
                   </div>
-                  <ul className="list-disc space-y-2 pl-5 text-[#F1E8DA]">
-                    {p.puntos.map((x) => <li key={x}>{x}</li>)}
+                  <ul className="space-y-2 text-[#F1E8DA]">
+                    {p.puntos.map((x) => (
+                      <li key={x} className="flex gap-2.5">
+                        <Check className="mt-1 size-4 shrink-0 text-[#E2C29B]" />
+                        {x}
+                      </li>
+                    ))}
                   </ul>
+                  {p.faltan && (
+                    <div className="border-t border-[#6B5442] pt-3.5">
+                      <p className="text-[0.8rem] font-bold tracking-[0.12em] text-[#E2C9A8]">NO INCLUYE</p>
+                      <ul className="mt-2 space-y-2 text-[#E2C9A8]">
+                        {p.faltan.map((x) => (
+                          <li key={x} className="flex gap-2.5">
+                            <X className="mt-1 size-4 shrink-0" />
+                            {x}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <Link
                     to={p.a}
                     className={cn(

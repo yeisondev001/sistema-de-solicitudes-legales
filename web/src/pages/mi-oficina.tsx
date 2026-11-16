@@ -172,7 +172,8 @@ export default function MiOficinaPagina() {
                 <Agregar alAgregar={(email) => hacer(() => api.post('/api/oficina/invitaciones', { email }), `Listo: cuando ${email} entre a Papiniano, verá la invitación.`)} />
               ) : (
                 <p className="mt-2 text-ink-soft">
-                  Para agregar a otro abogado, escríbanos desde Contacto y le sumamos un asiento.
+                  Ya están todos los lugares de su plan ocupados. Si necesita agregar a más abogados, escríbanos desde
+                  Contacto.
                 </p>
               ))}
             <p className="mt-4 flex gap-2 text-[0.9rem] text-ink-soft">
