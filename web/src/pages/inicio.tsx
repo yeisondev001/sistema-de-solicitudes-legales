@@ -107,12 +107,13 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 ]
 
 // Tres planes: el Básico para consultar, el Abogado que compra casi todos y el Despacho para oficinas. Los precios
-// se cambian aquí y en Lemon Squeezy, que es quien cobra. El uso se describe con palabras, sin números ni «sin
+// se cambian aquí (en dólares, al mes y al año; lo que se ahorra al año sale de los dos) y en Lemon Squeezy, que es
+// quien cobra. El uso se describe con palabras, sin números ni «sin
 // límite» (lo decidió el dueño): los topes están en cuentas.py y la app avisa al llegar. El Despacho es para hasta
 // 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
 const planes = (p: Prueba) => [
   {
-    nombre: 'Básico', para: 'Para consultar sentencias y leyes.', precio: 'US$19', periodo: 'al mes', nota: 'O US$190 al año: dos meses gratis.',
+    nombre: 'Básico', para: 'Para consultar sentencias y leyes.', mensual: 25, anual: 250,
     puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
     // lo que el Básico no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
@@ -120,14 +121,13 @@ const planes = (p: Prueba) => [
     boton: 'Elegir Básico', a: '/entrar',
   },
   {
-    nombre: 'Abogado', para: 'Para el trabajo de todos los días.', precio: 'US$50', periodo: 'al mes', destacado: true,
-    nota: 'O US$500 al año: dos meses gratis.',
+    nombre: 'Abogado', para: 'Para el trabajo de todos los días.', mensual: 50, anual: 500, destacado: true,
     puntos: ['Todo lo del Básico, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
       'Sus documentos en el buscador', 'Expedientes y agenda, cuando estén listos'],
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
-    nombre: 'Despacho', para: 'Para oficinas con varios abogados.', precio: 'US$200', periodo: 'al mes',
+    nombre: 'Despacho', para: 'Para oficinas con varios abogados.', mensual: 200,
     nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
@@ -375,9 +375,16 @@ export default function Inicio() {
                   </div>
                   <div>
                     <p className="text-[2.1rem] font-bold">
-                      {p.precio} <span className="text-base font-normal text-[#E2C9A8]">{p.periodo}</span>
+                      US${p.mensual} <span className="text-base font-normal text-[#E2C9A8]">al mes</span>
                     </p>
-                    <p className="text-[0.92rem] text-[#E2C9A8]">{p.nota}</p>
+                    {p.anual ? (
+                      <p className="text-[0.92rem] text-[#E2C9A8]">
+                        O US${p.anual} al año:{' '}
+                        <strong className="text-[#F1E8DA]">ahorra US${p.mensual * 12 - p.anual}</strong>.
+                      </p>
+                    ) : (
+                      <p className="text-[0.92rem] text-[#E2C9A8]">{p.nota}</p>
+                    )}
                   </div>
                   <ul className="space-y-2 text-[#F1E8DA]">
                     {p.puntos.map((x) => (
