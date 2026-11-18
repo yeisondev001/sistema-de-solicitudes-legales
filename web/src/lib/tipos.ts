@@ -191,3 +191,51 @@ export interface Audiencia {
   expediente: string
   tribunal: string
 }
+
+/** Quien lleva un expediente o una fecha: el abogado o un colega de su oficina */
+export interface Responsable {
+  id: number
+  nombre: string
+}
+
+export type TipoFecha = 'audiencia' | 'plazo' | 'reunion' | 'otro'
+
+/** Una fecha de la agenda: audiencia, plazo o reunión, de un expediente o suelta (fecha AAAA-MM-DD, hora HH:MM o vacía) */
+export interface Fecha {
+  id: number
+  tipo: TipoFecha
+  titulo: string
+  fecha: string
+  hora: string
+  lugar: string
+  notas: string
+  responsable: Responsable | null
+  de_oficina: boolean
+  /** en la agenda: el expediente al que pertenece */
+  expediente?: { id: number; cliente: string; asunto: string } | null
+}
+
+/** Un expediente en la lista: el caso y su próxima fecha */
+export interface ExpedienteResumen {
+  id: number
+  cliente: string
+  asunto: string
+  numero: string
+  tribunal: string
+  contraparte: string
+  estado: 'activo' | 'cerrado'
+  responsable: Responsable | null
+  /** es de la oficina (plan Despacho): lo ven todos sus abogados */
+  de_oficina: boolean
+  creado: number
+  actualizado: number
+  proxima: { fecha: string; hora: string; tipo: TipoFecha; titulo: string } | null
+}
+
+/** Un expediente por dentro: sus fechas, y las conversaciones y documentos que el abogado guardó en él */
+export interface Expediente extends Omit<ExpedienteResumen, 'proxima'> {
+  notas: string
+  fechas: Fecha[]
+  conversaciones: { id: number; titulo: string; actualizada: number; con_escrito: boolean }[]
+  documentos: { id: number; nombre: string }[]
+}

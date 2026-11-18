@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Tabs as TabsPrimitive } from 'radix-ui'
-import { FilePen, FileStack, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
+import { FilePen, FileStack, FolderClosed, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ElegirExpediente, type Caso } from '@/components/elegir-expediente'
 import { PanelEscrito } from '@/components/escrito'
 import { GaleriaModelos, VistaModelo } from '@/components/modelos'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
@@ -17,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api, ErrorApi, preguntarAlAsistente } from '@/lib/api'
 import { useAncho } from '@/lib/pantalla'
 import { useSesion } from '@/lib/sesion'
-import type { Conversacion, Escrito, Modelo, Turno } from '@/lib/tipos'
+import type { Conversacion, Escrito, Expediente, Modelo, Turno } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
 const EJEMPLOS = [
@@ -70,6 +71,11 @@ export default function Asistente() {
   const convId = id ? Number(id) : null
   const navegar = useNavigate()
   const { perfil, refrescar } = useSesion()
+  // «Consultar a Papiniano sobre este caso»: la conversación nueva queda guardada en ese expediente
+  const [params] = useSearchParams()
+  const desdeCaso = convId === null ? Number(params.get('expediente')) || null : null
+  const [caso, setCaso] = useState<Caso | null>(null)
+  const [elegirCaso, setElegirCaso] = useState(false)
 
   const [mensajes, setMensajes] = useState<Turno[]>([])
   const [pendiente, setPendiente] = useState<string | null>(null)
@@ -122,10 +128,11 @@ export default function Asistente() {
     }
     setCargando(true)
     api
-      .get<{ mensajes: Turno[]; escrito: Escrito | null }>(`/api/conversaciones/${convId}`)
+      .get<{ mensajes: Turno[]; escrito: Escrito | null; expediente: Caso | null }>(`/api/conversaciones/${convId}`)
       .then((r) => {
         setMensajes(r.mensajes)
         setEscrito(r.escrito)
+        setCaso(r.expediente ?? null)
         setCorreccionEstado(r.escrito ? leerCorreccion(perfil.id, convId) : null)
       })
       .catch((e: ErrorApi) => {
@@ -134,6 +141,18 @@ export default function Asistente() {
       })
       .finally(() => setCargando(false))
   }, [convId, navegar, perfil.id])
+
+  useEffect(() => {
+    if (convId !== null) return
+    if (!desdeCaso || !perfil.propios) {
+      setCaso(null)
+      return
+    }
+    api
+      .get<Expediente>(`/api/expedientes/${desdeCaso}`)
+      .then((x) => setCaso({ id: x.id, cliente: x.cliente }))
+      .catch(() => setCaso(null))
+  }, [convId, desdeCaso, perfil.propios])
 
   useEffect(() => {
     fin.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -165,6 +184,7 @@ export default function Asistente() {
           }
         },
         modelo,
+        desde === null ? caso?.id : undefined,
       )
       setMensajes((m) => [...m, r.turno])
       if (convActual.current === desde) {
@@ -376,6 +396,16 @@ export default function Asistente() {
               <Button variant="ghost" className="h-11 min-w-11 text-ink-soft" onClick={() => setGaleria(true)} title="Modelos de escritos">
                 <FileStack /> <span className={etiqueta}>Modelos</span>
               </Button>
+              {perfil.propios && (
+                <Button
+                  variant="ghost"
+                  className={cn('h-11 min-w-11', caso ? 'text-marca-texto' : 'text-ink-soft')}
+                  onClick={() => setElegirCaso(true)}
+                  title="Guardar en un expediente"
+                >
+                  <FolderClosed /> <span className={etiqueta}>Expediente</span>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 className={cn('h-11 min-w-11 text-ink-soft', !alLado && 'xl:hidden')}
@@ -395,6 +425,16 @@ export default function Asistente() {
               </Button>
             </div>
           </div>
+        )}
+
+        {caso && !enEscrito && (
+          <p className="flex items-center gap-2 border-b border-papel-borde bg-muted/40 px-4 py-2 text-[0.92rem] text-ink-soft md:px-8">
+            <FolderClosed className="size-4 shrink-0 text-marca-texto" />
+            <span className="min-w-0 truncate">
+              {convId === null ? 'Esta consulta quedará en el expediente de ' : 'Guardada en el expediente de '}
+              <Link to={`/expedientes/${caso.id}`} className="font-bold text-marca-texto hover:underline">{caso.cliente}</Link>
+            </span>
+          </p>
         )}
 
         {conPestanas ? (
@@ -485,6 +525,18 @@ export default function Asistente() {
           <div className="px-2 pb-6">{listaConversaciones}</div>
         </SheetContent>
       </Sheet>
+
+      {elegirCaso && (
+        <ElegirExpediente
+          convId={convId}
+          actual={caso}
+          alCerrar={() => setElegirCaso(false)}
+          alElegir={(c) => {
+            setCaso(c)
+            setElegirCaso(false)
+          }}
+        />
+      )}
 
       <AlertDialog open={Boolean(porBorrar)} onOpenChange={(abierto) => !abierto && setPorBorrar(null)}>
         <AlertDialogContent>

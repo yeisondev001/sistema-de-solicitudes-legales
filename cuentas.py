@@ -141,6 +141,49 @@ _MIGRACIONES = {
         "UPDATE oficinas SET asientos = 10 WHERE asientos < 10",
         # los escritos nuevos del día, para el tope por mes
         "ALTER TABLE uso ADD COLUMN IF NOT EXISTS escritos INT NOT NULL DEFAULT 0",
+        # Expedientes y Agenda (expedientes.py): de la oficina, o del abogado si no tiene oficina. La tabla se llama
+        # «casos»: «expedientes» ya es la del historial de reportes de audiencia (historial.py), en la misma base
+        """CREATE TABLE IF NOT EXISTS casos (
+            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            oficina_id BIGINT,
+            responsable_id BIGINT,
+            cliente TEXT NOT NULL,
+            asunto TEXT NOT NULL DEFAULT '',
+            numero TEXT NOT NULL DEFAULT '',
+            tribunal TEXT NOT NULL DEFAULT '',
+            contraparte TEXT NOT NULL DEFAULT '',
+            notas TEXT NOT NULL DEFAULT '',
+            estado TEXT NOT NULL DEFAULT 'activo',
+            creado BIGINT NOT NULL,
+            actualizado BIGINT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS casos_oficina ON casos (oficina_id)",
+        "CREATE INDEX IF NOT EXISTS casos_usuario ON casos (usuario_id)",
+        # las fechas: audiencias, plazos y reuniones (fecha AAAA-MM-DD; hora HH:MM o vacía si es todo el día)
+        """CREATE TABLE IF NOT EXISTS agenda (
+            id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+            usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            oficina_id BIGINT,
+            responsable_id BIGINT,
+            expediente_id BIGINT,
+            tipo TEXT NOT NULL DEFAULT 'audiencia',
+            titulo TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            hora TEXT NOT NULL DEFAULT '',
+            lugar TEXT NOT NULL DEFAULT '',
+            notas TEXT NOT NULL DEFAULT '',
+            creado BIGINT NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS agenda_fecha ON agenda (fecha)",
+        "CREATE INDEX IF NOT EXISTS agenda_expediente ON agenda (expediente_id)",
+        # la conversación (con su escrito) guardada en un expediente
+        "ALTER TABLE conversaciones ADD COLUMN IF NOT EXISTS expediente_id BIGINT",
+        # los documentos de la Biblioteca que el abogado guardó en un expediente (los documentos están en otra base)
+        """CREATE TABLE IF NOT EXISTS caso_documentos (
+            expediente_id BIGINT NOT NULL,
+            usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            doc_id BIGINT NOT NULL,
+            nombre TEXT NOT NULL,
+            PRIMARY KEY (expediente_id, usuario_id, doc_id))""",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -190,6 +233,49 @@ _MIGRACIONES = {
         "ALTER TABLE oficinas ADD COLUMN asientos INTEGER NOT NULL DEFAULT 10",
         "UPDATE oficinas SET asientos = 10 WHERE asientos < 10",
         "ALTER TABLE uso ADD COLUMN escritos INTEGER NOT NULL DEFAULT 0",
+        # Expedientes y Agenda (expedientes.py): de la oficina, o del abogado si no tiene oficina. La tabla se llama
+        # «casos»: «expedientes» ya es la del historial de reportes de audiencia (historial.py), en la misma base
+        """CREATE TABLE IF NOT EXISTS casos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            oficina_id INTEGER,
+            responsable_id INTEGER,
+            cliente TEXT NOT NULL,
+            asunto TEXT NOT NULL DEFAULT '',
+            numero TEXT NOT NULL DEFAULT '',
+            tribunal TEXT NOT NULL DEFAULT '',
+            contraparte TEXT NOT NULL DEFAULT '',
+            notas TEXT NOT NULL DEFAULT '',
+            estado TEXT NOT NULL DEFAULT 'activo',
+            creado INTEGER NOT NULL,
+            actualizado INTEGER NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS casos_oficina ON casos (oficina_id)",
+        "CREATE INDEX IF NOT EXISTS casos_usuario ON casos (usuario_id)",
+        # las fechas: audiencias, plazos y reuniones (fecha AAAA-MM-DD; hora HH:MM o vacía si es todo el día)
+        """CREATE TABLE IF NOT EXISTS agenda (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            oficina_id INTEGER,
+            responsable_id INTEGER,
+            expediente_id INTEGER,
+            tipo TEXT NOT NULL DEFAULT 'audiencia',
+            titulo TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            hora TEXT NOT NULL DEFAULT '',
+            lugar TEXT NOT NULL DEFAULT '',
+            notas TEXT NOT NULL DEFAULT '',
+            creado INTEGER NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS agenda_fecha ON agenda (fecha)",
+        "CREATE INDEX IF NOT EXISTS agenda_expediente ON agenda (expediente_id)",
+        # la conversación (con su escrito) guardada en un expediente
+        "ALTER TABLE conversaciones ADD COLUMN expediente_id INTEGER",
+        # los documentos de la Biblioteca que el abogado guardó en un expediente (los documentos están en otra base)
+        """CREATE TABLE IF NOT EXISTS caso_documentos (
+            expediente_id INTEGER NOT NULL,
+            usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            doc_id INTEGER NOT NULL,
+            nombre TEXT NOT NULL,
+            PRIMARY KEY (expediente_id, usuario_id, doc_id))""",
     ],
 }
 _tablas_listas = False
@@ -685,9 +771,13 @@ def _sacar(usuario_id: int):
 
 
 def borrar_oficina(oficina_id: int):
-    """Cada abogado sigue con su cuenta y lo suyo, con el plan que tenía su cuenta antes de entrar."""
+    """Cada abogado sigue con su cuenta y lo suyo, con el plan que tenía su cuenta antes de entrar.
+    Los expedientes y las fechas de la oficina vuelven a quien los creó."""
     for m in _ejecutar("SELECT id FROM usuarios WHERE oficina_id = %s", (oficina_id,), leer=True):
         _sacar(m["id"])
+    for tabla in ("casos", "agenda"):
+        _ejecutar(f"UPDATE {tabla} SET oficina_id = NULL, responsable_id = usuario_id WHERE oficina_id = %s",
+                  (oficina_id,))
     _ejecutar("DELETE FROM oficina_invitaciones WHERE oficina_id = %s", (oficina_id,))
     _ejecutar("DELETE FROM oficinas WHERE id = %s", (oficina_id,))
 

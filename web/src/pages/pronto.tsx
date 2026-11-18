@@ -2,14 +2,6 @@ import { TituloSala } from '@/components/oficina'
 import { Seccion } from '@/components/seccion'
 
 const SALAS = {
-  expedientes: {
-    titulo: 'Expedientes',
-    texto: 'Una carpeta por cliente con sus documentos, conversaciones y plazos. Viene pronto.',
-  },
-  agenda: {
-    titulo: 'Agenda',
-    texto: 'Audiencias y vencimientos; el escritorio le avisará lo de la semana. Viene pronto.',
-  },
   redaccion: {
     titulo: 'Redacción',
     texto: 'Plantillas de escritos y solicitudes listas para llenar y descargar en Word o PDF. Viene pronto.',

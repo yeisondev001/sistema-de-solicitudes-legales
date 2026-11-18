@@ -273,12 +273,23 @@
 @layer components {
   .demo-aparece { animation: demo-aparece 0.45s ease-out both; }
   .demo-pagina { animation: demo-pagina 0.5s ease-out both; }
+  /* el video de arriba: el cursor del que escribe y la flecha del ratón que llega al botón */
+  .demo-cursor { animation: demo-cursor 1s steps(1) infinite; }
+  .demo-puntero { animation: demo-puntero 0.45s ease-out both; }
+  .demo-panel { animation: demo-panel 0.5s ease-out both; }
+  /* el párrafo citado se ilumina un momento cuando se abre la página */
+  .demo-resalte { animation: demo-resalte 1.6s ease-out 0.4s both; }
   .inicio-cierre-sombra {
     background: linear-gradient(90deg, rgb(30 20 14 / 0.92) 0%, rgb(30 20 14 / 0.72) 55%, rgb(30 20 14 / 0.4) 100%);
   }
   @keyframes demo-aparece { from { opacity: 0; transform: translateY(8px); } }
   @keyframes demo-pagina { from { opacity: 0; transform: translateY(16px) scale(0.98); } }
+  @keyframes demo-cursor { 50% { opacity: 0; } }
+  @keyframes demo-puntero { from { opacity: 0; transform: translate(18px, 18px); } }
+  @keyframes demo-panel { from { opacity: 0; transform: translateX(48px); } }
+  @keyframes demo-resalte { from { background: #f6e3b4; } to { background: #F7EDE6; } }
   @media (prefers-reduced-motion: reduce) {
-    .demo-aparece, .demo-pagina { animation: none; }
+    .demo-aparece, .demo-pagina, .demo-cursor, .demo-puntero, .demo-panel { animation: none; }
+    .demo-resalte { animation: none; background: #F7EDE6; }
   }
 }

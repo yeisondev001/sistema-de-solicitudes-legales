@@ -7,6 +7,7 @@ import {
 import { Papiniano } from '@/components/papiniano'
 import { Antetitulo, CabeceraPublica, PiePublico } from '@/components/publico'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { VideoPapiniano } from '@/components/video-papiniano'
 import { api } from '@/lib/api'
 import type { Entrada } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
@@ -93,9 +94,9 @@ const SALAS: {
     texto: 'Su asistente. Le pregunta como a un colega y le responde con la jurisprudencia, la ley que aplica y su análisis. Le redacta el escrito en una hoja al lado de la conversación y saca las prestaciones laborales con las reglas del Código de Trabajo.',
   },
   { icono: LibraryBig, nombre: 'Biblioteca', texto: 'Todo lo que Papiniano lee, y sus propios documentos. Abre la página del PDF ahí mismo.' },
-  { icono: FolderClosed, nombre: 'Expedientes', texto: 'Cada cliente con sus documentos, conversaciones, escritos y plazos, en una carpeta.', pronto: true },
+  { icono: FolderClosed, nombre: 'Expedientes', texto: 'Una carpeta por caso: sus fechas, sus documentos y lo que trabajó con Papiniano.' },
   { icono: PenLine, nombre: 'Redacción', texto: 'Sus modelos de escritos y solicitudes, listos en Word o PDF.', pronto: true },
-  { icono: CalendarDays, nombre: 'Agenda', texto: 'Audiencias y vencimientos. El escritorio le avisa lo que vence esta semana.', pronto: true },
+  { icono: CalendarDays, nombre: 'Agenda', texto: 'Audiencias, plazos y reuniones. El escritorio le avisa lo que viene esta semana.' },
 ]
 
 /** Su información: solo lo que es cierto hoy (ver /privacidad) */
@@ -117,13 +118,13 @@ const planes = (p: Prueba) => [
     puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
     // lo que el Básico no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
-    faltan: ['Sus propios modelos de escritos', 'Subir sus propios documentos'],
+    faltan: ['Sus propios modelos de escritos', 'Subir sus propios documentos', 'Expedientes y agenda'],
     boton: 'Elegir Básico', a: '/entrar',
   },
   {
     nombre: 'Abogado', para: 'Para el trabajo de todos los días.', mensual: 50, anual: 500, destacado: true,
     puntos: ['Todo lo del Básico, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
-      'Sus documentos en el buscador', 'Expedientes y agenda, cuando estén listos'],
+      'Sus documentos en el buscador', 'Expedientes y agenda de audiencias y plazos'],
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
@@ -131,7 +132,7 @@ const planes = (p: Prueba) => [
     nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
-      'Expedientes y agenda compartidos, cuando estén listos'],
+      'Expedientes y agenda compartidos por la oficina'],
     boton: 'Hablar con nosotros', a: '/contacto',
   },
 ]
@@ -176,25 +177,16 @@ export default function Inicio() {
       <CabeceraPublica />
 
       <main>
-        {/* lo principal */}
-        <section className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 pt-12 pb-16 md:px-6 md:pt-20 md:pb-24 lg:grid-cols-[1.05fr_1fr]">
+        {/* lo principal: el título y, al lado, Papiniano por dentro, con la misma cara de la app */}
+        <section className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 pt-12 pb-16 md:px-6 md:pt-20 md:pb-24 lg:grid-cols-[0.8fr_1.2fr] lg:gap-10">
           <div className="space-y-7">
-            <div className="space-y-5">
-              <a
-                href="#salas"
-                className="inline-flex items-center gap-2.5 rounded-full border border-papel-borde bg-card py-1 pr-4 pl-1 text-[0.95rem] text-ink hover:border-marca"
-              >
-                <span className="rounded-full bg-marca px-2.5 py-0.5 text-[0.75rem] font-bold tracking-wide text-white">NUEVO</span>
-                Ahora le redacta el escrito
-              </a>
-              <Antetitulo>PARA ABOGADOS DE REPÚBLICA DOMINICANA</Antetitulo>
-            </div>
-            <h1 className="font-heading text-[2.7rem] leading-[1.05] font-medium tracking-tight md:text-[4rem]">
+            <Antetitulo>PARA ABOGADOS DE REPÚBLICA DOMINICANA</Antetitulo>
+            <h1 className="font-heading text-[2.7rem] leading-[1.05] font-medium tracking-tight md:text-[4rem] lg:text-[3.5rem]">
               Todo su trabajo, en una sola oficina.
             </h1>
-            <p className="max-w-[34rem] text-lg leading-relaxed text-ink-soft md:text-[1.25rem]">
+            <p className="max-w-[34rem] text-lg leading-relaxed text-ink-soft md:text-[1.2rem]">
               Pregúntele a Papiniano, su asistente, como a un colega: le responde con las sentencias de la Suprema Corte y
-              las leyes, y le muestra la página exacta de cada cita.
+              las leyes, le muestra la página exacta de cada cita y le redacta el escrito.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link to="/entrar" className="rounded-lg bg-boton px-6 py-4 text-[1.05rem] font-bold text-sobre-boton hover:bg-boton/90">
@@ -206,7 +198,10 @@ export default function Inicio() {
             </div>
             <p className="text-[0.92rem] text-ink-soft">{prueba.dias} días gratis, sin tarjeta. Entra con su cuenta de Gmail.</p>
           </div>
-          <EjemploRespuesta />
+          {/* en pantallas grandes la app se sale un poco hacia la derecha, para que se lea mejor; el texto queda alineado con el menú */}
+          <div className="min-[1500px]:-mr-24 min-[1700px]:-mr-40">
+            <VideoPapiniano />
+          </div>
         </section>
 
         {/* las fuentes oficiales que lee */}
@@ -322,10 +317,6 @@ export default function Inicio() {
                 </div>
               ))}
             </div>
-            <p className="text-[1.05rem] text-ink-soft">
-              <strong className="text-ink">Muy pronto, en la misma oficina:</strong> Expedientes (una carpeta por cliente),
-              sus propios modelos de escritos y la Agenda de audiencias.
-            </p>
           </div>
         </section>
 
@@ -625,44 +616,6 @@ function Demostracion({ paso }: { paso: number }) {
             {[100, 95, 72].map((w) => <i key={w} className="block h-2 rounded bg-[#DCC9BA]" style={{ width: `${w}%` }} />)}
           </div>
           {[96, 58].map((w) => <i key={w} className="block h-2 rounded bg-[#E9E1D4]" style={{ width: `${w}%` }} />)}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** Cómo se ve una respuesta adentro (ilustración, no es una consulta real) */
-function EjemploRespuesta() {
-  return (
-    <div aria-hidden="true" className="space-y-3.5 rounded-2xl border border-papel-borde bg-card p-5 shadow-[0_24px_60px_-20px_color-mix(in_oklab,var(--t-ink)_25%,transparent)] md:p-6">
-      <div className="flex items-center gap-2.5 border-b border-papel-borde pb-3.5">
-        <Papiniano className="size-9" decorativo />
-        <span className="font-heading text-lg font-medium">Papiniano</span>
-        <span className="text-[0.85rem] text-ink-soft">· su asistente</span>
-      </div>
-      <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-panel px-4 py-3 text-sobre-panel">
-        ¿Qué pasa si se aprobó un deslinde sin citar a los colindantes?
-      </p>
-      <div className="flex flex-wrap gap-2 text-[0.8rem] text-ink-soft">
-        {['Buscó en las sentencias y las leyes', 'Leyó 3 sentencias', '1 reglamento'].map((t) => (
-          <span key={t} className="rounded-full bg-[#F1E6DE] px-3 py-1">{t}</span>
-        ))}
-      </div>
-      <div className="space-y-3 rounded-2xl rounded-tl-sm border border-papel-borde bg-background p-5">
-        <p className="font-heading text-[1.05rem] leading-relaxed">
-          La falta de citación de los colindantes puede llevar a anular el deslinde, porque afecta su derecho de defensa
-          {[1, 2].map((n) => (
-            <span key={n} className="ml-1.5 rounded bg-[#F1E6DE] px-1.5 py-px font-sans text-[0.8rem] font-bold text-roble">{n}</span>
-          ))}
-        </p>
-        <p className="text-[0.8rem] font-bold tracking-[0.12em] text-marca-texto">LO QUE DICE LA JURISPRUDENCIA · ANÁLISIS</p>
-        <p className="text-ink-soft">El criterio de las sentencias, cómo aplica a su caso, los argumentos y los riesgos.</p>
-        <div className="flex items-start gap-3 rounded-lg border border-papel-borde bg-card p-3">
-          <FileText className="mt-0.5 size-5 shrink-0 text-marca-texto" />
-          <div className="text-[0.88rem]">
-            <p className="font-bold text-ink">[1] Sentencia de la Tercera Sala — Boletín Judicial, pág. …</p>
-            <p className="text-ink-soft">Ver la página aquí · Abrir en el Boletín Judicial</p>
-          </div>
         </div>
       </div>
     </div>

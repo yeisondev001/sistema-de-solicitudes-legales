@@ -7,8 +7,8 @@ import { Renglon, Seccion } from '@/components/seccion'
 import { useSubida } from '@/components/subida'
 import { api } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
-import type { Audiencia, Conversacion, Documento, Invitacion } from '@/lib/tipos'
-import { cuando, fechaDeHoy, saludo } from '@/lib/fechas'
+import type { Audiencia, Conversacion, Documento, Fecha, Invitacion } from '@/lib/tipos'
+import { cuando, cuandoEs, fechaDeHoy, horaBonita, saludo } from '@/lib/fechas'
 import { InvitacionesOficina } from '@/pages/mi-oficina'
 
 /** El inicio: el saludo y lo del día. Para preguntar se va directo a Papiniano (no hay caja aquí). */
@@ -17,6 +17,8 @@ export default function Escritorio() {
   const navegar = useNavigate()
   const [convs, setConvs] = useState<Conversacion[] | null>(null)
   const [audiencias, setAudiencias] = useState<Audiencia[]>([])
+  // lo de la agenda en los próximos 7 días (plan Abogado y Despacho)
+  const [semana, setSemana] = useState<Fecha[] | null>(null)
   const [docs, setDocs] = useState<{ configurada: boolean; documentos: Documento[] } | null>(null)
   const [apariencia, setApariencia] = useState(false)
   // las oficinas que le piden unirse (plan Despacho)
@@ -30,18 +32,21 @@ export default function Escritorio() {
   useEffect(() => {
     api.get<Conversacion[]>('/api/conversaciones').then(setConvs).catch(() => setConvs([]))
     if (perfil.plantillas) api.get<Audiencia[]>('/api/audiencias').then(setAudiencias).catch(() => {})
+    if (perfil.propios) api.get<Fecha[]>('/api/agenda').then(setSemana).catch(() => setSemana([]))
     contarDocumentos()
     if (perfil.email && !perfil.oficina) buscarInvitaciones()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil.plantillas])
 
   const nombre = perfil.nombre.split(/\s+/)[0] ?? ''
-  const resumen = perfil.plantillas
-    ? audiencias.length
-      ? `${audiencias.length} audiencia${audiencias.length === 1 ? '' : 's'} esta semana`
-      : 'Sin audiencias esta semana'
-    : perfil.prueba
-      ? `Prueba gratis · quedan ${perfil.prueba.dias} día${perfil.prueba.dias === 1 ? '' : 's'}`
+  // lo de la semana: la agenda y, en las cuentas con plantillas, las audiencias del historial de reportes
+  const enAgenda = (semana?.length ?? 0) + audiencias.length
+  const resumen = perfil.prueba
+    ? `Prueba gratis · quedan ${perfil.prueba.dias} día${perfil.prueba.dias === 1 ? '' : 's'}`
+    : perfil.propios || perfil.plantillas
+      ? enAgenda
+        ? `${enAgenda} fecha${enAgenda === 1 ? '' : 's'} esta semana`
+        : 'Nada en la agenda esta semana'
       : ''
 
   const mosaicos: [LucideIcon, string, () => void][] = [
@@ -73,6 +78,29 @@ export default function Escritorio() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2">
+        {perfil.propios && (
+          <Seccion titulo="Esta semana" accion={{ texto: 'Ver agenda', a: '/agenda' }}>
+            {semana === null ? (
+              <Cargando renglones={2} que="Cargando su agenda" />
+            ) : semana.length ? (
+              semana.slice(0, 5).map((f) => (
+                <Renglon
+                  key={f.id}
+                  titulo={f.titulo}
+                  detalle={[f.hora ? horaBonita(f.hora) : 'Todo el día', f.expediente?.cliente, f.lugar].filter(Boolean).join(' · ')}
+                  etiqueta={cuandoEs(f.fecha)}
+                  a={f.expediente ? `/expedientes/${f.expediente.id}` : '/agenda'}
+                />
+              ))
+            ) : (
+              <p className="text-ink-soft">
+                Nada en los próximos 7 días.{' '}
+                <Link to="/agenda" className="text-marca-texto hover:underline">Agregue sus audiencias y plazos</Link>.
+              </p>
+            )}
+          </Seccion>
+        )}
+
         {perfil.plantillas && (
           <Seccion titulo="Audiencias de la semana" accion={{ texto: 'Ver historial', a: '/redaccion/historial' }}>
             {audiencias.length ? (

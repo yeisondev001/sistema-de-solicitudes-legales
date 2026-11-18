@@ -52,6 +52,18 @@ El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que e
 - Las preguntas se cuentan por día en la tabla `uso`.
 - **Tema de colores:** cada cuenta guarda el suyo en `usuarios.tema` (lo elige en Apariencia).
 
+## Expedientes y Agenda (`expedientes.py`, 18 nov)
+
+- **Qué son:** un expediente es la carpeta de un caso (cliente, asunto, número, tribunal, contraparte, quién lo lleva, notas, activo o cerrado). La agenda son las fechas: audiencia, plazo, reunión u otro, de un expediente o sueltas (`fecha` AAAA-MM-DD; `hora` HH:MM o vacía si es todo el día). Pantallas: `web/src/pages/expedientes.tsx` (lista y `/expedientes/:id`), `agenda.tsx` (el mes y las próximas fechas por día) y `components/agenda.tsx` (lo que comparten).
+- **Las tablas se llaman `casos`, `agenda` y `caso_documentos`.** Ojo: **`expedientes` ya es la tabla del historial de reportes de audiencia** (`historial.py`), en la misma base; por eso la de los expedientes nuevos se llama `casos`. `conversaciones.expediente_id` guarda en qué caso está cada conversación. Se crean con las de `cuentas.py` (`_MIGRACIONES`).
+- **Quién ve qué:** en una oficina (plan Despacho) los expedientes y la agenda son de la oficina: todos sus abogados los ven y los cambian, y cada cosa dice quién la lleva. Sin oficina, cada abogado ve solo lo suyo. Si un abogado sale de la oficina, lo de la oficina se queda en ella; si se cierra la oficina, cada cosa vuelve a quien la creó (`cuentas.borrar_oficina`).
+- **Las conversaciones y los documentos siguen siendo de cada abogado:** un expediente muestra solo los que guardó en él el abogado que lo mira. En el chat, el botón **Expediente** guarda la conversación (con su escrito) en un caso; «Consultar a Papiniano sobre este caso» (`/papiniano?expediente=ID`) abre una conversación nueva que queda guardada en él. Los documentos se eligen de la Biblioteca (están en la otra base: `caso_documentos` solo guarda el enlace, y se esconden los que se borraron allá).
+- **Ley 172-13:** los datos del caso se guardan en la base de Papiniano y **no se le mandan a la IA**: al consultar desde un expediente, Papiniano recibe solo la pregunta. No hay campo de cédula. La página de Privacidad lo dice.
+- **Planes:** todos menos el Básico (`servidor.con_expedientes`, 403 con aviso para pasar al plan Abogado). En la página pública el Básico dice que no los trae.
+- **Escritorio:** la tarjeta **Esta semana** (las fechas de los próximos 7 días); las cuentas con plantillas siguen viendo además las audiencias del historial de reportes.
+- **Topes:** 2.000 expedientes y 5.000 fechas por oficina o abogado (la base gratis es chica).
+- **Falta:** que Papiniano calcule los plazos (por ejemplo, un mes para apelar), con reglas en el código como las prestaciones; avisos por correo de lo que vence.
+
 ## Cómo funciona la jurisprudencia
 
 Los archivos están en `jurisprudencia/`.
@@ -143,7 +155,7 @@ El concepto: **la app es la oficina del abogado** (nombre de entonces; hoy es Pa
   - **Letras:** Literata y Atkinson Hyperlegible se cargan desde jsDelivr (Fontsource). Flet admite un solo archivo por letra, así que la negrita la dibuja el navegador.
 - **La oficina por dentro (11 nov):**
   - **Menú de salas** a la izquierda; en el celular, con el botón ☰ arriba. Las salas son Escritorio, Asistente, Biblioteca, Expedientes, Redacción y Agenda.
-  - **Las que todavía no existen dicen «Pronto»:** Expedientes y Agenda para todos, y Redacción para las cuentas sin plantillas.
+  - **Redacción dice «Pronto»** en las cuentas sin plantillas. Expedientes y Agenda ya existen (18 nov; ver arriba).
   - **Escritorio (el inicio):**
     - Saludo con la fecha y una caja para preguntarle al asistente (abre una conversación nueva).
     - Conversaciones recientes, cosas a la mano y su biblioteca.
@@ -161,7 +173,6 @@ El concepto: **la app es la oficina del abogado** (nombre de entonces; hoy es Pa
   - **El nombre:** era «Despacho», provisional; el 11 nov pasó a ser **Papiniano** (ver abajo).
 - **Falta:**
   - El tamaño de letra en la app de Flet (en la app nueva ya está).
-  - **Funciones nuevas:** Expedientes (una carpeta por cliente) y Agenda (audiencias y plazos). Que nazcan compartidos por oficina (`usuarios.oficina_id`).
   - El botón «Elegir plan» con Lemon Squeezy.
   - **Páginas legales (13 nov):** ya no dicen «borrador» ni llevan empresa: el responsable es «Papiniano» y Lemon Squeezy es el vendedor (cobra, factura y reembolsa). Reembolso: 7 días. **Falta el correo de contacto** (`CORREO` en `web/src/pages/legal.tsx`, hoy `[CORREO DE CONTACTO]`): no subir sin él. Que un abogado las lea antes de cobrar.
   - **Precios (decididos el 13 nov):** tres planes, como Clerk: uno barato, el del medio que compra casi todos y uno caro. Todos empiezan con 7 días gratis, con todo y sin tarjeta (20 consultas por día).

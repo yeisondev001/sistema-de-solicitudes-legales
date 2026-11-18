@@ -84,6 +84,10 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
           <li>Su nombre y correo (de su cuenta de Google o los que usted escribe al crear la cuenta).</li>
           <li>Sus conversaciones con el asistente, para que pueda volver a abrirlas.</li>
           <li>Los documentos que usted sube a su biblioteca.</li>
+          <li>
+            Sus expedientes y su agenda: el nombre del cliente, el asunto, el número, el tribunal, la contraparte, las
+            fechas y las notas que usted escribe. Estos datos no se le envían a la inteligencia artificial.
+          </li>
           <li>Cuántas consultas hace por día (para el límite de la prueba).</li>
           <li>Los datos del pago los guarda Lemon Squeezy; nosotros no vemos su tarjeta.</li>
         </ul>
@@ -103,8 +107,9 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         <p>
           El dueño de la oficina ve su nombre, su correo, cuándo usó {NOMBRE_APP} por última vez y cuántas consultas hizo
           en el mes. Nunca ve lo que usted pregunta, sus conversaciones, sus documentos ni sus escritos. Los modelos que
-          usted decida compartir los ven los abogados de su oficina. Si sale de la oficina, todo lo suyo sigue en su
-          cuenta.
+          usted decida compartir los ven los abogados de su oficina. Los expedientes y la agenda son de la oficina: los
+          ven y los cambian todos sus abogados. Si sale de la oficina, todo lo suyo sigue en su cuenta, y los expedientes
+          y la agenda se quedan en la oficina.
         </p>
         <h2>Cookies</h2>
         <p>Usamos una sola cookie, la que mantiene abierta su sesión. No usamos cookies de publicidad ni de seguimiento.</p>

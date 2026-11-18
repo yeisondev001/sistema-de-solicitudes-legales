@@ -23,16 +23,16 @@ interface Sala {
   pronto?: boolean
 }
 
-/** Las salas del despacho. Las que todavía no existen salen con «Pronto». */
+/** Las salas del despacho. Redacción dice «Pronto» en las cuentas sin plantillas. */
 function useSalas(): Sala[] {
   const { perfil } = useSesion()
   return [
     { ruta: '/', nombre: 'Escritorio', icono: House },
     { ruta: '/papiniano', nombre: NOMBRE_ASISTENTE, icono: Papiniano },
     { ruta: '/biblioteca', nombre: 'Biblioteca', icono: LibraryBig },
-    { ruta: '/expedientes', nombre: 'Expedientes', icono: FolderClosed, pronto: true },
+    { ruta: '/expedientes', nombre: 'Expedientes', icono: FolderClosed },
     { ruta: '/redaccion', nombre: 'Redacción', icono: PenLine, pronto: !perfil.plantillas },
-    { ruta: '/agenda', nombre: 'Agenda', icono: CalendarDays, pronto: true },
+    { ruta: '/agenda', nombre: 'Agenda', icono: CalendarDays },
   ]
 }
 

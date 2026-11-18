@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Red
 from pydantic import BaseModel
 
 import cuentas
+import expedientes
 import historial
 import modelos
 import redaccion
@@ -325,7 +326,12 @@ def conversacion(conv_id: int, u=Depends(usuario_actual)):
     mensajes = cuentas.abrir_conversacion(u["id"], conv_id)
     if not mensajes:
         raise HTTPException(404, "Esa conversación ya no existe.")
-    return {"id": conv_id, "mensajes": _con_referencia(mensajes), "escrito": cuentas.leer_escrito(u["id"], conv_id)}
+    try:
+        expediente = expedientes.de_conversacion(u, conv_id) if cuentas.con_propios(u["plan"]) else None
+    except Exception:
+        expediente = None   # si no se puede leer, la conversación se abre igual
+    return {"id": conv_id, "mensajes": _con_referencia(mensajes), "escrito": cuentas.leer_escrito(u["id"], conv_id),
+            "expediente": expediente}
 
 
 @app.delete("/api/conversaciones/{conv_id}")
@@ -339,6 +345,8 @@ class Pregunta(BaseModel):
     conv_id: int | None = None
     # el modelo que eligió el abogado para el escrito; "ninguno": lo quiere sin modelo
     modelo: str | None = None
+    # una conversación nueva que empieza desde un expediente queda guardada en él
+    expediente_id: int | None = None
 
 
 def _modelo(clave: str, u: dict):
@@ -548,7 +556,13 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
         escrito_listo = None
         if guardar:
             try:
+                nueva = not conv_id
                 conv_id = cuentas.guardar_conversacion(u["id"], conv_id, historial_chat + [pregunta, turno])
+                if nueva and datos.expediente_id and cuentas.con_propios(u["plan"]):
+                    try:
+                        expedientes.poner_conversacion(u, conv_id, datos.expediente_id)
+                    except (LookupError, ValueError):
+                        pass   # el expediente ya no existe: la conversación queda suelta
                 if nuevo_escrito:
                     escrito_listo = cuentas.guardar_escrito(u["id"], conv_id, nuevo_escrito)
             except Exception:
@@ -996,6 +1010,146 @@ def oficina_rechazar(oid: int, u=Depends(usuario_actual)):
 @app.post("/api/oficina/salir")
 def oficina_salir(u=Depends(usuario_actual)):
     _en_oficina(lambda: cuentas.salir_de_oficina(u))
+    return {"ok": True}
+
+
+# ── EXPEDIENTES Y AGENDA ─────────────────────────
+# Del plan Abogado y del Despacho (en una oficina, compartidos por todos sus abogados): el Básico no los trae.
+SIN_EXPEDIENTES = "Expedientes y Agenda vienen con el plan Abogado. Para pasar al plan Abogado, escríbanos."
+
+
+def con_expedientes(u=Depends(usuario_actual)) -> dict:
+    if not cuentas.con_propios(u["plan"]):
+        raise HTTPException(403, SIN_EXPEDIENTES)
+    return u
+
+
+class DatosExpediente(BaseModel):
+    cliente: str
+    asunto: str = ""
+    numero: str = ""
+    tribunal: str = ""
+    contraparte: str = ""
+    notas: str = ""
+    estado: str = "activo"
+    responsable_id: int | None = None
+
+
+class DatosFecha(BaseModel):
+    titulo: str
+    tipo: str = "audiencia"
+    fecha: str
+    hora: str = ""
+    lugar: str = ""
+    notas: str = ""
+    expediente_id: int | None = None
+    responsable_id: int | None = None
+
+
+class EnExpediente(BaseModel):
+    expediente_id: int | None = None
+
+
+class DocumentoDeBiblioteca(BaseModel):
+    doc_id: int
+
+
+def _caso(accion):
+    """Hace el cambio; si no se puede, el motivo le llega al abogado como mensaje."""
+    try:
+        return accion()
+    except LookupError as ex:
+        raise HTTPException(404, str(ex))
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+
+
+def _expediente_completo(u: dict, exp_id: int) -> dict:
+    """El expediente con sus documentos de la Biblioteca que todavía existen (se pudieron borrar allá)."""
+    x = _caso(lambda: expedientes.leer(u, exp_id))
+    if x["documentos"] and juris_db.configurada():
+        try:
+            existen = {d["id"] for d in juris_proc.mis_documentos(u["id"])}
+            x["documentos"] = [d for d in x["documentos"] if d["id"] in existen]
+        except Exception:
+            pass   # si la otra base no responde, se muestran como estaban
+    return x
+
+
+@app.get("/api/expedientes")
+def expedientes_lista(u=Depends(con_expedientes)):
+    return expedientes.listar(u)
+
+
+@app.post("/api/expedientes")
+def expediente_crear(datos: DatosExpediente, u=Depends(con_expedientes)):
+    exp_id = _caso(lambda: expedientes.guardar(u, None, datos.model_dump()))
+    return _expediente_completo(u, exp_id)
+
+
+@app.get("/api/expedientes/{exp_id}")
+def expediente_ver(exp_id: int, u=Depends(con_expedientes)):
+    return _expediente_completo(u, exp_id)
+
+
+@app.put("/api/expedientes/{exp_id}")
+def expediente_cambiar(exp_id: int, datos: DatosExpediente, u=Depends(con_expedientes)):
+    _caso(lambda: expedientes.guardar(u, exp_id, datos.model_dump()))
+    return _expediente_completo(u, exp_id)
+
+
+@app.delete("/api/expedientes/{exp_id}")
+def expediente_borrar(exp_id: int, u=Depends(con_expedientes)):
+    _caso(lambda: expedientes.borrar(u, exp_id))
+    return {"ok": True}
+
+
+@app.post("/api/expedientes/{exp_id}/documentos")
+def expediente_poner_documento(exp_id: int, datos: DocumentoDeBiblioteca, u=Depends(con_expedientes)):
+    """Guarda en el expediente uno de sus documentos de la Biblioteca (solo los suyos)."""
+    try:
+        doc = next((d for d in juris_proc.mis_documentos(u["id"]) if d["id"] == datos.doc_id), None)
+    except Exception:
+        raise HTTPException(503, "No se pudieron leer sus documentos. Intente de nuevo en un momento.")
+    if not doc:
+        raise HTTPException(404, "Ese documento ya no está en su Biblioteca.")
+    _caso(lambda: expedientes.poner_documento(u, exp_id, doc["id"], doc["titulo"] or "Documento"))
+    return _expediente_completo(u, exp_id)
+
+
+@app.delete("/api/expedientes/{exp_id}/documentos/{doc_id}")
+def expediente_quitar_documento(exp_id: int, doc_id: int, u=Depends(con_expedientes)):
+    _caso(lambda: expedientes.quitar_documento(u, exp_id, doc_id))
+    return _expediente_completo(u, exp_id)
+
+
+@app.put("/api/conversaciones/{conv_id}/expediente")
+def conversacion_en_expediente(conv_id: int, datos: EnExpediente, u=Depends(con_expedientes)):
+    """Guarda la conversación (con su escrito) en un expediente, o la saca (expediente_id null)."""
+    _caso(lambda: expedientes.poner_conversacion(u, conv_id, datos.expediente_id))
+    return {"expediente": expedientes.de_conversacion(u, conv_id)}
+
+
+@app.get("/api/agenda")
+def agenda(desde: str = "", hasta: str = "", u=Depends(con_expedientes)):
+    """Las fechas entre dos días (AAAA-MM-DD, los dos incluidos); sin días, las de los próximos 7."""
+    hoy = expedientes.hoy()
+    return _caso(lambda: expedientes.agenda(u, desde or hoy.isoformat(), hasta or (hoy + timedelta(days=7)).isoformat()))
+
+
+@app.post("/api/agenda")
+def fecha_crear(datos: DatosFecha, u=Depends(con_expedientes)):
+    return {"id": _caso(lambda: expedientes.guardar_fecha(u, None, datos.model_dump()))}
+
+
+@app.put("/api/agenda/{fecha_id}")
+def fecha_cambiar(fecha_id: int, datos: DatosFecha, u=Depends(con_expedientes)):
+    return {"id": _caso(lambda: expedientes.guardar_fecha(u, fecha_id, datos.model_dump()))}
+
+
+@app.delete("/api/agenda/{fecha_id}")
+def fecha_borrar(fecha_id: int, u=Depends(con_expedientes)):
+    _caso(lambda: expedientes.borrar_fecha(u, fecha_id))
     return {"ok": True}
 
 

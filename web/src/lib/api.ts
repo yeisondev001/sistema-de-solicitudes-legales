@@ -59,6 +59,8 @@ export async function preguntarAlAsistente(
   alAvanzar: (texto: string, escrito: boolean) => void,
   /** el modelo que eligió para el escrito; «ninguno» si lo quiere sin modelo */
   modelo?: string,
+  /** en una conversación nueva: el expediente donde queda guardada */
+  expedienteId?: number,
 ): Promise<{ turno: Turno; conv_id: number | null; escrito?: Escrito }> {
   let r: Response
   try {
@@ -66,7 +68,7 @@ export async function preguntarAlAsistente(
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texto, conv_id: convId, modelo }),
+      body: JSON.stringify({ texto, conv_id: convId, modelo, expediente_id: expedienteId }),
     })
   } catch {
     throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
