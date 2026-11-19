@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { LibraryBig, MessageSquarePlus, Palette, PenLine, Upload, type LucideIcon } from 'lucide-react'
+import { FileStack, LibraryBig, MessageSquarePlus, Palette, PenLine, type LucideIcon } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
 import { Cargando } from '@/components/cargando'
 import { Renglon, Seccion } from '@/components/seccion'
-import { useSubida } from '@/components/subida'
 import { api } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
 import type { Audiencia, Conversacion, Documento, Fecha, Invitacion } from '@/lib/tipos'
@@ -27,7 +26,6 @@ export default function Escritorio() {
   const contarDocumentos = () => api.get<typeof docs>('/api/documentos').then(setDocs).catch(() => {})
   const buscarInvitaciones = () =>
     api.get<{ invitaciones: Invitacion[] }>('/api/oficina').then((r) => setInvitaciones(r.invitaciones)).catch(() => {})
-  const subida = useSubida(contarDocumentos)
 
   useEffect(() => {
     api.get<Conversacion[]>('/api/conversaciones').then(setConvs).catch(() => setConvs([]))
@@ -51,7 +49,7 @@ export default function Escritorio() {
 
   const mosaicos: [LucideIcon, string, () => void][] = [
     [MessageSquarePlus, 'Preguntarle a Papiniano', () => navegar('/papiniano')],
-    [Upload, 'Subir un documento', subida.abrir],
+    [FileStack, 'Buscar un modelo', () => navegar('/modelos')],
     [LibraryBig, 'Ver la biblioteca', () => navegar('/biblioteca')],
     perfil.plantillas
       ? [PenLine, 'Nueva solicitud', () => navegar('/redaccion')]
@@ -60,7 +58,6 @@ export default function Escritorio() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 md:px-8 md:py-8">
-      {subida.entrada}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-ink pb-5">
         <div className="space-y-1.5">
           <p className="text-[0.85rem] font-bold tracking-wide text-pista uppercase">{fechaDeHoy()}</p>
