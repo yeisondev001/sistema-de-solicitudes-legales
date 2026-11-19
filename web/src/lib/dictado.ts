@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 /**
  * Dictado por voz con el reconocimiento que trae el navegador (Chrome, Edge, Safari): gratis y sin servicios
@@ -84,14 +85,37 @@ function paraLeer(texto: string): string {
     .trim()
 }
 
-/** la mejor voz en español: dominicana, latinoamericana o la de España, en ese orden */
-function vozEspanol(): SpeechSynthesisVoice | undefined {
-  const voces = window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('es'))
-  for (const preferida of ['es-do', 'es-us', 'es-mx', 'es-419', 'es-es']) {
-    const v = voces.find((x) => x.lang.toLowerCase() === preferida)
-    if (v) return v
+/**
+ * La mejor voz en español: dominicana, latinoamericana o la de España, y antes las de Google o las «naturales»
+ * (suenan mejor). Chrome carga las voces un momento después de abrir la página: si todavía no hay, se espera.
+ */
+function vozEspanol(voces: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  const es = voces.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith('es'))
+  const puntos = (v: SpeechSynthesisVoice) => {
+    const lang = v.lang.toLowerCase().replace('_', '-')
+    const region = ['es-do', 'es-us', 'es-mx', 'es-419', 'es-es'].indexOf(lang)
+    const calidad = /google|natural|online/i.test(v.name) ? 0 : 10
+    return calidad + (region === -1 ? 9 : region)
   }
-  return voces[0]
+  return es.sort((a, b) => puntos(a) - puntos(b))[0]
+}
+
+function conVoces(hacer: (voces: SpeechSynthesisVoice[]) => void) {
+  const s = window.speechSynthesis
+  const voces = s.getVoices()
+  if (voces.length) {
+    hacer(voces)
+    return
+  }
+  let hecho = false
+  const listo = () => {
+    if (hecho) return
+    hecho = true
+    s.removeEventListener('voiceschanged', listo)
+    hacer(s.getVoices())
+  }
+  s.addEventListener('voiceschanged', listo)
+  setTimeout(listo, 1500)   // algunos navegadores no avisan: se habla igual con lo que haya
 }
 
 /** Lee el texto en voz alta (corta lo que estaba leyendo). alTerminar avisa cuando acaba o se corta. */
@@ -99,14 +123,28 @@ export function hablar(texto: string, alTerminar?: () => void) {
   if (!hayVoz()) return
   const s = window.speechSynthesis
   s.cancel()
-  const frase = new SpeechSynthesisUtterance(paraLeer(texto))
-  frase.lang = 'es-DO'
-  const voz = vozEspanol()
-  if (voz) frase.voice = voz
-  frase.rate = 1
-  frase.onend = () => alTerminar?.()
-  frase.onerror = () => alTerminar?.()
-  s.speak(frase)
+  conVoces((voces) => {
+    const voz = vozEspanol(voces)
+    if (!voz) {
+      // leer español con una voz en inglés suena mal: mejor avisar
+      toast.error('Este navegador no tiene una voz en español. Use Google Chrome o agregue una voz en español en '
+        + 'la configuración de voz de su equipo (Windows: Configuración › Hora e idioma › Voz).')
+      alTerminar?.()
+      return
+    }
+    const frase = new SpeechSynthesisUtterance(paraLeer(texto))
+    frase.voice = voz
+    frase.lang = voz.lang
+    frase.rate = 1
+    frase.onend = () => alTerminar?.()
+    frase.onerror = () => alTerminar?.()
+    s.speak(frase)
+  })
+}
+
+/** Si el equipo tiene alguna voz en español (si no, lee con acento de otro idioma) */
+export function hayVozEspanol(): boolean {
+  return hayVoz() && Boolean(vozEspanol(window.speechSynthesis.getVoices()))
 }
 
 export function callar() {
@@ -127,6 +165,37 @@ export function useVoz() {
       } else {
         setLeyendo(clave)
         hablar(texto, () => setLeyendo((l) => (l === clave ? null : l)))
+      }
+    },
+  }
+}
+
+const CLAVE_VOZ = 'papiniano.voz'
+
+/**
+ * «Que Papiniano me hable»: encendido, lee solo cada respuesta nueva (en el chat) y cada pregunta (en
+ * Redacción). Se recuerda en este equipo y vale para las dos salas.
+ */
+export function useVozAutomatica() {
+  const [encendida, setEncendida] = useState(() => {
+    try {
+      return localStorage.getItem(CLAVE_VOZ) === '1'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => () => callar(), [])
+  return {
+    disponible: hayVoz(),
+    encendida,
+    alternar() {
+      const nuevo = !encendida
+      setEncendida(nuevo)
+      if (!nuevo) callar()
+      try {
+        localStorage.setItem(CLAVE_VOZ, nuevo ? '1' : '0')
+      } catch {
+        // sin almacenamiento: vale mientras la página esté abierta
       }
     },
   }

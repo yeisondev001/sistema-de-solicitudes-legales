@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Tabs as TabsPrimitive } from 'radix-ui'
-import { FilePen, FileStack, FolderClosed, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
+import { FilePen, FileStack, FolderClosed, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2, Volume2, VolumeX } from 'lucide-react'
 import { toast } from 'sonner'
 import { ElegirExpediente, type Caso } from '@/components/elegir-expediente'
 import { PanelEscrito } from '@/components/escrito'
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { api, ErrorApi, preguntarAlAsistente } from '@/lib/api'
+import { hablar, useVozAutomatica } from '@/lib/dictado'
 import { useAncho } from '@/lib/pantalla'
 import { useSesion } from '@/lib/sesion'
 import type { Conversacion, Escrito, Expediente, Modelo, Turno } from '@/lib/tipos'
@@ -96,6 +97,8 @@ export default function Asistente() {
   // la conversación donde se acaba de poner un modelo: su hoja abre los datos por llenar
   const [datosPara, setDatosPara] = useState<number | null | undefined>(undefined)
   const ancha = useAncho(ANCHO_LADO_A_LADO)
+  // encendida, Papiniano lee en voz alta cada respuesta nueva
+  const voz = useVozAutomatica()
 
   // la conversación abierta (la respuesta puede llegar después de cambiar de dirección)
   const convActual = useRef(convId)
@@ -187,6 +190,7 @@ export default function Asistente() {
         desde === null ? caso?.id : undefined,
       )
       setMensajes((m) => [...m, r.turno])
+      if (voz.encendida && r.turno.texto) hablar(r.turno.texto)
       if (convActual.current === desde) {
         if (r.escrito) setEscrito(r.escrito)
         if (r.turno.pedir_datos) {
@@ -404,6 +408,17 @@ export default function Asistente() {
               {hayEscrito && ancha && oculto && (
                 <Button variant="ghost" className="h-11 min-w-11 text-ink-soft" onClick={() => verEscrito()} title="Ver el escrito">
                   <FilePen /> <span className={etiqueta}>Ver el escrito</span>
+                </Button>
+              )}
+              {voz.disponible && (
+                <Button
+                  variant="ghost"
+                  className={cn('h-11 min-w-11', voz.encendida ? 'text-marca-texto' : 'text-ink-soft')}
+                  onClick={voz.alternar}
+                  aria-pressed={voz.encendida}
+                  title={voz.encendida ? 'Papiniano lee cada respuesta en voz alta. Toque para apagarlo.' : 'Que Papiniano me lea cada respuesta en voz alta'}
+                >
+                  {voz.encendida ? <Volume2 /> : <VolumeX />} <span className={etiqueta}>{voz.encendida ? 'Voz encendida' : 'Voz'}</span>
                 </Button>
               )}
               <Button variant="ghost" className="h-11 min-w-11 text-ink-soft" onClick={() => setGaleria(true)} title="Modelos de escritos">

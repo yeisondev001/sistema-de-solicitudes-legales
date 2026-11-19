@@ -12,7 +12,7 @@ import { Seccion } from '@/components/seccion'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api, ErrorApi, leerParaRedactar, redactarEscrito, type DocumentoLeido } from '@/lib/api'
-import { hablar, callar, hayVoz, useDictado } from '@/lib/dictado'
+import { hablar, hayVoz, useDictado, useVozAutomatica } from '@/lib/dictado'
 import { useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
@@ -397,14 +397,9 @@ function Entrevista({
     (mensaje) => toast.error(mensaje),
   )
 
-  // que Papiniano lea cada pregunta en voz alta (lo enciende el abogado; se recuerda en este equipo)
-  const [conVoz, setConVoz] = useState(() => {
-    try {
-      return localStorage.getItem('papiniano.voz') === '1'
-    } catch {
-      return false
-    }
-  })
+  // que Papiniano lea cada pregunta en voz alta (el mismo ajuste que en el chat)
+  const voz = useVozAutomatica()
+  const conVoz = voz.encendida
 
   useEffect(() => {
     fin.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -414,19 +409,6 @@ function Entrevista({
     hablar(p ? `${p.pregunta}. ${p.ayuda}` : 'Tengo todo lo que necesito. ¿Con qué modelo lo hago?')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paso, conVoz])
-  useEffect(() => () => callar(), [])
-
-  function cambiarVoz() {
-    const nuevo = !conVoz
-    setConVoz(nuevo)
-    if (!nuevo) callar()
-    try {
-      localStorage.setItem('papiniano.voz', nuevo ? '1' : '0')
-    } catch {
-      // sin almacenamiento: vale mientras la página esté abierta
-    }
-  }
-
   function responder(valor: string) {
     if (!actual) return
     if (dictado.escuchando) dictado.alternar()
@@ -453,7 +435,7 @@ function Entrevista({
     <section className="space-y-4 rounded-2xl border border-papel-borde bg-background p-4 md:p-6">
       {hayVoz() && (
         <div className="flex justify-end">
-          <Button variant="ghost" className="h-11 text-ink-soft" onClick={cambiarVoz} aria-pressed={conVoz}>
+          <Button variant="ghost" className="h-11 text-ink-soft" onClick={voz.alternar} aria-pressed={conVoz}>
             {conVoz ? <><VolumeX /> Que no me hable</> : <><Volume2 /> Que Papiniano me lea las preguntas</>}
           </Button>
         </div>
