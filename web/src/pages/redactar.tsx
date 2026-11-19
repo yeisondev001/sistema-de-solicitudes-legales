@@ -255,6 +255,16 @@ export default function Redactar() {
                   <span className="font-bold text-ink">{leyendo ? 'Leyendo el documento…' : 'Elegir el documento'}</span>
                   <span className="text-[0.9rem] text-ink-soft">o arrástrelo aquí</span>
                 </button>
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-papel-borde bg-background p-4">
+                  <PencilLine className="size-6 shrink-0 text-marca-texto" aria-hidden />
+                  <p className="flex-1 text-[0.95rem] text-ink-soft">
+                    <strong className="text-ink">¿No tiene documento?</strong> Hágalo usted mismo: Papiniano le pregunta
+                    lo de su caso y lo redacta.
+                  </p>
+                  <Button variant="outline" className="h-11 border-regla" onClick={() => setModo('propio')} disabled={leyendo}>
+                    Que Papiniano me pregunte
+                  </Button>
+                </div>
                 <div className="space-y-1.5">
                   <label htmlFor="indicaciones" className="font-bold text-ink">
                     Indicaciones para Papiniano <span className="font-normal text-ink-soft">(opcional)</span>
