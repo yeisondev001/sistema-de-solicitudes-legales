@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpenCheck, ChevronDown, FileSignature, FileUp, Landmark, Loader2, PencilLine, Scale, ShieldCheck,
-  Sparkles, type LucideIcon,
+  ArrowLeft, BookOpenCheck, ChevronDown, FileSignature, FileUp, Landmark, Loader2, PencilLine, Scale, SendHorizontal,
+  ShieldCheck, Sparkles, type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { guardarDatosDelEscrito } from '@/components/escrito'
 import { TituloSala } from '@/components/oficina'
+import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Seccion } from '@/components/seccion'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -140,7 +141,6 @@ export default function Redactar() {
   const quitados = documento
     ? Object.entries(documento.cuenta).map(([k, n]) => `${n} ${(NOMBRES[k] ?? [k.toLowerCase(), k.toLowerCase()])[n === 1 ? 0 : 1]}`)
     : []
-  const faltan = tipo?.preguntas.filter((p) => p.requerida && (respuestas[p.clave] ?? '').trim().length < 3) ?? []
 
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 md:px-8 md:py-8">
@@ -210,8 +210,8 @@ export default function Redactar() {
                   <PencilLine className="size-7 text-marca-texto" aria-hidden />
                   <span className="text-lg font-bold text-ink">Hacerlo yo mismo</span>
                   <span className="text-[0.95rem] text-ink-soft">
-                    Responda unas preguntas de su caso (tribunal, hechos, motivos, qué pide) y Papiniano lo redacta
-                    con el modelo y los artículos de la biblioteca.
+                    Papiniano le pregunta lo de su caso (tribunal, hechos, motivos, qué pide) y lo redacta con el
+                    modelo y los artículos de la biblioteca.
                   </span>
                 </button>
               </div>
@@ -323,57 +323,17 @@ export default function Redactar() {
             </Seccion>
           )}
 
-          {/* Hacerlo yo mismo: las preguntas del caso */}
+          {/* Hacerlo yo mismo: Papiniano pregunta */}
           {modo === 'propio' && (
-            <Seccion titulo="Los datos de su caso">
-              <div className="space-y-5">
-                <p className="text-ink-soft">
-                  Conteste lo que sabe; lo marcado con * hace falta. Papiniano busca en la biblioteca los artículos y
-                  sentencias que encajan con sus hechos y motivos: no pone ninguno que no esté ahí. No escriba nombres
-                  ni cédulas: van como datos por llenar y se ponen al descargar.
-                </p>
-                {tipo.preguntas.map((p) => (
-                  <div key={p.clave} className="space-y-1.5">
-                    <label htmlFor={`p-${p.clave}`} className="font-bold text-ink">
-                      {p.pregunta}
-                      {p.requerida && <span className="text-marca-texto"> *</span>}
-                    </label>
-                    {p.ayuda && <p className="text-[0.9rem] text-ink-soft">{p.ayuda}</p>}
-                    <Textarea
-                      id={`p-${p.clave}`}
-                      value={respuestas[p.clave] ?? ''}
-                      onChange={(e) => setRespuestas((r) => ({ ...r, [p.clave]: e.target.value }))}
-                      className={cn('text-base', ['hechos', 'motivos'].includes(p.clave) ? 'min-h-32' : 'min-h-16')}
-                      maxLength={4000}
-                      disabled={Boolean(avance)}
-                    />
-                  </div>
-                ))}
-                <div className="space-y-1.5">
-                  <label htmlFor="modelo" className="font-bold text-ink">Modelo</label>
-                  <select
-                    id="modelo"
-                    value={modelo}
-                    onChange={(e) => setModelo(e.target.value)}
-                    disabled={Boolean(avance)}
-                    className="h-12 w-full rounded-lg border border-regla bg-card px-3 text-base text-ink focus:border-marca focus:outline-none"
-                  >
-                    <option value="">Que Papiniano elija el que mejor encaje</option>
-                    {tipo.modelos.map((m) => (
-                      <option key={m.clave} value={m.clave}>{m.nombre}</option>
-                    ))}
-                    <option value="ninguno">Sin modelo</option>
-                  </select>
-                </div>
-                <BotonRedactar
-                  nombre={tipo.nombre}
-                  avance={avance}
-                  desactivado={faltan.length > 0}
-                  alRedactar={redactarPropio}
-                  aviso={faltan.length ? `Falta: ${faltan.map((p) => p.pregunta).join(' · ')}` : undefined}
-                />
-              </div>
-            </Seccion>
+            <Entrevista
+              tipo={tipo}
+              respuestas={respuestas}
+              setRespuestas={setRespuestas}
+              modelo={modelo}
+              setModelo={setModelo}
+              avance={avance}
+              alRedactar={redactarPropio}
+            />
           )}
         </div>
       )}
@@ -403,6 +363,165 @@ function BotonRedactar({
       ) : (
         aviso && <p className="text-[0.9rem] text-ink-soft">{aviso}</p>
       )}
+    </div>
+  )
+}
+
+/**
+ * «Hacerlo yo mismo» como conversación: Papiniano hace las preguntas del caso una por una, como un colega,
+ * y al final pregunta con qué modelo lo hace. Las preguntas son fijas por tipo de escrito (redactar.py):
+ * no gastan IA y no se le olvida ninguna. Se puede volver a cualquier respuesta para cambiarla.
+ */
+function Entrevista({
+  tipo, respuestas, setRespuestas, modelo, setModelo, avance, alRedactar,
+}: {
+  tipo: Tipo
+  respuestas: Record<string, string>
+  setRespuestas: (r: Record<string, string>) => void
+  modelo: string
+  setModelo: (m: string) => void
+  avance: string | null
+  alRedactar: () => void
+}) {
+  const preguntas = tipo.preguntas
+  const [paso, setPaso] = useState(0)
+  const [texto, setTexto] = useState('')
+  const fin = useRef<HTMLDivElement>(null)
+  const entrada = useRef<HTMLTextAreaElement>(null)
+  const actual = preguntas[paso]
+  const listo = paso >= preguntas.length
+
+  useEffect(() => {
+    fin.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    entrada.current?.focus()
+  }, [paso])
+
+  function responder(valor: string) {
+    if (!actual) return
+    const limpio = valor.trim()
+    if (actual.requerida && limpio.length < 3) {
+      toast.error('Esta respuesta hace falta para el escrito.')
+      return
+    }
+    const nuevas = { ...respuestas, [actual.clave]: limpio }
+    setRespuestas(nuevas)
+    // la siguiente que falta (si volvió a cambiar una, sigue donde iba)
+    const siguiente = preguntas.findIndex((p, i) => i > paso && !(p.clave in nuevas))
+    setPaso(siguiente === -1 ? preguntas.length : siguiente)
+    setTexto('')
+  }
+
+  function cambiar(i: number) {
+    setPaso(i)
+    setTexto(respuestas[preguntas[i].clave] ?? '')
+  }
+
+  const articulo = /^(demanda)/i.test(tipo.nombre) ? 'la' : 'el'
+  return (
+    <section className="space-y-4 rounded-2xl border border-papel-borde bg-background p-4 md:p-6">
+      <BurbujaPapiniano>
+        Vamos a preparar {articulo} {tipo.nombre.toLowerCase()}. Le hago unas preguntas de su caso y con eso busco en la
+        biblioteca los artículos y sentencias que encajan; no pongo ninguno que no esté ahí. Los nombres y cédulas no
+        me los dé: van como datos por llenar y se ponen al descargar.
+      </BurbujaPapiniano>
+
+      {preguntas.map((p, i) => {
+        const respondida = p.clave in respuestas && i !== paso
+        if (i > paso && !respondida) return null
+        return (
+          <div key={p.clave} className="space-y-3">
+            <BurbujaPapiniano>
+              <span className="font-bold">{p.pregunta}</span>
+              {p.ayuda && <span className="mt-1 block text-[0.9rem] text-ink-soft">{p.ayuda}</span>}
+              {!p.requerida && <span className="mt-1 block text-[0.85rem] italic text-ink-soft">Si no aplica, sáltela.</span>}
+            </BurbujaPapiniano>
+            {respondida && (
+              <div className="flex flex-col items-end gap-1">
+                <div className="ml-12 rounded-2xl rounded-br-sm bg-panel px-4 py-3 whitespace-pre-wrap text-sobre-panel">
+                  {respuestas[p.clave] || <span className="italic opacity-80">(la saltó)</span>}
+                </div>
+                {!avance && (
+                  <button type="button" onClick={() => cambiar(i)} className="text-[0.85rem] text-ink-soft underline underline-offset-2 hover:text-ink">
+                    Cambiar
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {listo && (
+        <BurbujaPapiniano>
+          <span className="font-bold">Tengo todo lo que necesito. ¿Con qué modelo lo hago?</span>
+          <span className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Modelo">
+            {[{ clave: '', nombre: 'Que Papiniano elija' }, ...tipo.modelos, { clave: 'ninguno', nombre: 'Sin modelo' }].map((m) => (
+              <button
+                key={m.clave || 'elige'}
+                type="button"
+                aria-pressed={modelo === m.clave}
+                disabled={Boolean(avance)}
+                onClick={() => setModelo(m.clave)}
+                className={cn(
+                  'min-h-10 rounded-full border px-4 py-1.5 text-left text-[0.9rem] transition-colors',
+                  modelo === m.clave ? 'border-marca bg-marca font-bold text-sobre-boton' : 'border-regla bg-card text-ink hover:border-marca',
+                )}
+              >
+                {m.nombre}
+              </button>
+            ))}
+          </span>
+        </BurbujaPapiniano>
+      )}
+      <div ref={fin} />
+
+      {listo ? (
+        <BotonRedactar nombre={tipo.nombre} avance={avance} desactivado={false} alRedactar={alRedactar} />
+      ) : (
+        <form
+          className="flex items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            responder(texto)
+          }}
+        >
+          <Textarea
+            ref={entrada}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                responder(texto)
+              }
+            }}
+            placeholder="Escriba su respuesta…"
+            aria-label={actual?.pregunta}
+            className="min-h-12 flex-1 rounded-2xl text-base"
+            maxLength={4000}
+          />
+          {actual && !actual.requerida && (
+            <Button type="button" variant="ghost" className="h-12 text-ink-soft" onClick={() => responder('')}>
+              Saltar
+            </Button>
+          )}
+          <Button type="submit" size="icon-grande" aria-label="Enviar respuesta">
+            <SendHorizontal />
+          </Button>
+        </form>
+      )}
+    </section>
+  )
+}
+
+function BurbujaPapiniano({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mr-12 space-y-2">
+      <div className="flex items-center gap-2">
+        <Papiniano className="size-7" decorativo />
+        <span className="text-[0.9rem] font-bold text-ink">{NOMBRE_ASISTENTE}</span>
+      </div>
+      <div className="rounded-2xl rounded-tl-sm border border-papel-borde bg-card px-5 py-4 text-ink">{children}</div>
     </div>
   )
 }
