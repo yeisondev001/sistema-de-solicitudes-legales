@@ -319,5 +319,9 @@ que `prestaciones.py`: si cambia una, cambiar la otra. Se comprobó con 8 casos 
   `<noscript>` y los datos de Papiniano en JSON-LD. El servidor (`servidor.PAGINAS_PUBLICAS`) pone el título, la
   descripción, la dirección canónica y, en la calculadora, su propio resumen, antes de mandar la página. Si cambian
   los planes o los precios, cambiar también esos textos y `llms.txt`.
-- Falta: registrar el sitio en Google Search Console y Bing Webmaster Tools (registro TXT en Hostinger).
+- **Google Search Console:** verificado el 19 nov con un registro TXT en Hostinger (cuenta de Google de yeison; no
+  borrar ese registro). Ahí se manda el `sitemap.xml` y se pide indexar cada página nueva.
+- **Bing (y ChatGPT, que busca con Bing):** por IndexNow, sin cuenta. La clave es el archivo
+  `web/public/582303ee1c04c4cb02a788c1a7354e34.txt`; para avisar de páginas nuevas o cambiadas:
+  `curl -X POST https://api.indexnow.org/indexnow -H "Content-Type: application/json" -d '{"host":"papinianord.com","key":"582303ee1c04c4cb02a788c1a7354e34","urlList":["https://papinianord.com/"]}'`
 
