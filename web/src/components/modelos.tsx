@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Eye, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Hoja } from '@/components/escrito'
 import { SubirModelo, type Borrador } from '@/components/mis-modelos'
@@ -25,10 +25,13 @@ interface Catalogo {
   materias: Record<string, string>
 }
 
+/** sin tildes ni mayúsculas, para buscar «demanda» y encontrar «Demanda en desalojo» o «DEMANDA» */
+const llano = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
 /**
  * «Modelos»: los suyos («Mis modelos», que sube él) y los de todos, por grupo (actos, demandas, conclusiones…)
  * y con un filtro por materia. Cada uno se puede ver antes de usarlo; al usarlo, Papiniano lo pone en la hoja
- * y pide los datos.
+ * y pide los datos. Ventana dentro del Asistente; la sala «Modelos» muestra la misma lista en su página.
  */
 export function GaleriaModelos({
   abierto, alCerrar, alUsar, ocupado,
@@ -38,9 +41,35 @@ export function GaleriaModelos({
   alUsar: (m: Modelo) => void
   ocupado: boolean
 }) {
+  return (
+    <Dialog open={abierto} onOpenChange={(a) => !a && alCerrar()}>
+      <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="font-heading text-2xl font-medium">Modelos de escritos</DialogTitle>
+          <DialogDescription>
+            Elija uno: Papiniano lo pone en la hoja y le pide los datos del caso. Están hechos de escritos reales, sin
+            ningún dato de las personas.
+          </DialogDescription>
+        </DialogHeader>
+        {abierto && <ListaModelos alUsar={alUsar} ocupado={ocupado} enVentana />}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** El buscador, los filtros y la lista de modelos (con sus ventanas para verlos, subirlos y borrarlos) */
+export function ListaModelos({
+  alUsar, ocupado, enVentana = false,
+}: {
+  alUsar: (m: Modelo) => void
+  ocupado: boolean
+  /** dentro de una ventana la lista tiene su propia barra; en una página baja con la página */
+  enVentana?: boolean
+}) {
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null)
   const [error, setError] = useState('')
   const [materia, setMateria] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [viendo, setViendo] = useState<Modelo | null>(null)
   // subir uno nuevo (null) o editar uno suyo; undefined: no se está subiendo nada
   const [subiendo, setSubiendo] = useState<Borrador | null | undefined>(undefined)
@@ -48,17 +77,27 @@ export function GaleriaModelos({
   const { perfil } = useSesion()
 
   useEffect(() => {
-    if (!abierto || catalogo) return
+    if (catalogo) return
     api
       .get<Catalogo>('/api/modelos')
       .then(setCatalogo)
       .catch((e: ErrorApi) => setError(e.message))
-  }, [abierto, catalogo])
+  }, [catalogo])
 
-  const deMateria = (m: Modelo) => !materia || m.materia === materia
+  // cada palabra buscada tiene que estar en el nombre, cuándo se usa, el tribunal, el grupo o la materia
+  const palabras = llano(busqueda).split(/\s+/).filter(Boolean)
+  const coincide = (m: Modelo) => {
+    if (!palabras.length) return true
+    const donde = llano(
+      [m.nombre, m.cuando, m.tribunal, catalogo?.grupos[m.grupo], catalogo?.materias[m.materia]].filter(Boolean).join(' '),
+    )
+    return palabras.every((p) => donde.includes(p))
+  }
+  const deMateria = (m: Modelo) => (!materia || m.materia === materia) && coincide(m)
   const lista = catalogo?.modelos.filter(deMateria) ?? []
   const propios = catalogo?.propios.filter(deMateria) ?? []
   const deOficina = catalogo?.oficina.filter(deMateria) ?? []
+  const ninguno = Boolean(catalogo) && palabras.length > 0 && !lista.length && !propios.length && !deOficina.length
   const materias = catalogo
     ? Object.entries(catalogo.materias).filter(([k]) =>
         [...catalogo.modelos, ...catalogo.propios, ...catalogo.oficina].some((m) => m.materia === k),
@@ -88,18 +127,20 @@ export function GaleriaModelos({
   }
 
   return (
-    <Dialog open={abierto} onOpenChange={(a) => !a && alCerrar()}>
-      <DialogContent className="flex max-h-[90dvh] flex-col sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="font-heading text-2xl font-medium">Modelos de escritos</DialogTitle>
-          <DialogDescription>
-            Elija uno: Papiniano lo pone en la hoja y le pide los datos del caso. Están hechos de escritos reales, sin
-            ningún dato de las personas.
-          </DialogDescription>
-        </DialogHeader>
-
+    <>
         {catalogo ? (
           <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-ink-soft" aria-hidden />
+              <input
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar un modelo: demanda, desalojo, apelación…"
+                aria-label="Buscar un modelo"
+                className="h-12 w-full rounded-full border border-regla bg-card pr-4 pl-11 text-base text-ink placeholder:text-ink-soft focus:border-marca focus:outline-none"
+              />
+            </div>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Materia">
               {[['', 'Todas'] as const, ...materias].map(([clave, nombre]) => (
                 <button
@@ -116,8 +157,14 @@ export function GaleriaModelos({
                 </button>
               ))}
             </div>
-            <div className="-mx-1 min-h-0 flex-1 space-y-6 overflow-y-auto px-1 pb-1">
-              <section className="space-y-2.5">
+            <div className={cn('space-y-6', enVentana && '-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1')}>
+              {ninguno && (
+                <p className="text-ink-soft" role="status">
+                  Ningún modelo coincide con «{busqueda.trim()}». Pruebe con otra palabra, o pídale el escrito a Papiniano
+                  sin modelo.
+                </p>
+              )}
+              {(!palabras.length || propios.length > 0) && <section className="space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="font-heading text-lg font-medium text-ink">
                     Mis modelos <span className="font-sans text-[0.9rem] text-ink-soft">({propios.length})</span>
@@ -156,7 +203,7 @@ export function GaleriaModelos({
                         : 'Suba sus propios escritos en Word para usarlos como modelo. Solo los ve usted.'}
                   </p>
                 )}
-              </section>
+              </section>}
               {deOficina.length > 0 && (
                 <section className="space-y-2.5">
                   <h3 className="font-heading text-lg font-medium text-ink">
@@ -212,7 +259,6 @@ export function GaleriaModelos({
             <Loader2 className="size-4 animate-spin" /> Buscando los modelos…
           </p>
         )}
-      </DialogContent>
       <VistaModelo
         key={viendo?.clave}
         modelo={viendo}
@@ -251,7 +297,7 @@ export function GaleriaModelos({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Tabs as TabsPrimitive } from 'radix-ui'
 import { FilePen, FileStack, FolderClosed, History, Loader2, MessageSquarePlus, SendHorizontal, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -215,6 +215,19 @@ export default function Asistente() {
     setViendo(null)
     enviar(`Usar el modelo «${m.nombre}»`, m.clave)
   }
+
+  // eligió un modelo en la sala «Modelos»: se abre una conversación nueva con ese modelo en la hoja.
+  // Se borra de la dirección enseguida, así al volver atrás o recargar no se usa otra vez.
+  const ubicacion = useLocation()
+  const modeloElegido = (ubicacion.state as { modelo?: { clave: string; nombre: string } } | null)?.modelo
+  const modeloUsado = useRef<string | null>(null)
+  useEffect(() => {
+    if (!modeloElegido || convId !== null || modeloUsado.current === modeloElegido.clave) return
+    modeloUsado.current = modeloElegido.clave
+    navegar('/papiniano', { replace: true, state: null })
+    enviar(`Usar el modelo «${modeloElegido.nombre}»`, modeloElegido.clave)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modeloElegido, convId])
 
   const ocupado = Boolean(pendiente) || correccion !== null
   const accionesModelos = {

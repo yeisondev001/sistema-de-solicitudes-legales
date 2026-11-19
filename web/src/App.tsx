@@ -15,6 +15,7 @@ import Expedientes from '@/pages/expedientes'
 import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
 import MiOficina from '@/pages/mi-oficina'
+import Modelos from '@/pages/modelos'
 import Pronto from '@/pages/pronto'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
@@ -99,6 +100,7 @@ export default function App() {
           <Route index element={<Escritorio />} />
           <Route path="papiniano" element={<Asistente />} />
           <Route path="papiniano/:id" element={<Asistente />} />
+          <Route path="modelos" element={<Modelos />} />
           <Route path="biblioteca" element={<Biblioteca />} />
           {sesion.perfil.plantillas ? (
             <>
