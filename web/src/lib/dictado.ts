@@ -128,7 +128,8 @@ export function hablar(texto: string, alTerminar?: () => void) {
     if (!voz) {
       // leer español con una voz en inglés suena mal: mejor avisar
       toast.error('Este navegador no tiene una voz en español. Use Google Chrome o agregue una voz en español en '
-        + 'la configuración de voz de su equipo (Windows: Configuración › Hora e idioma › Voz).')
+        + 'la configuración de voz de su equipo (Windows: Configuración › Hora e idioma › Voz).',
+        { id: 'sin-voz-espanol' })   // con id: aunque se pida leer varias veces, sale un solo aviso
       alTerminar?.()
       return
     }
