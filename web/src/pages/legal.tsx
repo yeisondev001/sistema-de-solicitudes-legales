@@ -8,7 +8,7 @@ import { NOMBRE_APP } from '@/lib/tema'
   antes de cobrar.
 */
 
-const CORREO = '[CORREO DE CONTACTO]'
+const CORREO = 'soportepapiniano@gmail.com'
 const ACTUALIZADO = '13 de noviembre de 2026'
 
 type Pagina = 'terminos' | 'privacidad' | 'reembolso' | 'contacto'
