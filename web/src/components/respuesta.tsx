@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FilePen, FileText, Loader2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, ExternalLink, FilePen, FileText, Loader2, Volume2, VolumeX } from 'lucide-react'
+import { useVoz } from '@/lib/dictado'
 import { toast } from 'sonner'
 import { ModelosSugeridos } from '@/components/modelos'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
@@ -46,6 +47,8 @@ export function Burbuja({
     ? lista.length === 1 ? 'Ver la fuente citada' : `Ver las ${lista.length} fuentes citadas`
     : `Ver las ${lista.length} fuentes encontradas`
 
+  const voz = useVoz()
+
   function copiar() {
     // sin las marcas de Markdown (** y >), para pegarlo en un escrito o un correo
     navigator.clipboard
@@ -59,6 +62,17 @@ export function Burbuja({
       <div className="flex items-center gap-2 text-[0.82rem] font-bold text-ink-soft">
         <Papiniano className="size-7" decorativo />
         <span className="flex-1 text-[0.9rem] text-ink">{NOMBRE_ASISTENTE}</span>
+        {voz.disponible && turno.texto && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-11 px-3 text-ink-soft"
+            onClick={() => voz.alternar('respuesta', turno.texto)}
+            aria-pressed={voz.leyendo === 'respuesta'}
+          >
+            {voz.leyendo === 'respuesta' ? <><VolumeX /> Detener</> : <><Volume2 /> Escuchar</>}
+          </Button>
+        )}
         {(turno.fuentes || turno.ia) && (
           <Button variant="ghost" size="sm" className="h-11 px-3 text-ink-soft" onClick={copiar}>
             <Copy /> Copiar

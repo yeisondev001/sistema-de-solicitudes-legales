@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpenCheck, ChevronDown, FileSignature, FileUp, Landmark, Loader2, PencilLine, Scale, SendHorizontal,
+  ArrowLeft, BookOpenCheck, ChevronDown, FileSignature, FileUp, Landmark, Loader2, Mic, MicOff, PencilLine, Volume2, VolumeX, Scale, SendHorizontal,
   ShieldCheck, Sparkles, type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -12,6 +12,7 @@ import { Seccion } from '@/components/seccion'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api, ErrorApi, leerParaRedactar, redactarEscrito, type DocumentoLeido } from '@/lib/api'
+import { hablar, callar, hayVoz, useDictado } from '@/lib/dictado'
 import { useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
@@ -390,14 +391,45 @@ function Entrevista({
   const entrada = useRef<HTMLTextAreaElement>(null)
   const actual = preguntas[paso]
   const listo = paso >= preguntas.length
+  // hablarlo en vez de escribirlo: cada frase dictada se suma a la respuesta
+  const dictado = useDictado(
+    (frase) => setTexto((t) => (t.trim() ? `${t.trimEnd()} ${frase}` : frase)),
+    (mensaje) => toast.error(mensaje),
+  )
+
+  // que Papiniano lea cada pregunta en voz alta (lo enciende el abogado; se recuerda en este equipo)
+  const [conVoz, setConVoz] = useState(() => {
+    try {
+      return localStorage.getItem('papiniano.voz') === '1'
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     fin.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
     entrada.current?.focus()
-  }, [paso])
+    if (!conVoz) return
+    const p = preguntas[paso]
+    hablar(p ? `${p.pregunta}. ${p.ayuda}` : 'Tengo todo lo que necesito. ¿Con qué modelo lo hago?')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, conVoz])
+  useEffect(() => () => callar(), [])
+
+  function cambiarVoz() {
+    const nuevo = !conVoz
+    setConVoz(nuevo)
+    if (!nuevo) callar()
+    try {
+      localStorage.setItem('papiniano.voz', nuevo ? '1' : '0')
+    } catch {
+      // sin almacenamiento: vale mientras la página esté abierta
+    }
+  }
 
   function responder(valor: string) {
     if (!actual) return
+    if (dictado.escuchando) dictado.alternar()
     const limpio = valor.trim()
     if (actual.requerida && limpio.length < 3) {
       toast.error('Esta respuesta hace falta para el escrito.')
@@ -419,10 +451,18 @@ function Entrevista({
   const articulo = /^(demanda)/i.test(tipo.nombre) ? 'la' : 'el'
   return (
     <section className="space-y-4 rounded-2xl border border-papel-borde bg-background p-4 md:p-6">
+      {hayVoz() && (
+        <div className="flex justify-end">
+          <Button variant="ghost" className="h-11 text-ink-soft" onClick={cambiarVoz} aria-pressed={conVoz}>
+            {conVoz ? <><VolumeX /> Que no me hable</> : <><Volume2 /> Que Papiniano me lea las preguntas</>}
+          </Button>
+        </div>
+      )}
       <BurbujaPapiniano>
         Vamos a preparar {articulo} {tipo.nombre.toLowerCase()}. Le hago unas preguntas de su caso y con eso busco en la
         biblioteca los artículos y sentencias que encajan; no pongo ninguno que no esté ahí. Los nombres y cédulas no
         me los dé: van como datos por llenar y se ponen al descargar.
+        {dictado.disponible && ' Si prefiere, toque el micrófono y dígame la respuesta en voz alta.'}
       </BurbujaPapiniano>
 
       {preguntas.map((p, i) => {
@@ -495,11 +535,25 @@ function Entrevista({
                 responder(texto)
               }
             }}
-            placeholder="Escriba su respuesta…"
+            placeholder={dictado.escuchando ? 'Lo escucho… hable con calma; vuelva a tocar el micrófono al terminar.' : 'Escriba su respuesta o toque el micrófono para hablarla…'}
             aria-label={actual?.pregunta}
             className="min-h-12 flex-1 rounded-2xl text-base"
             maxLength={4000}
           />
+          {dictado.disponible && (
+            <Button
+              type="button"
+              variant={dictado.escuchando ? 'default' : 'outline'}
+              size="icon-grande"
+              className={cn(dictado.escuchando ? 'animate-pulse' : 'border-regla')}
+              onClick={dictado.alternar}
+              aria-pressed={dictado.escuchando}
+              aria-label={dictado.escuchando ? 'Dejar de escuchar' : 'Dictar la respuesta con el micrófono'}
+              title={dictado.escuchando ? 'Dejar de escuchar' : 'Hablar en vez de escribir'}
+            >
+              {dictado.escuchando ? <MicOff /> : <Mic />}
+            </Button>
+          )}
           {actual && !actual.requerida && (
             <Button type="button" variant="ghost" className="h-12 text-ink-soft" onClick={() => responder('')}>
               Saltar
