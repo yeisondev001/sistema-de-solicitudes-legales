@@ -24,7 +24,7 @@ interface Sala {
   pronto?: boolean
 }
 
-/** Las salas del despacho. Redacción dice «Pronto» en las cuentas sin plantillas. */
+/** Las salas del despacho. «Escritos de Gregorio» (las plantillas de Redacción) solo sale en las cuentas con plantillas. */
 function useSalas(): Sala[] {
   const { perfil } = useSesion()
   return [
@@ -32,9 +32,9 @@ function useSalas(): Sala[] {
     { ruta: '/papiniano', nombre: NOMBRE_ASISTENTE, icono: Papiniano },
     { ruta: '/modelos', nombre: 'Modelos', icono: FileStack },
     { ruta: '/expedientes', nombre: 'Expedientes', icono: FolderClosed },
-    { ruta: '/redaccion', nombre: 'Redacción', icono: PenLine, pronto: !perfil.plantillas },
     { ruta: '/agenda', nombre: 'Agenda', icono: CalendarDays },
     { ruta: '/biblioteca', nombre: 'Biblioteca', icono: LibraryBig },
+    ...(perfil.plantillas ? [{ ruta: '/redaccion', nombre: 'Escritos de Gregorio', icono: PenLine }] : []),
   ]
 }
 

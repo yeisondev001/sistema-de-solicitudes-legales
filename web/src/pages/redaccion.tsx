@@ -185,7 +185,7 @@ export default function Redaccion() {
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 md:px-8 md:py-8">
       <TituloSala
-        titulo="Redacción"
+        titulo="Escritos de Gregorio"
         sub={clave === 'historial' ? 'Cada Reporte de Audiencia generado (Word o PDF) se guarda aquí.' : plantilla?.sub}
       />
 

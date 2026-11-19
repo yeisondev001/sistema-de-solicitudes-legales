@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Briefcase, CalendarDays, Check, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, PenLine, RotateCcw, Scale,
+  Briefcase, CalendarDays, Check, FileStack, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, RotateCcw, Scale,
   ShieldCheck, Trash2, UserRound, X, type LucideIcon,
 } from 'lucide-react'
 import { Papiniano } from '@/components/papiniano'
@@ -94,9 +94,9 @@ const SALAS: {
     retrato: true,
     texto: 'Su asistente. Le pregunta como a un colega y le responde con la jurisprudencia, la ley que aplica y su análisis. Le redacta el escrito en una hoja al lado de la conversación y saca las prestaciones laborales con las reglas del Código de Trabajo.',
   },
-  { icono: LibraryBig, nombre: 'Biblioteca', texto: 'Todo lo que Papiniano lee, y sus propios documentos. Abre la página del PDF ahí mismo.' },
+  { icono: LibraryBig, nombre: 'Biblioteca', texto: 'Las sentencias y las leyes de donde Papiniano saca cada respuesta. Abre la página del PDF ahí mismo.' },
   { icono: FolderClosed, nombre: 'Expedientes', texto: 'Una carpeta por caso: sus fechas, sus documentos y lo que trabajó con Papiniano.' },
-  { icono: PenLine, nombre: 'Redacción', texto: 'Sus modelos de escritos y solicitudes, listos en Word o PDF.', pronto: true },
+  { icono: FileStack, nombre: 'Modelos', texto: 'Busque el escrito que necesita, mírelo y elíjalo: Papiniano lo redacta con usted a partir de ese modelo.' },
   { icono: CalendarDays, nombre: 'Agenda', texto: 'Audiencias, plazos y reuniones. El escritorio le avisa lo que viene esta semana.' },
 ]
 

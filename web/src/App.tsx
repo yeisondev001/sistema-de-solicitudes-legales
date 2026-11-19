@@ -16,7 +16,6 @@ import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
 import MiOficina from '@/pages/mi-oficina'
 import Modelos from '@/pages/modelos'
-import Pronto from '@/pages/pronto'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
 
@@ -108,7 +107,7 @@ export default function App() {
               <Route path="redaccion/:clave" element={<Redaccion />} />
             </>
           ) : (
-            <Route path="redaccion/*" element={<Pronto sala="redaccion" />} />
+            <Route path="redaccion/*" element={<Navigate to="/" replace />} />
           )}
           {sesion.perfil.es_admin && <Route path="usuarios" element={<Usuarios />} />}
           {/* siempre: al aceptar una invitación se llega aquí antes de que se vuelva a leer la cuenta */}
