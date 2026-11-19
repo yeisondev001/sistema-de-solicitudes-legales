@@ -1155,10 +1155,15 @@ def fecha_borrar(fecha_id: int, u=Depends(con_expedientes)):
 
 # ── PANTALLAS ────────────────────────────────────
 @app.get("/{ruta:path}")
-def pantallas(ruta: str):
+def pantallas(ruta: str, request: Request):
     """Las pantallas ya armadas (npm run build). Cualquier dirección que no sea un archivo abre la app."""
     if ruta.startswith("api/"):
         return JSONResponse({"detail": "No existe."}, 404)
+    # la dirección vieja de Render (…onrender.com) lleva al dominio propio, para que Google y los enlaces viejos
+    # terminen en una sola dirección
+    propia = os.environ.get("APP_URL", "").rstrip("/")
+    if propia and ".onrender.com" not in propia and (request.url.hostname or "").endswith(".onrender.com"):
+        return RedirectResponse(f"{propia}/{ruta}" + (f"?{request.url.query}" if request.url.query else ""), 301)
     archivo = (PANTALLAS / ruta).resolve()
     if ruta and archivo.is_file() and PANTALLAS.resolve() in archivo.parents:
         return FileResponse(archivo)
