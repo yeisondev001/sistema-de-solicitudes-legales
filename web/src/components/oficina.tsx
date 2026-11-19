@@ -31,10 +31,10 @@ function useSalas(): Sala[] {
     { ruta: '/', nombre: 'Escritorio', icono: House },
     { ruta: '/papiniano', nombre: NOMBRE_ASISTENTE, icono: Papiniano },
     { ruta: '/modelos', nombre: 'Modelos', icono: FileStack },
-    { ruta: '/biblioteca', nombre: 'Biblioteca', icono: LibraryBig },
     { ruta: '/expedientes', nombre: 'Expedientes', icono: FolderClosed },
     { ruta: '/redaccion', nombre: 'Redacción', icono: PenLine, pronto: !perfil.plantillas },
     { ruta: '/agenda', nombre: 'Agenda', icono: CalendarDays },
+    { ruta: '/biblioteca', nombre: 'Biblioteca', icono: LibraryBig },
   ]
 }
 
