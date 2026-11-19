@@ -43,6 +43,14 @@ function guardar(clave: string, datos: Record<string, string>) {
   }
 }
 
+/**
+ * Deja llenos los datos de un escrito antes de abrirlo (sala Redacción: los nombres y cédulas que se le
+ * quitaron al documento antes de mandarlo a la IA). Solo en este equipo, como los que llena el abogado.
+ */
+export function guardarDatosDelEscrito(usuario: number, conv: number, datos: Record<string, string>) {
+  guardar(claveDatos(usuario, conv), { ...leer(claveDatos(usuario, conv)), ...datos })
+}
+
 const CLASES: Record<TipoParrafo, string> = {
   titulo: 'mb-[1.6em] text-center text-[1.08em] font-bold',
   centro: 'text-center font-bold',

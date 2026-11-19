@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  FilePen,
   FileStack,
   Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, Users,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ function useSalas(): Sala[] {
     { ruta: '/', nombre: 'Escritorio', icono: House },
     { ruta: '/papiniano', nombre: NOMBRE_ASISTENTE, icono: Papiniano },
     { ruta: '/modelos', nombre: 'Modelos', icono: FileStack },
+    { ruta: '/redactar', nombre: 'Redacción', icono: FilePen },
     { ruta: '/expedientes', nombre: 'Expedientes', icono: FolderClosed },
     { ruta: '/agenda', nombre: 'Agenda', icono: CalendarDays },
     { ruta: '/biblioteca', nombre: 'Biblioteca', icono: LibraryBig },

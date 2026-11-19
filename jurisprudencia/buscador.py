@@ -258,3 +258,17 @@ def referencia(f: dict) -> str:
     partes = [f["numero"] or f["titulo"] or "Documento", f["sala"], f["materia"]]
     origen = "Boletín Judicial" if f["origen"] == "boletin" else "Documento propio"
     return f'{" · ".join(p for p in partes if p)} — {origen}, pág. {f["pagina"]}'
+
+
+def articulos_existentes(claves: list) -> set:
+    """De las claves «CODIGO CIVIL, ART. 1184», las que están en la base (leyes y comentarios de la principal).
+    Para que el escrito no cite artículos que no están en la biblioteca (jurisprudencia/articulos.py)."""
+    if not claves or not basedatos.configurada():
+        return set()
+    with basedatos.conectar() as conn:
+        filas = basedatos.filas(
+            conn,
+            "SELECT DISTINCT upper(f_unaccent(numero)) AS n FROM documentos "
+            "WHERE origen IN ('ley', 'doctrina') AND upper(f_unaccent(numero)) = ANY(%(c)s)",
+            {"c": list(claves)})
+    return {f["n"].translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU")) for f in filas}

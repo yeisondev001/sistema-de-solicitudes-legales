@@ -28,6 +28,7 @@ import expedientes
 import historial
 import modelos
 import redaccion
+import redactar
 import temas
 from generators import generar_expedientes, generar_escrito, pdf_escrito, nombre_escrito
 from jurisprudencia import basedatos as juris_db, buscador as juris_buscar, ia as juris_ia, procesar as juris_proc
@@ -412,7 +413,8 @@ def _escribir(q: str, plan: dict, historial_chat: list, actual: str, u: dict, av
             print(f"La búsqueda falló: {ex}", flush=True)   # el escrito se arma igual, sin fuentes
     avance("Cambiando el escrito…" if actual else "Escribiendo el escrito…", True)
     try:
-        r = juris_ia.escribir(q, actual, fuentes, juris_buscar.referencia, historial_chat)
+        r = juris_ia.escribir(q, actual, fuentes, juris_buscar.referencia, historial_chat,
+                              existen=juris_buscar.articulos_existentes)
     except juris_ia.LimiteAlcanzado:
         turno["texto"] = "_Se alcanzó el límite gratis de la IA por ahora; intente en un minuto._"
         return turno
@@ -572,6 +574,205 @@ def preguntar(datos: Pregunta, u=Depends(usuario_actual)):
             escrito_listo = {"texto": nuevo_escrito, "deshacer": False}
         yield linea({"turno": _con_referencia([turno])[0], "conv_id": conv_id,
                      **({"escrito": escrito_listo} if escrito_listo else {})})
+
+    return StreamingResponse(eventos(), media_type="application/x-ndjson")
+
+
+# ── Sala «Redacción»: un escrito a partir del documento de la otra parte ─────
+# Ley 172-13: el documento se lee y se le quitan los datos de las personas aquí, sin la IA (redactar.py).
+# El abogado ve el texto ya sin datos antes de mandarlo; la lista de qué dato es cada uno vuelve solo a su
+# navegador. A la IA y a la base de Papiniano solo llega el texto con [PERSONA 1], [CÉDULA 1]…
+MAX_MB_REDACTAR = 20
+
+
+@app.get("/api/redactar")
+def redactar_tipos(u=Depends(usuario_actual)):
+    """Los tipos de escrito, con lo que hay que subir, las preguntas de «Hacerlo yo mismo» y sus modelos."""
+    return [{"clave": k, "nombre": t["nombre"], "documento": t["documento"], "preguntas": redactar.preguntas(k),
+             "modelos": redactar.modelos_del_tipo(k)} for k, t in redactar.TIPOS.items()]
+
+
+@app.post("/api/redactar/leer")
+async def redactar_leer(request: Request, u=Depends(usuario_actual)):
+    """Lee el PDF o Word y le quita los datos de las personas. No guarda nada ni usa la IA."""
+    nombre = unquote(request.headers.get("X-Nombre", "")).strip() or "documento"
+    contenido = await request.body()
+    if len(contenido) > MAX_MB_REDACTAR * 1024 * 1024:
+        raise HTTPException(413, f"«{nombre}» pesa más de {MAX_MB_REDACTAR} MB.")
+    try:
+        texto = redactar.leer(contenido, nombre)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    texto, mapa, cuenta = redactar.quitar_datos_caso(texto)
+    return {"nombre": nombre, "texto": texto, "mapa": mapa, "cuenta": cuenta}
+
+
+class PedidoRedactar(BaseModel):
+    tipo: str
+    # «documento»: a partir del documento de la otra parte; «propio»: con las respuestas del abogado
+    modo: str = "documento"
+    # el documento ya sin los datos de las personas (lo que devolvió /api/redactar/leer, quizá corregido)
+    texto: str = ""
+    nombre: str = "documento"
+    indicaciones: str = ""
+    # «Hacerlo yo mismo»: clave de la pregunta → respuesta, y el modelo que eligió (None: que elija Papiniano)
+    respuestas: dict = {}
+    modelo: str | None = None
+
+
+def _guardar_redaccion(u: dict, pedido_usuario: str, texto: str, fuentes: list, r: dict) -> int:
+    """La conversación nueva con el escrito en la hoja; cuenta como un escrito del mes."""
+    mensajes = [{"rol": "usuario", "texto": pedido_usuario},
+                {"rol": "asistente", "texto": texto, "fuentes": fuentes, "citadas": r["citadas"], "ia": True,
+                 "escrito": "nuevo"}]
+    conv_id = cuentas.guardar_conversacion(u["id"], None, mensajes)
+    cuentas.guardar_escrito(u["id"], conv_id, r["escrito"])
+    try:
+        cuentas.contar_escrito(u["id"])
+    except Exception:
+        pass   # si no se puede contar, el escrito igual se entrega
+    return conv_id
+
+
+def _fuentes_para(busquedas: list, u: dict, avance) -> list:
+    if not busquedas or not juris_db.configurada():
+        return []
+    avance("Buscando las leyes y sentencias…")
+    try:
+        return juris_buscar.buscar(busquedas, u["id"], limite=juris_ia.MAX_FUENTES, pregunta=busquedas[0]) or []
+    except Exception as ex:
+        print(f"La búsqueda falló: {ex}", flush=True)   # el escrito se arma igual, sin fuentes
+        return []
+
+
+def _redactar_propio(datos: PedidoRedactar, u: dict, avance) -> dict:
+    """«Hacerlo yo mismo»: con las respuestas del abogado, el modelo y lo que se encuentre en la biblioteca."""
+    t = redactar.TIPOS[datos.tipo]
+    respuestas, mapa = redactar.respuestas_sin_datos(datos.tipo, datos.respuestas)
+
+    avance("Eligiendo el modelo…")
+    ficha = None
+    if datos.modelo and datos.modelo != "ninguno":
+        ficha, _ = _modelo(datos.modelo, u)
+    if not ficha and datos.modelo != "ninguno":
+        try:
+            propios = _modelos_del_abogado(u) if cuentas.con_propios(u["plan"]) else []
+        except Exception:
+            propios = []
+        ficha = redactar.elegir_modelo(datos.tipo, respuestas, propios)
+    modelo_texto = (_modelo(ficha["clave"], u)[1] or "") if ficha else ""
+
+    # las búsquedas salen de los hechos y los motivos: de ahí, los artículos de la biblioteca que encajan
+    avance("Pensando qué buscar…")
+    try:
+        busquedas = juris_ia.generar_busquedas(f"{t['nombre']}. {respuestas[:1800]}")
+    except juris_ia.LimiteAlcanzado:
+        busquedas = []
+    if not busquedas:
+        busquedas = [" ".join(str(datos.respuestas.get(k) or "") for k in ("objeto", "motivos"))[:150]]
+    fuentes = _fuentes_para([b for b in busquedas if b.strip()], u, avance)
+
+    avance("Escribiendo el escrito…")
+    r = juris_ia.escribir(redactar.pedido_propio(datos.tipo, respuestas, bool(modelo_texto)), modelo_texto, fuentes,
+                          juris_buscar.referencia, None, existen=juris_buscar.articulos_existentes,
+                          actual_es_del_abogado=False)
+    if not r["escrito"]:
+        raise ValueError("La IA no devolvió el escrito.")
+    con_modelo = (f"con el modelo **«{ficha['nombre']}»**" if ficha else "sin modelo")
+    texto = (f"Redacté {t['nombre'].lower()} {con_modelo}, con lo que me contó y las leyes y sentencias de la "
+             f"biblioteca. Está en la hoja: revíselo y pídame los cambios que quiera.\n\n{r['mensaje']}\n\n"
+             "_Los nombres, cédulas y domicilios van como datos por llenar y se ponen solo al descargar._")
+    conv_id = _guardar_redaccion(u, f"{t['nombre']} con mis datos\n\n{respuestas}", texto, fuentes, r)
+    return {"conv_id": conv_id, "mapa": mapa}
+
+
+def _redactar(datos: PedidoRedactar, u: dict, avance) -> dict:
+    """Analiza el documento, elige el modelo, busca las fuentes y redacta. Devuelve {"conv_id"}."""
+    t = redactar.TIPOS[datos.tipo]
+    avance("Leyendo el documento…")
+    que_hacer = f"{t['nombre']}: {t['pedido']}" + (f". Indicaciones: {datos.indicaciones}" if datos.indicaciones else "")
+    analisis = juris_ia.analizar_documento(redactar.para_ia(datos.texto), que_hacer)
+    resumen = juris_ia.analisis_en_texto(analisis)
+
+    avance("Eligiendo el modelo…")
+    try:
+        propios = _modelos_del_abogado(u) if cuentas.con_propios(u["plan"]) else []
+    except Exception:
+        propios = []
+    caso = " ".join(str(analisis.get(k) or "") for k in ("materia", "documento", "pide_o_decide"))
+    ficha = redactar.elegir_modelo(datos.tipo, caso, propios, str(analisis.get("materia") or ""))
+    modelo_texto = (_modelo(ficha["clave"], u)[1] or "") if ficha else ""
+
+    fuentes = _fuentes_para(analisis["busquedas"], u, avance)
+
+    avance("Escribiendo el escrito…")
+    pedido = redactar.pedido(datos.tipo, resumen, datos.indicaciones, bool(modelo_texto))
+    r = juris_ia.escribir(pedido, modelo_texto, fuentes, juris_buscar.referencia, None,
+                          existen=juris_buscar.articulos_existentes, actual_es_del_abogado=False)
+    if not r["escrito"]:
+        raise ValueError("La IA no devolvió el escrito.")
+
+    con_modelo = (f"con el modelo **«{ficha['nombre']}»**" if ficha
+                  else "sin modelo, porque todavía no tengo uno de este tipo")
+    texto = (f"Leí «{datos.nombre}» y redacté {t['nombre'].lower()} {con_modelo}. Está en la hoja: revíselo "
+             f"y pídame los cambios que quiera.\n\n{resumen}\n\n{r['mensaje']}\n\n"
+             "_Los nombres, cédulas y domicilios del documento no se le mandaron a la IA: en el escrito van como "
+             "[PERSONA 1], [CÉDULA 1]… y se llenan en «Datos por llenar» solo al descargar._")
+    pedido_usuario = (f"{t['nombre']} a partir de «{datos.nombre}»"
+                      + (f"\n\n{datos.indicaciones}" if datos.indicaciones else ""))
+    conv_id = _guardar_redaccion(u, pedido_usuario, texto, fuentes, r)
+    return {"conv_id": conv_id}
+
+
+@app.post("/api/redactar")
+def redactar_escrito(datos: PedidoRedactar, u=Depends(usuario_actual)):
+    """Por partes (una línea JSON por evento): los avances y al final {"conv_id": …} o {"error": …}."""
+    if datos.tipo not in redactar.TIPOS:
+        raise HTTPException(400, "Elija qué quiere redactar.")
+    if datos.modo == "propio":
+        faltan = redactar.faltan(datos.tipo, datos.respuestas)
+        if faltan:
+            raise HTTPException(400, "Falta responder: " + "; ".join(faltan) + ".")
+    elif len(datos.texto.strip()) < 200:
+        raise HTTPException(400, "El documento casi no tiene texto.")
+    datos.texto = datos.texto[:redactar.MAX_CARACTERES]
+    datos.indicaciones = datos.indicaciones.strip()[:1500]
+
+    def linea(evento: dict) -> str:
+        return json.dumps(evento, ensure_ascii=False, default=str) + "\n"
+
+    def eventos():
+        aviso = _sin_escritos(u)
+        if aviso:
+            yield linea({"error": aviso})
+            return
+        if not juris_ia.disponible():
+            yield linea({"error": "Papiniano no puede redactar en este momento. Intente más tarde."})
+            return
+        yield linea({"avance": "Pensando…"})
+        cola = queue.Queue()
+
+        def trabajo():
+            try:
+                hacer = _redactar_propio if datos.modo == "propio" else _redactar
+                cola.put(("fin", hacer(datos, u, lambda t: cola.put(("avance", t)))))
+            except juris_ia.LimiteAlcanzado:
+                cola.put(("error", "Se alcanzó el límite gratis de la IA por ahora; intente en un minuto."))
+            except Exception as ex:
+                print(f"La redacción falló: {ex}", flush=True)
+                cola.put(("error", "No pude redactar el escrito. Intente de nuevo en un momento."))
+
+        threading.Thread(target=trabajo, daemon=True).start()
+        while True:
+            tipo, valor = cola.get()
+            if tipo == "avance":
+                yield linea({"avance": valor})
+            elif tipo == "error":
+                yield linea({"error": valor})
+                return
+            else:
+                yield linea(valor)
+                return
 
     return StreamingResponse(eventos(), media_type="application/x-ndjson")
 

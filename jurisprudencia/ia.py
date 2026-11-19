@@ -101,7 +101,8 @@ def estado() -> str:
 def _chat(mensajes: list, proveedor: tuple, max_tokens: int = 700, json_modo: bool = False) -> str:
     url, clave, modelo = proveedor
     cuerpo = {"model": modelo, "messages": mensajes, "temperature": 0.1, "max_tokens": max_tokens}
-    if json_modo:
+    # el modo JSON de Cloudflare daña el texto a mitad de camino: allí se pide JSON solo con palabras
+    if json_modo and "cloudflare" not in url:
         cuerpo["response_format"] = {"type": "json_object"}
     if "gpt-oss" in modelo:
         cuerpo["reasoning_effort"] = "low"   # que no gaste los tokens pensando
@@ -395,9 +396,9 @@ _SISTEMA_ESCRITO = (
     "[MATRÍCULA DEL ABOGADO] y [DOMICILIO PROFESIONAL DEL ABOGADO].\n"
     "- En los fundamentos usa las leyes y sentencias de las fuentes que sirven y nómbralas como en un escrito real "
     "(«el artículo 130 de la Ley 108-05 de Registro Inmobiliario», «la sentencia núm. SCJ-TS-25-1451»), sin "
-    "números entre corchetes dentro del escrito. Nunca inventes sentencias, números, fechas ni artículos; si hace "
-    "falta una norma que no está en las fuentes, nómbrala solo si estás seguro y avisa en el mensaje que hay que "
-    "verificarla.\n"
+    "números entre corchetes dentro del escrito. Nunca inventes sentencias, números, fechas ni artículos. Solo "
+    "puedes citar los artículos y sentencias que están en las fuentes (o en el escrito actual): si hace falta una "
+    "norma que no está, no la cites de memoria; deja el argumento sin el artículo y dilo en el mensaje.\n"
     "- Hoy es {fecha}. Eres una herramienta de apoyo: el abogado revisa y firma."
 )
 
@@ -447,7 +448,8 @@ def _texto_de(datos: dict):
     return e if isinstance(e, str) and e.strip() else None
 
 
-def escribir(pedido: str, actual: str, fuentes: list, referencia, historial: list = None) -> dict:
+def escribir(pedido: str, actual: str, fuentes: list, referencia, historial: list = None, existen=None,
+             actual_es_del_abogado: bool = True) -> dict:
     """Redacta el escrito o le hace los cambios que pide el abogado.
     {"mensaje": lo que se dice en la conversación, "escrito": el texto nuevo (None si no cambió), "citadas": [...]}"""
     from datetime import datetime, timedelta, timezone
@@ -481,10 +483,38 @@ def escribir(pedido: str, actual: str, fuentes: list, referencia, historial: lis
         nuevo = _sin_formato(sin_latex(nuevo))
         if nuevo == actual.strip():
             nuevo = None
+    # artículos que no están en la biblioteca: no van (regla del dueño). Se le pide una vez que los quite;
+    # si insiste, se cambian por [ARTÍCULO POR VERIFICAR]. Los que ya tenía el escrito del abogado no se tocan.
+    quitados = []
+    if nuevo and existen:
+        from . import articulos
+        exentas = articulos.claves_de(actual) if actual_es_del_abogado else set()
+        malas = articulos.sin_respaldo(nuevo, existen, exentas)
+        if malas:
+            try:
+                otra = _json(_chat_en_cadena(mensajes + [
+                    {"role": "assistant", "content": json.dumps({"escrito": nuevo}, ensure_ascii=False)},
+                    {"role": "user", "content": "Estos artículos no están en la biblioteca de Papiniano y no pueden ir "
+                                                "en el escrito: " + " | ".join(f"«{m['texto']}»" for m in malas)
+                                                + ". Quítelos: deje el argumento sin ese artículo o use uno de las "
+                                                "fuentes. Devuelva el escrito completo en \"escrito\"."}],
+                    max_tokens=MAX_TOKENS_ESCRITO, json_modo=True))
+                otro = _texto_de(otra)
+                if otro:
+                    nuevo = _sin_formato(sin_latex(otro))
+                    malas = articulos.sin_respaldo(nuevo, existen, exentas)
+            except (LimiteAlcanzado, ValueError):
+                pass   # sin cuota para corregir: se quitan aquí mismo
+            if malas:
+                quitados = [m["texto"] for m in malas]
+                nuevo = articulos.quitar(nuevo, malas)
     mensaje = re.sub(r"【\s*(\d+)[^】]*】", r"[\1]", str(datos.get("mensaje") or "").strip())
     if not mensaje:
         mensaje = ("Listo, ya está el escrito." if nuevo and not actual else "Listo, hice el cambio." if nuevo
                    else "No hice cambios al escrito.")
+    if quitados:
+        mensaje += ("\n\n> ⚠️ **Quité del escrito artículos que no están en la biblioteca:** "
+                    + ", ".join(dict.fromkeys(quitados)) + ". Donde estaban dice [ARTÍCULO POR VERIFICAR].")
     # plazos que no salen de ningún lado: se avisa en la conversación (el escrito no se toca)
     if nuevo:
         # la fecha de hoy («a los doce (12) días del mes…») no es un plazo
@@ -497,3 +527,55 @@ def escribir(pedido: str, actual: str, fuentes: list, referencia, historial: lis
     citadas = sorted({int(n) for n in re.findall(r"\[(\d+)\]", mensaje)} & validas)
     mensaje = re.sub(r"\[(\d+)\]", lambda m: m.group(0) if int(m.group(1)) in validas else "", mensaje)
     return {"mensaje": mensaje, "escrito": nuevo, "citadas": citadas}
+
+
+# ── Analizar el documento de la otra parte (sala «Redacción») ─────
+# El documento llega sin los datos de las personas: [PERSONA 1], [CÉDULA 1]… (redactar.quitar_datos_caso).
+_SISTEMA_ANALISIS = (
+    "Eres Papiniano, abogado asistente en República Dominicana. Te dan un documento judicial de la otra parte (una "
+    "demanda, un recurso o una sentencia) y lo que el abogado quiere hacer con él. Los datos de las personas vienen "
+    "cambiados por marcas entre corchetes ([PERSONA 1], [CÉDULA 2], [DOMICILIO 1]…): cópialas exactamente así y "
+    "nunca inventes a quién corresponden.\n\n"
+    "Devuelve solo JSON con estas claves:\n"
+    "{\"documento\": \"qué es: tipo, número y fecha si los tiene, y tribunal\",\n"
+    " \"partes\": [{\"dato\": \"[PERSONA 1]\", \"papel\": \"demandante / demandado / recurrente / abogado de…\"}],\n"
+    " \"cliente\": \"quién es el cliente del abogado según lo que quiere hacer (por ejemplo, para un escrito de "
+    "defensa, el demandado), con su marca\",\n"
+    " \"materia\": \"civil, laboral, tierras, administrativo, penal…\",\n"
+    " \"hechos\": \"los hechos en 4 a 8 oraciones\",\n"
+    " \"pide_o_decide\": \"qué pide la demanda o el recurso, o qué decidió la sentencia (el dispositivo)\",\n"
+    " \"fundamentos\": \"en qué se apoya: artículos, leyes y sentencias que cita\",\n"
+    " \"puntos\": [\"argumentos a favor del cliente que salen del propio documento: errores, contradicciones, "
+    "plazos vencidos, falta de pruebas, inadmisibilidades, normas mal aplicadas. Si uno depende de algo que el "
+    "documento no dice, empiézalo con «Verificar:»\"],\n"
+    " \"busquedas\": [\"3 a 5 búsquedas cortas (3 a 8 palabras) para encontrar las leyes y sentencias que apoyan "
+    "al cliente\"]}\n"
+    "Sé fiel al documento: si algo no está, no lo pongas."
+)
+
+
+def analizar_documento(texto: str, que_hacer: str) -> dict:
+    """Lo que dice el documento de la otra parte, para redactar a partir de él."""
+    datos = _json(_chat_en_cadena([
+        {"role": "system", "content": _SISTEMA_ANALISIS},
+        {"role": "user", "content": f"Lo que quiere hacer el abogado: {que_hacer}.\n\nDocumento:\n<<<\n{texto}\n>>>"}],
+        para_busquedas=True, max_tokens=1800))   # sin modo JSON: en Cloudflare lo daña a mitad del texto
+    if not isinstance(datos, dict) or not (datos.get("hechos") or datos.get("pide_o_decide")):
+        raise ValueError("No se pudo analizar el documento.")
+    datos["busquedas"] = [b.strip() for b in datos.get("busquedas") or []
+                          if isinstance(b, str) and len(b.split()) >= 2][:5]
+    if not datos["busquedas"]:   # sin búsquedas que sirvan: lo que pide o decide el documento
+        datos["busquedas"] = [" ".join(str(datos.get(k) or "") for k in ("materia", "pide_o_decide"))[:120]]
+    return datos
+
+
+def analisis_en_texto(a: dict) -> str:
+    """El análisis como texto, para la conversación y para el pedido del escrito."""
+    partes = "; ".join(f"{p.get('dato', '')}: {p.get('papel', '')}" for p in a.get("partes") or []
+                       if isinstance(p, dict))
+    puntos = "\n".join(f"- {p}" for p in a.get("puntos") or [] if isinstance(p, str))
+    lineas = [("Documento", a.get("documento")), ("Partes", partes), ("Su cliente", a.get("cliente")),
+              ("Materia", a.get("materia")), ("Hechos", a.get("hechos")),
+              ("Qué pide o qué decidió", a.get("pide_o_decide")), ("En qué se apoya", a.get("fundamentos"))]
+    texto = "\n".join(f"**{k}:** {v}" for k, v in lineas if v)
+    return texto + (f"\n**Puntos a favor de su cliente:**\n{puntos}" if puntos else "")
