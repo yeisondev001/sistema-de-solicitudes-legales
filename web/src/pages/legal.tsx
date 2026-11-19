@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTitulo } from '@/lib/titulo'
 import { CabeceraPublica, PiePublico } from '@/components/publico'
 import { NOMBRE_APP } from '@/lib/tema'
 
@@ -160,13 +161,8 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
 /** Una página legal pública, con la cabecera y el pie de la recepción */
 export default function Legal({ pagina }: { pagina: Pagina }) {
   const { titulo, cuerpo } = PAGINAS[pagina]
-  useEffect(() => {
-    document.title = `${titulo} · ${NOMBRE_APP}`
-    window.scrollTo(0, 0)
-    return () => {
-      document.title = NOMBRE_APP
-    }
-  }, [titulo])
+  useTitulo(`${titulo} · ${NOMBRE_APP}`)
+  useEffect(() => window.scrollTo(0, 0), [titulo])
 
   return (
     <div className="min-h-dvh bg-background text-ink">

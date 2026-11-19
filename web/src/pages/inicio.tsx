@@ -10,6 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { VideoPapiniano } from '@/components/video-papiniano'
 import { api } from '@/lib/api'
 import type { Entrada } from '@/lib/tipos'
+import { useTitulo } from '@/lib/titulo'
 import { cn } from '@/lib/utils'
 
 // La prueba gratis la decide el servidor (PRUEBA_DIAS y PRUEBA_PREGUNTAS_DIA en cuentas.py); esto se ve mientras responde
@@ -164,6 +165,7 @@ const preguntas = (p: Prueba): [string, string][] => [
  * Los colores son siempre los de la marca, «Vino y madera». Las secciones alternan el fondo para que no se vea todo igual.
  */
 export default function Inicio() {
+  useTitulo('Papiniano · Asistente jurídico con IA para abogados dominicanos')
   const [prueba, setPrueba] = useState(PRUEBA_INICIAL)
   useEffect(() => {
     api

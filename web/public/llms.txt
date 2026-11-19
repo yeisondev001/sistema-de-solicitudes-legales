@@ -36,6 +36,8 @@ cada cita se debe verificar en la fuente oficial.
 ## Páginas
 
 - [Inicio](https://papinianord.com/): qué es, cómo funciona, planes y preguntas frecuentes
+- [Calculadora de prestaciones laborales](https://papinianord.com/calculadora-prestaciones-laborales): gratis y sin
+  registrarse, con las fórmulas del Código de Trabajo dominicano (preaviso, cesantía, vacaciones y salario de Navidad)
 - [Términos](https://papinianord.com/terminos)
 - [Privacidad](https://papinianord.com/privacidad)
 - [Reembolso](https://papinianord.com/reembolso)

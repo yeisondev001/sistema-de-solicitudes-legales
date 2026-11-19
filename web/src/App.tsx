@@ -8,6 +8,7 @@ import type { Perfil } from '@/lib/tipos'
 import Agenda from '@/pages/agenda'
 import Asistente from '@/pages/asistente'
 import Biblioteca from '@/pages/biblioteca'
+import Calculadora from '@/pages/calculadora'
 import Entrada from '@/pages/entrada'
 import Escritorio from '@/pages/escritorio'
 import Expedientes from '@/pages/expedientes'
@@ -61,10 +62,13 @@ export default function App() {
 
   if (perfil === undefined) return <div className="min-h-dvh bg-background" aria-busy="true" />
 
-  // las páginas legales se ven con o sin sesión
-  const legales = (['terminos', 'privacidad', 'reembolso', 'contacto'] as const).map((p) => (
-    <Route key={p} path={p} element={<Legal pagina={p} />} />
-  ))
+  // las páginas legales y la calculadora de prestaciones se ven con o sin sesión
+  const legales = [
+    ...(['terminos', 'privacidad', 'reembolso', 'contacto'] as const).map((p) => (
+      <Route key={p} path={p} element={<Legal pagina={p} />} />
+    )),
+    <Route key="calculadora" path="calculadora-prestaciones-laborales" element={<Calculadora />} />,
+  ]
 
   // sin sesión: la página pública en /, la entrada en /entrar; cualquier otra dirección pide entrar
   if (!sesion)

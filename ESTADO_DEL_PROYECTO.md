@@ -22,7 +22,7 @@ El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que e
 
 | Pieza | Servicio | Detalle |
 |---|---|---|
-| Web | **Render**, plan gratis | **El despliegue es manual:** después de cada push a `master` hay que entrar a Render → **Manual Deploy → Deploy latest commit**. Después de cambiar variables, **Restart service**. Se duerme sin uso: la primera carga tarda hasta ~1 min |
+| Web | **Render**, plan gratis | **El despliegue es manual:** después de cada push a `master` hay que entrar a Render → **Manual Deploy → Deploy latest commit**. Después de cambiar variables, **Restart service**. Dominio propio: **papinianord.com** (comprado en Hostinger, vence 19 nov 2029; DNS: `A @ → 216.24.57.1`, `CNAME www → …onrender.com`), con `APP_URL=https://papinianord.com`; la dirección `…onrender.com` redirige al dominio. Se duerme sin uso: de 7 a. m. a 7 p. m. (RD) una tarea de cron-job.org visita `/` para que no se duerma |
 | Usuarios, sesiones e historial | **Neon**, proyecto `solicitudes-legales` | Variable `DATABASE_URL`. No tocar |
 | Jurisprudencia | **Neon**, 5 proyectos en AWS US East 2 (Ohio) | `jurisprudencia-rd` (principal: solo documentos de usuarios) y `jurisprudencia-archivo-1` a `-4` (Boletín) |
 | Carga del Boletín | **GitHub Actions**, `.github/workflows/boletines.yml` | Todos los días a las 5:00 a. m. (RD); GitHub la atrasa a veces varias horas. También a mano: *Actions → Cargar boletines → Run workflow* |
@@ -30,7 +30,7 @@ El primer usuario real es un abogado del área **Inmobiliario (Tierras)**, que e
 | Huellas atrasadas | **Kaggle**, GPU gratis | Una sola vez: `kaggle/huellas.ipynb` (ver abajo) |
 | Respuestas de la IA | **Groq** | `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` prepara las búsquedas |
 | Huellas (vectores), y respaldo de la IA | **Cloudflare Workers AI** | `@cf/qwen/qwen3-embedding-0.6b` (1024 dimensiones). Si Groq llega a su límite, responde `@cf/openai/gpt-oss-120b`. Plan gratis: 10.000 neuronas por día |
-| Entrar con Google | **Google Cloud**, pantalla de consentimiento | Está en modo **Testing**: solo entran los correos agregados como *test users*. Para clientes hay que **publicarla** |
+| Entrar con Google | **Google Cloud**, pantalla de consentimiento | **En producción** desde el 19 nov 2026, con el nombre Papiniano. Pide solo `openid email profile`, así que no hace falta la revisión de Google; subir un logo sí la exigiría |
 
 ### Variables (solo los nombres)
 
@@ -307,4 +307,17 @@ Si la pregunta habla de despido/desahucio/prestaciones y trae salario y tiempo, 
 del Código de Trabajo (arts. 76, 80, 177-182, 219-220; salario diario = mensual / 23.83) y le pasa el cálculo a la
 IA, que solo lo explica. El art. 95 se menciona aparte, nunca se suma. Además, `ia.cifras_sin_respaldo` revisa que
 cada "N días / meses / años" de una respuesta salga de las fuentes (si no, pide corregir una vez y si no, avisa).
+
+**Calculadora pública** (`/calculadora-prestaciones-laborales`, 19 nov): gratis y sin cuenta, para traer visitas desde
+Google. Calcula en el navegador (`web/src/lib/prestaciones.ts`), sin servidor ni base de datos, con **las mismas reglas**
+que `prestaciones.py`: si cambia una, cambiar la otra. Se comprobó con 8 casos que dan lo mismo, peso por peso.
+
+## Google y los asistentes de IA (SEO, 19 nov)
+- `web/public/robots.txt` deja entrar a todos (también a los robots de IA); solo `/api/` queda fuera. `sitemap.xml`
+  lista las páginas públicas y `llms.txt` resume Papiniano para las IA.
+- La app se arma con JavaScript y varios robots de IA no lo corren: por eso `index.html` trae un resumen en
+  `<noscript>` y los datos de Papiniano en JSON-LD. El servidor (`servidor.PAGINAS_PUBLICAS`) pone el título, la
+  descripción, la dirección canónica y, en la calculadora, su propio resumen, antes de mandar la página. Si cambian
+  los planes o los precios, cambiar también esos textos y `llms.txt`.
+- Falta: registrar el sitio en Google Search Console y Bing Webmaster Tools (registro TXT en Hostinger).
 

@@ -13,13 +13,14 @@ La sesión es la misma de siempre (tabla sesiones de cuentas.py), guardada en un
 que el navegador no deja leer a JavaScript.
 """
 
-import json, os, pathlib, queue, secrets, threading, time, uuid
+import json, os, pathlib, queue, re, secrets, threading, time, uuid
+from html import escape
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, unquote, urlencode
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
 import cuentas
@@ -1154,6 +1155,56 @@ def fecha_borrar(fecha_id: int, u=Depends(con_expedientes)):
 
 
 # ── PANTALLAS ────────────────────────────────────
+# Lo que Google y los asistentes de IA leen de cada página pública antes de que corra el JavaScript: el título, la
+# descripción y, en la calculadora, un resumen propio (el de index.html habla de la portada). Las pantallas ponen el
+# mismo título al abrirse (useTitulo).
+PAGINAS_PUBLICAS = {
+    "": ("Papiniano · Asistente jurídico con IA para abogados dominicanos",
+         "Papiniano responde con las sentencias de la Suprema Corte de Justicia y las leyes dominicanas, muestra la "
+         "página exacta de cada cita y redacta sus escritos. Expedientes y agenda. Pruébelo 7 días gratis.", None),
+    "calculadora-prestaciones-laborales": (
+        "Calculadora de prestaciones laborales (República Dominicana) · Papiniano",
+        "Calcule gratis el preaviso, la cesantía, las vacaciones y el salario de Navidad con las fórmulas del Código "
+        "de Trabajo dominicano. Sin registrarse.",
+        "<h1>Calculadora de prestaciones laborales de República Dominicana</h1>"
+        "<p>Calcula gratis, sin registrarse, el preaviso (art. 76), el auxilio de cesantía (art. 80), las vacaciones no "
+        "disfrutadas (arts. 177, 180 y 182) y el salario de Navidad proporcional (arts. 219 y 220) de un trabajador al "
+        "que le hicieron desahucio o lo despidieron sin causa justificada, con las fórmulas del Código de Trabajo. "
+        "El salario diario es el salario mensual dividido entre 23.83.</p>"
+        "<p>Preaviso: 7 días de 3 a 6 meses; 14 días de más de 6 meses a un año; 28 días con más de un año. Cesantía: "
+        "6 días de 3 a 6 meses; 13 días de 6 meses a un año; 21 días por año de uno a cinco años; 23 días por año con "
+        "cinco años o más.</p>"
+        '<p>Hecha por <a href="https://papinianord.com/">Papiniano</a>, el asistente jurídico con IA para abogados '
+        "dominicanos.</p>"),
+    "terminos": ("Términos de servicio · Papiniano", "Las condiciones de uso de Papiniano.", None),
+    "privacidad": ("Política de privacidad · Papiniano",
+                   "Qué datos guarda Papiniano, para qué, y cómo pedir verlos o borrarlos (Ley 172-13).", None),
+    "reembolso": ("Política de reembolso · Papiniano", "Cuándo y cómo se devuelve un pago de Papiniano.", None),
+    "contacto": ("Contacto · Papiniano", "Escríbale a Papiniano: preguntas, el plan Despacho o algo que no funciona.", None),
+    "entrar": ("Entrar · Papiniano", "Entre a Papiniano con su cuenta de Gmail o con su usuario y contraseña.", None),
+}
+_INDICE = {}
+
+
+def _indice(ruta: str) -> str:
+    """index.html con el título, la descripción y la dirección de esa página (se arma una vez por página)."""
+    if ruta not in _INDICE:
+        html = (PANTALLAS / "index.html").read_text(encoding="utf-8")
+        titulo, descripcion, resumen = PAGINAS_PUBLICAS[ruta]
+        t, d = escape(titulo, quote=True), escape(descripcion, quote=True)
+        direccion = f"https://papinianord.com/{ruta}"
+        html = re.sub(r"<title>.*?</title>", f"<title>{t}</title>", html, count=1)
+        html = re.sub(r'(<meta name="description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
+        html = re.sub(r'(<meta property="og:title" content=")[^"]*', lambda m: m.group(1) + t, html, count=1)
+        html = re.sub(r'(<meta property="og:description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
+        html = re.sub(r'(<meta property="og:url" content=")[^"]*', lambda m: m.group(1) + direccion, html, count=1)
+        html = html.replace("</head>", f'    <link rel="canonical" href="{direccion}" />\n  </head>', 1)
+        if resumen:
+            html = re.sub(r"<noscript>.*?</noscript>", lambda m: f"<noscript>{resumen}</noscript>", html, count=1, flags=re.S)
+        _INDICE[ruta] = html
+    return _INDICE[ruta]
+
+
 @app.get("/{ruta:path}")
 def pantallas(ruta: str, request: Request):
     """Las pantallas ya armadas (npm run build). Cualquier dirección que no sea un archivo abre la app."""
@@ -1168,5 +1219,7 @@ def pantallas(ruta: str, request: Request):
     if ruta and archivo.is_file() and PANTALLAS.resolve() in archivo.parents:
         return FileResponse(archivo)
     if (PANTALLAS / "index.html").is_file():
+        if ruta.strip("/") in PAGINAS_PUBLICAS:
+            return HTMLResponse(_indice(ruta.strip("/")), headers={"Cache-Control": "no-cache"})
         return FileResponse(PANTALLAS / "index.html", headers={"Cache-Control": "no-cache"})
     return PlainTextResponse("Faltan las pantallas: en la carpeta web, corra npm install y npm run build.", 503)
