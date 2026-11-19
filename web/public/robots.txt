@@ -1,3 +1,5 @@
+# Papiniano: todos los buscadores y los robots de inteligencia artificial pueden leer las páginas públicas
+# (Google, Bing, ChatGPT, Claude, Perplexity, Gemini…). Solo /api/ queda fuera: son datos de la app, no páginas.
 User-agent: *
 Disallow: /api/
 Allow: /

@@ -1,0 +1,42 @@
+# Papiniano
+
+> Papiniano es la oficina digital con inteligencia artificial para abogados de República Dominicana. Su asistente
+> responde con las sentencias de la Suprema Corte de Justicia y las leyes dominicanas, muestra la página exacta del
+> documento oficial de cada cita y redacta escritos (instancias, recursos y otros) que se descargan en Word o PDF.
+
+Sitio: https://papinianord.com/ · Prueba gratis de 7 días, sin tarjeta, entrando con Gmail · Funciona en el navegador
+de la computadora, la tableta y el celular, sin instalar nada · Contacto: soportepapiniano@gmail.com
+
+## Qué hace
+
+- **Asistente Papiniano:** se le pregunta como a un colega. Busca en el Boletín Judicial de la Suprema Corte de
+  Justicia y en los códigos, leyes y reglamentos dominicanos, y responde con lo que dice la ley, la jurisprudencia y su
+  análisis. Cada cita abre la página del PDF oficial dentro de la app.
+- **Redacción de escritos:** redacta instancias, recursos y otros escritos en una hoja al lado de la conversación, con
+  modelos de escritos reales. El abogado le pide cambios y lo descarga en Word o PDF.
+- **Prestaciones laborales:** calcula las prestaciones con las fórmulas del Código de Trabajo (no las calcula la IA).
+- **Biblioteca:** el Boletín Judicial, los códigos y las leyes, y los documentos propios del abogado (solo él los ve).
+- **Expedientes:** una carpeta por caso con cliente, tribunal, contraparte, fechas, escritos y documentos.
+- **Agenda:** audiencias, plazos y reuniones, con aviso de lo que viene en la semana.
+- **Oficinas:** en el plan Despacho, varios abogados comparten expedientes y agenda.
+
+## Planes (en dólares)
+
+- **Básico:** US$25 al mes o US$250 al año. Para consultar sentencias y leyes, con pocos escritos al mes.
+- **Abogado:** US$50 al mes o US$500 al año. Para el trabajo de todos los días: más consultas y escritos, modelos y
+  documentos propios, expedientes y agenda.
+- **Despacho:** US$200 al mes, para hasta 10 abogados, el dueño incluido.
+
+## Privacidad
+
+Los datos personales de los clientes no se le mandan a la inteligencia artificial (Ley 172-13): los escritos dejan esos
+datos por llenar y el abogado los completa en la app. Papiniano es una herramienta de apoyo: no reemplaza al abogado y
+cada cita se debe verificar en la fuente oficial.
+
+## Páginas
+
+- [Inicio](https://papinianord.com/): qué es, cómo funciona, planes y preguntas frecuentes
+- [Términos](https://papinianord.com/terminos)
+- [Privacidad](https://papinianord.com/privacidad)
+- [Reembolso](https://papinianord.com/reembolso)
+- [Contacto](https://papinianord.com/contacto)
