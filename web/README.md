@@ -23,7 +23,7 @@ Abrir http://localhost:5180. Vite le pasa a Python todo lo que empieza con `/api
 
 ## Dónde está cada cosa
 
-- `src/pages/`: una pantalla por sala (entrada, escritorio, asistente, biblioteca).
+- `src/pages/`: una pantalla por sala (escritorio, asistente, biblioteca, expedientes, agenda, redacción, mi oficina), la entrada y la página pública (`inicio.tsx`).
 - `src/components/oficina.tsx`: el menú de salas, la cuenta y la prueba gratis.
 - `src/components/ui/`: las piezas de shadcn/ui (se pueden cambiar; son código del proyecto).
 - `src/index.css`: los colores (variables `--t-*`, las mismas de `temas.py`) y las letras.

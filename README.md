@@ -1,184 +1,161 @@
-# Sistema de Solicitudes Legales
+# Papiniano
 
-Aplicación web para el Departamento Legal que estandariza la captura de datos y la generación de documentos jurídicos en formato Word y PDF.
+**La oficina digital con inteligencia artificial para abogados de República Dominicana.**
 
-El sistema reduce la redacción repetitiva, conserva la estructura de los modelos institucionales y facilita la descarga de documentos listos para revisión y firma.
+Papiniano es un SaaS: el abogado le pregunta a su asistente como a un colega y le responde con las sentencias de la
+Suprema Corte de Justicia y las leyes dominicanas, con la página exacta del documento oficial de cada cita. Además le
+redacta el escrito en una hoja al lado de la conversación, guarda cada caso en su expediente y lleva la agenda de
+audiencias y plazos. Un despacho con varios abogados lo comparte en una sola oficina.
 
-## Aplicación en línea
+> **De dónde viene.** Este repositorio nació como *Sistema de Solicitudes Legales*: un generador de documentos en Word
+> y PDF para el departamento legal de una institución. En noviembre de 2026 evolucionó a Papiniano, un producto para
+> cualquier abogado. Las plantillas institucionales siguen dentro de la app, en la sala Redacción, para las cuentas que
+> las usan.
 
-Pruebe la versión publicada en [sistema-de-solicitudes-legales.onrender.com](https://sistema-de-solicitudes-legales.onrender.com/).
+## En línea
 
-> La primera carga puede tomar unos instantes cuando el servicio gratuito de Render se está reactivando.
+[sistema-de-solicitudes-legales.onrender.com](https://sistema-de-solicitudes-legales.onrender.com/): la página
+pública con los planes, y la entrada con Gmail o con usuario y contraseña. Hay 7 días de prueba gratis, sin tarjeta.
 
-## Funcionalidades
+> En el plan gratuito de Render, la primera carga puede tardar unos segundos mientras el servicio despierta.
 
-- Generación de documentos en `.docx` y `.pdf`.
-- Formularios guiados con validación de datos obligatorios.
-- Listas de tribunales, salas y materias para reducir errores de digitación.
-- Diseño adaptable para computador y móvil.
-- Descarga directa del documento generado; en Windows se guarda además en la carpeta **Descargas**.
-- Formato documental homogéneo con fuente Century Gothic.
+## Qué hay adentro
 
-## Plantillas disponibles
-
-| # | Plantilla | Uso |
-|---:|---|---|
-| 1 | Informe Técnico | Solicitud de investigación parcelaria al Catastro. |
-| 2 | Solicitud de Archivo | Solicitud de copia certificada de expediente. |
-| 3 | Reporte de Audiencia | Registro estructurado de audiencia, fallo y próxima fecha. |
-| 4 | Solicitud de Cobros | Verificación de existencia de cuenta o pago. |
-| 5 | Solicitud de Inspección | Solicitud de inspección con contenido personalizado. |
-| 6 | Informe de Audiencia Provincial | Informe narrativo de traslado, audiencia y resultado en una provincia. Admite traslados de uno o dos días. |
-| 7 | Conclusiones de Saneamiento | Modelo de conclusiones con expediente, reclamante e inmueble variables. |
-
-## Historial de expedientes
-
-Cada **Reporte de Audiencia** generado (Word o PDF) se guarda automáticamente en el **Historial** (botón dorado arriba a la derecha). Desde ahí se puede:
-
-- **Buscar** por expediente, recurrente, tribunal o parcela.
-- **Ver completo** cualquier expediente tocando su fila.
-- **Editar** un expediente: se abre el formulario con todos sus datos y, al generar, se actualiza ese mismo registro.
-- **Usar como base** un expediente: se abre una copia para cambiar solo lo necesario y se guarda como uno nuevo.
-- **Borrar** expedientes.
-- **Descargar todo en Word** con el formato de *EXPEDIENTES* (una tabla por expediente: No., tribunal, fechas, partes, objeto, parcela y fallo).
-
-Las próximas audiencias de los siguientes 7 días se resaltan en la lista. Si se genera de nuevo un reporte con el mismo No. de expediente y fecha de audiencia, se actualiza en lugar de duplicarse.
-
-- **En producción** el historial se guarda en PostgreSQL ([Neon](https://neon.tech), plan gratuito). Configure la variable de entorno `DATABASE_URL` con la cadena de conexión.
-- **En local**, si no existe `DATABASE_URL`, se usa un archivo SQLite (`historial.db`) que se crea solo.
-
-## Usuarios y jurisprudencia
-
-La aplicación pide **usuario y contraseña**. La primera vez se crea la cuenta de administrador, que luego puede crear más usuarios desde el menú de la cuenta (arriba a la derecha) → **Usuarios**. Las contraseñas se guardan cifradas con scrypt.
-
-También se pueden crear desde la terminal (la contraseña no se ve al escribirla). Con `DATABASE_URL` definida se crean en Neon:
-
-```bash
-python crear_usuario.py           # usuario normal
-python crear_usuario.py --admin   # administrador
-```
-
-La sección **Jurisprudencia** permite preguntar en lenguaje normal y responde con sentencias reales, indicando número, sala y página:
-
-- Busca en el **Boletín Judicial** (público) y en los **documentos propios** de cada usuario.
-- Cada usuario puede **subir PDF digitales o Word**; solo él los ve. Los PDF escaneados (sin texto) todavía no se leen.
-- La búsqueda es **híbrida**: por palabras (búsqueda de texto de PostgreSQL en español) y por significado (vectores de Cloudflare guardados con pgvector). Así encuentra tanto números de expediente y artículos como ideas dichas con otras palabras. Si Cloudflare no responde, busca solo por palabras.
-- La IA solo redacta con las fuentes encontradas, y se eliminan las citas que no correspondan a una fuente real. Es una herramienta de apoyo: las citas deben verificarse.
-- Las respuestas las redacta Groq; si llega a su límite gratis, contesta Cloudflare.
-
-### Carga del Boletín Judicial
-
-`cargar_boletines.py` descarga el Boletín mensual de la Suprema Corte, lo corta en sentencias, lo guarda y borra el PDF. Desde 2025 el índice trae materia y decisión (se descartan las entradas de prueba); los boletines anteriores se cortan por la cabecera de cada sentencia. Después calcula los vectores que falten, sin pasarse de la cuota gratis del día. Los meses ya cargados se saltan.
-
-El Boletín sale con más de un año de atraso, así que los meses se cuentan desde el último publicado. La primera vez carga los últimos 60 meses publicados; después se van sumando los nuevos y no se borra nada (con `--conservar N` se pueden quitar los de más de N meses).
-
-El 1 GB gratis de un proyecto de Neon alcanza para unos 15 meses de Boletín con sus vectores. Para más, se crean otros proyectos en la misma cuenta y se ponen en `JURIS_ARCHIVO_URLS`: cada mes va a la primera base con espacio (la principal al final, con 200 MB libres para los documentos de los usuarios) y el buscador busca en todas a la vez.
-
-```bash
-python cargar_boletines.py                 # últimos 60 meses publicados que falten
-python cargar_boletines.py --mes 2025-05   # un mes concreto
-```
-
-En GitHub corre solo todos los días (`.github/workflows/boletines.yml`). Necesita los secretos `JURIS_DATABASE_URL`, `JURIS_ARCHIVO_URLS`, `CF_ACCOUNT_ID` y `CF_API_TOKEN` en *Settings → Secrets and variables → Actions*.
-
-Los vectores atrasados se pueden calcular de una vez con la GPU gratis de Kaggle: `kaggle/huellas.ipynb` usa el mismo modelo abierto que Cloudflare (Qwen3-Embedding-0.6B) y da vectores iguales. Los pasos están en el propio cuaderno y en `ESTADO_DEL_PROYECTO.md`.
-
-### Variables de entorno
-
-| Variable | Para qué |
+| Sala | Qué hace |
 |---|---|
-| `DATABASE_URL` | Historial, usuarios y sesiones (PostgreSQL / Neon). Sin ella se usa SQLite local |
-| `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
-| `JURIS_ARCHIVO_URLS` | Opcional: más bases para el Boletín cuando no cabe en una, separadas por espacios. También pueden ir todas en `JURIS_DATABASE_URL`: la primera es la principal |
-| `JURIS_LIMITE_MB` | Opcional: hasta cuántos MB se llena cada base (por defecto 850, del 1 GB gratis) |
-| `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
-| `IA_BASE_URL`, `IA_MODELO`, `IA_MODELO_RAPIDO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI). Por defecto `openai/gpt-oss-120b` redacta y `openai/gpt-oss-20b` arma las búsquedas y lo reemplaza si llega al límite |
-| `CF_ACCOUNT_ID`, `CF_API_TOKEN` | Cloudflare Workers AI: vectores de significado y reemplazo de la IA cuando Groq se llena. Sin ellas la búsqueda es solo por palabras |
-| `EMB_MODELO`, `CF_MODELO_TEXTO` | Opcional: modelos de Cloudflare (por defecto `@cf/qwen/qwen3-embedding-0.6b` y `@cf/openai/gpt-oss-120b`) |
-| `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Opcional: botón "Continuar con Google". En Google Cloud, la URL de redirección es `<dirección de la app>/oauth_callback`. Quien entra por primera vez queda en plan de prueba |
-| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (7) y preguntas por día (20) |
-| `BASICO_PREGUNTAS_DIA` | Opcional: preguntas por día del plan Básico (20) |
-| `BASICO_ESCRITOS_MES` | Opcional: escritos nuevos por mes del plan Básico (3) |
-| `ABOGADO_PREGUNTAS_DIA` | Opcional: preguntas por día del plan Abogado y de cada abogado de una oficina (50) |
-| `ABOGADO_ESCRITOS_MES` | Opcional: escritos nuevos por mes del plan Abogado, de cada abogado de una oficina y de la prueba (30) |
-| `APP_URL` | Opcional: dirección pública de la app para Google (en Render se toma sola de `RENDER_EXTERNAL_URL`) |
-| `FLET_SECRET_KEY` | Opcional: firma de las subidas de archivos (si falta, se genera una al arrancar) |
+| **Papiniano** | El asistente. Busca en el Boletín Judicial y en los códigos, leyes y reglamentos, y responde con lo que dice la ley, la jurisprudencia y su análisis. Cada cita abre la página del PDF oficial dentro de la app. Redacta instancias, recursos y otros escritos en una hoja al lado, con modelos de escritos reales; el abogado le pide cambios y lo descarga en Word o PDF. Calcula las prestaciones laborales con las reglas del Código de Trabajo. |
+| **Biblioteca** | Todo lo que Papiniano lee: el Boletín Judicial, los códigos y las leyes, y los documentos propios que sube cada abogado (solo él los ve). |
+| **Expedientes** | Una carpeta por caso: cliente, asunto, número, tribunal, contraparte, quién lo lleva y notas, con sus fechas, sus conversaciones y escritos con Papiniano y sus documentos. |
+| **Agenda** | Audiencias, plazos y reuniones, con el mes al lado. El Escritorio avisa lo que viene en la semana. |
+| **Redacción** | Las plantillas institucionales de solicitudes (informe técnico, solicitud de archivo, reporte de audiencia y otras) y su historial, para las cuentas que las tienen activadas. |
+| **Mi oficina** | En el plan Despacho, el dueño agrega a sus abogados por correo y ve cuánto usa cada uno, nunca lo que preguntan. Los expedientes y la agenda son de toda la oficina. |
 
-## Inicio rápido
+## Planes
 
-Requiere Python 3.11 o superior.
+| Plan | Precio | Para quién |
+|---|---|---|
+| Básico | US$25 al mes o US$250 al año | Consultar sentencias y leyes, con un límite por día y pocos escritos al mes. Sin documentos ni modelos propios, ni expedientes y agenda. |
+| Abogado | US$50 al mes o US$500 al año | El trabajo de todos los días: muchas más consultas y escritos, sus modelos y documentos, expedientes y agenda. |
+| Despacho | US$200 al mes | Una oficina de hasta 10 abogados, el dueño incluido, con todo lo del plan Abogado y los expedientes y la agenda compartidos. |
+
+Los límites de cada plan se configuran con variables de entorno (ver abajo). La página pública los describe con
+palabras, no con números.
+
+## Privacidad (Ley 172-13)
+
+- Los datos personales de los clientes **no se le mandan a la IA**. Papiniano deja en los escritos los datos por llenar
+  (`[NOMBRE DEL CLIENTE]`, `[CÉDULA]`…) y el abogado los completa en la app: se guardan solo en su equipo y se ponen al
+  descargar el Word o el PDF.
+- Los expedientes y la agenda se guardan en la base de Papiniano y tampoco pasan por la IA.
+- La IA solo redacta con las fuentes encontradas, y se quitan las citas que no correspondan a una fuente real. Es una
+  herramienta de apoyo: cada cita se debe verificar en la fuente.
+
+## Cómo está hecho
+
+| Parte | Tecnología |
+|---|---|
+| Pantallas | React, TypeScript, Vite, Tailwind CSS y shadcn/ui (`web/`) |
+| Servidor | Python con FastAPI (`servidor.py`): la API y las pantallas ya armadas |
+| Cuentas, conversaciones, expedientes y agenda | PostgreSQL en [Neon](https://neon.tech) (`DATABASE_URL`); sin la variable, SQLite local |
+| Buscador de jurisprudencia | PostgreSQL con `pgvector`: búsqueda híbrida por palabras (texto completo en español) y por significado (vectores) |
+| Inteligencia artificial | Groq para redactar; Cloudflare Workers AI para los vectores y de respaldo |
+| Documentos | `python-docx` y `fpdf2` para Word y PDF; `pikepdf` y `pypdfium2` para mostrar la página citada sin descargar el PDF entero |
+| Despliegue | Render (Python y Node) |
+
+## Probar en local
+
+Requiere Python 3.11 o superior y Node 20 o superior.
 
 ```bash
 git clone https://github.com/yeisondev001/sistema-de-solicitudes-legales.git
 cd sistema-de-solicitudes-legales
 python -m pip install -r requirements.txt
-python main.py
+python crear_usuario.py --admin
+uvicorn servidor:app --reload --port 8000
 ```
 
-La aplicación estará disponible en `http://localhost:8080`.
+En otra terminal:
 
-## Uso
+```bash
+cd web
+npm install
+npx vite --port 5180
+```
 
-1. Seleccione la plantilla en la barra superior.
-2. Complete los campos requeridos, identificados con un asterisco.
-3. Revise los datos antes de generar el documento.
-4. Elija **Generar documento Word** o **Generar documento PDF**.
-5. Valide el contenido jurídico y proceda con la firma institucional correspondiente.
+Abra `http://localhost:5180`. Vite le pasa a Python todo lo que empieza con `/api`. Sin `JURIS_DATABASE_URL` la app
+abre, pero el asistente no puede buscar sentencias.
 
-> Los documentos se generan a partir de los datos introducidos. La revisión legal y la autorización de firma siguen siendo responsabilidad del equipo competente.
+## Variables de entorno
+
+| Variable | Para qué |
+|---|---|
+| `DATABASE_URL` | Usuarios, sesiones, conversaciones, expedientes, agenda e historial (PostgreSQL / Neon). Sin ella se usa SQLite local |
+| `JURIS_DATABASE_URL` | Base del buscador de jurisprudencia (PostgreSQL / Neon, proyecto aparte) |
+| `JURIS_ARCHIVO_URLS` | Opcional: más bases para el Boletín cuando no cabe en una, separadas por espacios |
+| `JURIS_LIMITE_MB` | Opcional: hasta cuántos MB se llena cada base (por defecto 850, del 1 GB gratis) |
+| `IA_API_KEY` | Clave del proveedor de IA (por defecto Groq). Sin ella se muestran solo los fragmentos |
+| `IA_BASE_URL`, `IA_MODELO`, `IA_MODELO_RAPIDO` | Opcional: cambiar de proveedor o de modelo (API compatible con OpenAI) |
+| `CF_ACCOUNT_ID`, `CF_API_TOKEN` | Cloudflare Workers AI: vectores y respaldo de la IA. Sin ellas la búsqueda es solo por palabras |
+| `EMB_MODELO`, `CF_MODELO_TEXTO` | Opcional: modelos de Cloudflare |
+| `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Opcional: entrar con Google. La URL de redirección es `<dirección de la app>/oauth_callback` |
+| `APP_URL` | Opcional: dirección pública de la app (en Render se toma de `RENDER_EXTERNAL_URL`) |
+| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (7) y consultas por día (20) |
+| `BASICO_PREGUNTAS_DIA`, `BASICO_ESCRITOS_MES` | Opcional: consultas por día (20) y escritos nuevos por mes (3) del plan Básico |
+| `ABOGADO_PREGUNTAS_DIA`, `ABOGADO_ESCRITOS_MES` | Opcional: consultas por día (50) y escritos nuevos por mes (30) del plan Abogado y de cada abogado de una oficina |
+
+Nunca suba al repositorio claves, contraseñas ni cadenas de conexión: van en las variables del servidor.
+
+## Las fuentes
+
+- **Boletín Judicial.** `cargar_boletines.py` descarga el Boletín mensual de la Suprema Corte, lo corta en sentencias,
+  lo guarda con sus vectores y borra el PDF. En GitHub corre solo cada día (`.github/workflows/boletines.yml`, con los
+  secretos `JURIS_DATABASE_URL`, `JURIS_ARCHIVO_URLS`, `CF_ACCOUNT_ID` y `CF_API_TOKEN`). Los vectores atrasados se
+  pueden calcular de una vez con la GPU gratis de Kaggle (`kaggle/huellas.ipynb`).
+- **Leyes y reglamentos.** `cargar_leyes.py` carga los códigos, las leyes y los reglamentos en el buscador con sus
+  vectores. Los PDF quedan en `leyes/` y la app abre la página citada desde este repositorio.
+
+```bash
+python cargar_boletines.py                 # los meses publicados que falten
+python cargar_boletines.py --mes 2025-05   # un mes concreto
+python cargar_leyes.py                     # las leyes y reglamentos
+```
 
 ## Estructura del proyecto
 
 ```text
-├── main.py                         # Interfaz y formularios Flet
-├── historial.py                    # Historial de expedientes (PostgreSQL o SQLite)
-├── cuentas.py                      # Usuarios, contraseñas y sesiones
-├── crear_usuario.py                # Crear usuarios desde la terminal
-├── cargar_boletines.py             # Cargar el Boletín Judicial y sus vectores
-├── ESTADO_DEL_PROYECTO.md          # Por dónde va el trabajo y qué falta (leer primero)
-├── jurisprudencia/                 # Buscador: procesar documentos, búsqueda e IA
-├── kaggle/huellas.ipynb            # Calcular con GPU (Kaggle) los vectores atrasados del Boletín
-├── generators/
-│   ├── base.py                     # Utilidades compartidas para documentos Word
-│   ├── informe.py                  # Informe Técnico
-│   ├── archivo.py                  # Solicitud de Archivo
-│   ├── reporte.py                  # Reporte de Audiencia
-│   ├── cobros.py                   # Solicitud de Cobros
-│   ├── inspeccion.py               # Solicitud de Inspección
-│   ├── audiencia_provincial.py     # Informe de Audiencia Provincial
-│   ├── conclusiones_saneamiento.py # Conclusiones de Saneamiento
-│   ├── expedientes.py              # Historial en Word (formato EXPEDIENTES)
-│   └── pdf_gen.py                  # Generadores PDF
-├── assets/                         # Íconos, fuentes (EB Garamond, Lato) y recursos visuales
-├── requirements.in                 # Dependencias directas
-├── requirements.txt                # Versiones fijas de todas las dependencias
-├── render.yaml                     # Configuración de despliegue en Render
-└── Procfile                        # Comando de arranque para Render
+├── servidor.py                 # API (FastAPI) y pantallas ya armadas
+├── cuentas.py                  # Usuarios, planes, sesiones, conversaciones, escritos y oficinas
+├── expedientes.py              # Expedientes y agenda (compartidos por oficina)
+├── historial.py                # Historial de reportes de audiencia (plantillas)
+├── redaccion.py                # Las plantillas institucionales de Redacción
+├── modelos/                    # Modelos de escritos (sin datos reales) y su catálogo
+├── jurisprudencia/             # Buscador, IA, visor de páginas, leyes y prestaciones
+├── leyes/                      # PDF de códigos, leyes y reglamentos
+├── generators/                 # Word y PDF de las plantillas y del historial
+├── web/                        # Pantallas en React (ver web/README.md)
+├── cargar_boletines.py         # Cargar el Boletín Judicial y sus vectores
+├── cargar_leyes.py             # Cargar las leyes
+├── crear_usuario.py            # Crear usuarios desde la terminal
+├── kaggle/huellas.ipynb        # Vectores atrasados con GPU de Kaggle
+├── main.py                     # La app anterior en Flet (ya no es la que corre en Render)
+├── render-build.sh             # Build de Render
+└── ESTADO_DEL_PROYECTO.md      # Por dónde va el trabajo y qué falta (leer primero)
 ```
-
-## Agregar una plantilla
-
-1. Cree un generador en `generators/` con una función `generar(d: dict) -> bytes`.
-2. Exporte la función desde `generators/__init__.py`.
-3. Agregue el formulario, validaciones y pestaña en `main.py`.
-4. Incorpore su equivalente PDF en `generators/pdf_gen.py`.
-5. Pruebe ambos formatos con datos representativos antes de publicar.
 
 ## Despliegue
 
-El repositorio incluye la configuración necesaria para desplegar en [Render](https://render.com/). Render instala las dependencias y sirve la aplicación Flet en modo web.
+En Render, como servicio web:
 
-La instancia pública actual está disponible en [https://sistema-de-solicitudes-legales.onrender.com/](https://sistema-de-solicitudes-legales.onrender.com/).
+- **Build Command:** `bash render-build.sh` (instala lo de Python y arma las pantallas en `web/dist`).
+- **Start Command:** `uvicorn servidor:app --host 0.0.0.0 --port $PORT`.
 
-## Contribuciones
+## Contribuir
 
-Las pautas de desarrollo y verificación están disponibles en [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Datos y privacidad
-
-Evite versionar expedientes, cédulas, documentos generados u otra información sensible. Los archivos de prueba y las descargas deben permanecer fuera del control de versiones.
+Antes de cambiar algo, lea [ESTADO_DEL_PROYECTO.md](ESTADO_DEL_PROYECTO.md) y [CONTRIBUTING.md](CONTRIBUTING.md). No
+suba expedientes, cédulas, escritos con datos reales ni otros datos personales.
 
 ## Licencia
 
-Software privado. Todos los derechos reservados: no se permite copiarlo, modificarlo, distribuirlo ni usarlo sin autorización escrita del titular (ver [LICENSE](LICENSE)).
+Software privado. Todos los derechos reservados: no se permite copiarlo, modificarlo, distribuirlo ni usarlo sin
+autorización escrita del titular (ver [LICENSE](LICENSE)).
