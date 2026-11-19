@@ -20,10 +20,10 @@ audiencias y plazos. Un despacho con varios abogados lo comparte en una sola ofi
 
 ## En línea
 
-[sistema-de-solicitudes-legales.onrender.com](https://sistema-de-solicitudes-legales.onrender.com/): la página
-pública con los planes, y la entrada con Gmail o con usuario y contraseña. Hay 7 días de prueba gratis, sin tarjeta.
+[papinianord.com](https://papinianord.com/): la página pública con los planes, y la entrada con Gmail o con
+usuario y contraseña. Hay 7 días de prueba gratis, sin tarjeta.
 
-> En el plan gratuito de Render, la primera carga puede tardar unos segundos mientras el servicio despierta.
+> De noche, la primera carga puede tardar unos segundos mientras el servidor despierta.
 
 ## Qué hay adentro
 
