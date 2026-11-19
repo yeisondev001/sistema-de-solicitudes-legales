@@ -7,6 +7,12 @@ Suprema Corte de Justicia y las leyes dominicanas, con la página exacta del doc
 redacta el escrito en una hoja al lado de la conversación, guarda cada caso en su expediente y lleva la agenda de
 audiencias y plazos. Un despacho con varios abogados lo comparte en una sola oficina.
 
+<p align="center">
+  <img src="docs/papiniano.gif" width="880" alt="Papiniano por dentro: el abogado pregunta por un deslinde, Papiniano responde con la cita, al tocarla se abre la página del Boletín Judicial, y después redacta la instancia en el panel de al lado y la baja en Word">
+</p>
+<p align="center"><sub>Papiniano por dentro: la misma animación de la página pública, con datos de ejemplo.
+<a href="docs/papiniano.mp4">Verla en video (MP4)</a>.</sub></p>
+
 > **De dónde viene.** Este repositorio nació como *Sistema de Solicitudes Legales*: un generador de documentos en Word
 > y PDF para el departamento legal de una institución. En noviembre de 2026 evolucionó a Papiniano, un producto para
 > cualquier abogado. Las plantillas institucionales siguen dentro de la app, en la sala Redacción, para las cuentas que
