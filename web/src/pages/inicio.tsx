@@ -115,7 +115,7 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 // 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
 const planes = (p: Prueba) => [
   {
-    nombre: 'Aspirante', tiene: false, quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 25, anual: 250,
+    nombre: 'Aspirante', tiene: false, quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 29, anual: 290,
     puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
     // lo que el Aspirante no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
@@ -123,13 +123,13 @@ const planes = (p: Prueba) => [
     boton: 'Elegir Aspirante', a: '/entrar',
   },
   {
-    nombre: 'Abogado', tiene: true, quien: 'PARA EL DÍA A DÍA', para: 'Para el abogado que litiga y redacta cada semana, con sus casos y su agenda.', mensual: 50, anual: 500, destacado: true,
+    nombre: 'Abogado', tiene: true, quien: 'PARA EL DÍA A DÍA', para: 'Para el abogado que litiga y redacta cada semana, con sus casos y su agenda.', mensual: 59, anual: 590, destacado: true,
     puntos: ['Todo lo del Aspirante, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
       'Sus documentos en el buscador', 'Expedientes y agenda de audiencias y plazos'],
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
-    nombre: 'Buffet', tiene: true, quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 200, anual: 2000,
+    nombre: 'Buffet', tiene: true, quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 219, anual: 2190,
     nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
@@ -158,7 +158,7 @@ const preguntas = (p: Prueba): [string, string][] => [
   ['¿Hay un límite de consultas?',
     'Cada plan tiene un máximo de consultas por día y de escritos por mes, pensado para el trabajo normal de un abogado: el Aspirante es para consultar de vez en cuando y el Abogado alcanza para el trabajo de todos los días. Si llega al máximo, Papiniano le avisa y al día o al mes siguiente puede seguir.'],
   ['¿Cómo funciona el plan Buffet?',
-    'La oficina paga US$200 al mes y lo usan hasta 10 abogados, el dueño entre ellos. El dueño agrega a sus abogados con su correo y ve cuánto usa Papiniano cada uno, nunca lo que pregunta. Si su oficina tiene más de 10 abogados, escríbanos.'],
+    'La oficina paga US$219 al mes y lo usan hasta 10 abogados, el dueño entre ellos. El dueño agrega a sus abogados con su correo y ve cuánto usa Papiniano cada uno, nunca lo que pregunta. Si su oficina tiene más de 10 abogados, escríbanos.'],
   ['¿Por qué se llama Papiniano?',
     'Por Emilio Papiniano (siglo III), el jurista más respetado de Roma: cuando los grandes juristas no se ponían de acuerdo, la ley mandaba seguir su opinión.'],
   ['¿Funciona en el celular?', 'Sí. Funciona en el navegador de la computadora, la tableta y el celular, sin instalar nada.'],

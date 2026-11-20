@@ -40,9 +40,9 @@ usuario y contraseña. Hay 7 días de prueba gratis, sin tarjeta.
 
 | Plan | Precio | Para quién |
 |---|---|---|
-| Básico | US$25 al mes o US$250 al año | Consultar sentencias y leyes, con un límite por día y pocos escritos al mes. Sin documentos ni modelos propios, ni expedientes y agenda. |
-| Abogado | US$50 al mes o US$500 al año | El trabajo de todos los días: muchas más consultas y escritos, sus modelos y documentos, expedientes y agenda. |
-| Despacho | US$200 al mes | Una oficina de hasta 10 abogados, el dueño incluido, con todo lo del plan Abogado y los expedientes y la agenda compartidos. |
+| Básico | US$29 al mes o US$290 al año | Consultar sentencias y leyes, con un límite por día y pocos escritos al mes. Sin documentos ni modelos propios, ni expedientes y agenda. |
+| Abogado | US$59 al mes o US$590 al año | El trabajo de todos los días: muchas más consultas y escritos, sus modelos y documentos, expedientes y agenda. |
+| Despacho | US$219 al mes o US$2,190 al año | Una oficina de hasta 10 abogados, el dueño incluido, con todo lo del plan Abogado y los expedientes y la agenda compartidos. |
 
 Los límites de cada plan se configuran con variables de entorno (ver abajo). La página pública los describe con
 palabras, no con números.
