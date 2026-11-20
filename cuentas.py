@@ -8,7 +8,7 @@ Se entra con usuario y contraseña (cuentas que crea el administrador) o con Goo
 Quien entra con Google por primera vez queda en plan "prueba": unos días y un máximo
 de preguntas por día. El administrador cambia el plan desde el panel de usuarios:
   beta     sin límites y sin cobro (primeros usuarios que prueban la app)
-  prueba   PRUEBA_DIAS días, PRUEBA_PREGUNTAS_DIA preguntas por día y los escritos del plan Abogado
+  prueba   PRUEBA_DIAS días, PRUEBA_PREGUNTAS_DIA preguntas por día y PRUEBA_ESCRITOS_MES escritos
   basico   cliente del plan Aspirante: BASICO_PREGUNTAS_DIA preguntas por día, BASICO_ESCRITOS_MES escritos
            por mes y sin modelos ni documentos propios
   activo   cliente del plan Abogado o de una oficina: ABOGADO_PREGUNTAS_DIA preguntas por día y
@@ -27,12 +27,17 @@ DURACION_SESION = 30 * 24 * 3600   # 30 días
 MIN_CLAVE = 8 if DATABASE_URL else 3
 PLANES = ("beta", "prueba", "basico", "activo", "vencido")
 DIAS_PRUEBA = int(os.environ.get("PRUEBA_DIAS", "5"))
-PREGUNTAS_PRUEBA = int(os.environ.get("PRUEBA_PREGUNTAS_DIA", "20"))
-PREGUNTAS_BASICO = int(os.environ.get("BASICO_PREGUNTAS_DIA", "20"))
-PREGUNTAS_ABOGADO = int(os.environ.get("ABOGADO_PREGUNTAS_DIA", "50"))
+# la prueba gratis (20 nov): lo mismo que el Abogado, para que en 5 días lo pruebe de verdad
+PREGUNTAS_PRUEBA = int(os.environ.get("PRUEBA_PREGUNTAS_DIA", "200"))
+# el Aspirante (20 nov): bastante, pero lejos del Abogado, para que siga valiendo la pena subir
+PREGUNTAS_BASICO = int(os.environ.get("BASICO_PREGUNTAS_DIA", "60"))
+# el Abogado y cada abogado del Buffet: alto a propósito (20 nov), para que en el uso normal no se sienta un límite
+PREGUNTAS_ABOGADO = int(os.environ.get("ABOGADO_PREGUNTAS_DIA", "200"))
 # escritos nuevos por mes (cambiar uno que ya está no cuenta)
-ESCRITOS_BASICO = int(os.environ.get("BASICO_ESCRITOS_MES", "3"))
-ESCRITOS_ABOGADO = int(os.environ.get("ABOGADO_ESCRITOS_MES", "30"))
+ESCRITOS_BASICO = int(os.environ.get("BASICO_ESCRITOS_MES", "20"))
+ESCRITOS_ABOGADO = int(os.environ.get("ABOGADO_ESCRITOS_MES", "100"))
+# la prueba gratis: igual que el Abogado (se puede bajar sola con PRUEBA_ESCRITOS_MES)
+ESCRITOS_PRUEBA = int(os.environ.get("PRUEBA_ESCRITOS_MES", "100"))
 
 
 def tope_diario(plan: str):
@@ -42,7 +47,7 @@ def tope_diario(plan: str):
 
 def tope_escritos(plan: str):
     """Cuántos escritos nuevos por mes deja el plan, o None si no tiene límite."""
-    return {"prueba": ESCRITOS_ABOGADO, "basico": ESCRITOS_BASICO, "activo": ESCRITOS_ABOGADO}.get(plan)
+    return {"prueba": ESCRITOS_PRUEBA, "basico": ESCRITOS_BASICO, "activo": ESCRITOS_ABOGADO}.get(plan)
 
 
 def con_propios(plan: str) -> bool:
@@ -597,7 +602,7 @@ def email_desechable(email: str) -> bool:
 
 
 _MAXIMO_PREGUNTAS = {
-    "prueba": "Llegó al máximo de {tope} preguntas por día de la prueba gratis. Mañana puede seguir, o elija su "
+    "prueba": "Llegó al máximo de preguntas por día de la prueba gratis. Mañana puede seguir, o elija su "
               "plan para seguir trabajando.",
     "basico": "Llegó al máximo de preguntas por día del plan Aspirante. Mañana puede seguir, o pase al plan Abogado, "
               "que trae muchas más.",

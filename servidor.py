@@ -455,7 +455,7 @@ def audiencias(u=Depends(usuario_actual)):
 
 
 # ── ASISTENTE ────────────────────────────────────
-# el plan Aspirante redacta pocos escritos al mes y solo con los modelos de todos: sus propios modelos y
+# el plan Aspirante redacta escritos cada mes (menos que el Abogado) y solo con los modelos de todos: sus propios modelos y
 # documentos son del plan Abogado
 SIN_PROPIOS = ("Sus propios modelos y documentos vienen con el plan Abogado. Con el plan Aspirante puede usar "
                "nuestros modelos. Para pasar al plan Abogado, escríbanos.")

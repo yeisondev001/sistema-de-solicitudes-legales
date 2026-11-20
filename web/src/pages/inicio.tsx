@@ -15,7 +15,7 @@ import { useTitulo } from '@/lib/titulo'
 import { cn } from '@/lib/utils'
 
 // La prueba gratis la decide el servidor (PRUEBA_DIAS y PRUEBA_PREGUNTAS_DIA en cuentas.py); esto se ve mientras responde
-export const PRUEBA_INICIAL = { dias: 5, preguntas: 20 }
+export const PRUEBA_INICIAL = { dias: 5, preguntas: 200 }
 type Prueba = typeof PRUEBA_INICIAL
 
 /**
@@ -125,7 +125,7 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 export const planes = (_prueba: Prueba) => [
   {
     nombre: 'Aspirante', tiene: false, quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 29, anual: 290,
-    puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
+    puntos: ['Consultas a Papiniano todos los días', 'Escritos cada mes, con nuestros modelos',
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
     // lo que el Aspirante no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
     faltan: ['Sus propios modelos de escritos', 'Subir sus propios documentos', 'Expedientes y agenda'],

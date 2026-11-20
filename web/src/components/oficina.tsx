@@ -68,12 +68,18 @@ function MenuSalas({ alElegir }: { alElegir?: () => void }) {
   )
 }
 
-/** En la prueba gratis: los días que quedan y las consultas de hoy. En el plan Aspirante, solo las consultas. */
+/**
+ * En la prueba gratis: los días que quedan y cuánto lleva de las consultas de hoy. En el plan Aspirante, solo lo de hoy.
+ * Se muestra en porcentaje y no el número de consultas, para que se sienta como uso justo y no como un contador;
+ * desde el 80 % avisa que le quedan pocas, para que el máximo no le llegue de sorpresa.
+ */
 function CajaPrueba() {
   const { perfil } = useSesion()
   const limite = perfil.prueba ?? perfil.basico
   if (!limite) return null
   const { preguntas_hoy, tope } = limite
+  const usado = tope ? Math.min(100, Math.round((preguntas_hoy / tope) * 100)) : 0
+  const aviso = usado >= 100 ? 'Ya usó las de hoy. Mañana sigue.' : usado >= 80 ? 'Le quedan pocas por hoy.' : null
   return (
     <div className="space-y-2 border-t border-sidebar-border px-2.5 pt-4">
       <p className="text-[0.8rem] font-bold tracking-wide text-nav-sub">{perfil.prueba ? 'PRUEBA GRATIS' : 'PLAN BÁSICO'}</p>
@@ -82,14 +88,16 @@ function CajaPrueba() {
           Quedan {perfil.prueba.dias} día{perfil.prueba.dias === 1 ? '' : 's'}
         </p>
       )}
-      <Progress
-        value={tope ? Math.min(100, (preguntas_hoy / tope) * 100) : 0}
-        className="h-1.5 bg-sidebar-accent [&>*]:bg-nav-linea"
-        aria-label="Consultas usadas hoy"
-      />
-      <p className="text-[0.9rem] text-nav-sub">
-        {preguntas_hoy} de {tope} consultas hoy
+      <p className="flex items-baseline justify-between gap-2 text-[0.9rem] text-nav-sub">
+        <span>Consultas de hoy</span>
+        <span className="font-bold text-sobre-panel tabular-nums">{usado}%</span>
       </p>
+      <Progress
+        value={usado}
+        className={cn('h-1.5 bg-sidebar-accent', aviso ? '[&>*]:bg-[#E2C29B]' : '[&>*]:bg-nav-linea')}
+        aria-label={`Consultas de hoy: ${usado} por ciento usado`}
+      />
+      {aviso && <p className="text-[0.88rem] font-bold text-[#E2C29B]">{aviso}</p>}
     </div>
   )
 }

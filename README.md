@@ -40,7 +40,7 @@ usuario y contraseña. Hay 7 días de prueba gratis, sin tarjeta.
 
 | Plan | Precio | Para quién |
 |---|---|---|
-| Básico | US$29 al mes o US$290 al año | Consultar sentencias y leyes, con un límite por día y pocos escritos al mes. Sin documentos ni modelos propios, ni expedientes y agenda. |
+| Aspirante | US$29 al mes o US$290 al año | Consultar sentencias y leyes a diario, con escritos cada mes usando los modelos de Papiniano. Sin documentos ni modelos propios, ni expedientes y agenda. |
 | Abogado | US$59 al mes o US$590 al año | El trabajo de todos los días: muchas más consultas y escritos, sus modelos y documentos, expedientes y agenda. |
 | Despacho | US$219 al mes o US$2,190 al año | Una oficina de hasta 10 abogados, el dueño incluido, con todo lo del plan Abogado y los expedientes y la agenda compartidos. |
 
@@ -106,10 +106,11 @@ abre, pero el asistente no puede buscar sentencias.
 | `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Opcional: entrar con Google. La URL de redirección es `<dirección de la app>/oauth_callback` |
 | `APP_URL` | Opcional: dirección pública de la app (en Render se toma de `RENDER_EXTERNAL_URL`) |
-| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (5) y consultas por día (20) |
+| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (5) y consultas por día (200) |
 | `POLAR_TOKEN`, `POLAR_WEBHOOK_SECRET` | Cobro con Polar (opcional; sin ellos «Mi plan» dice que el pago llega pronto). El aviso de Polar apunta a `<dirección>/api/pagos/aviso`. `POLAR_SANDBOX=1` usa el sandbox |
-| `BASICO_PREGUNTAS_DIA`, `BASICO_ESCRITOS_MES` | Opcional: consultas por día (20) y escritos nuevos por mes (3) del plan Básico |
-| `ABOGADO_PREGUNTAS_DIA`, `ABOGADO_ESCRITOS_MES` | Opcional: consultas por día (50) y escritos nuevos por mes (30) del plan Abogado y de cada abogado de una oficina |
+| `BASICO_PREGUNTAS_DIA`, `BASICO_ESCRITOS_MES` | Opcional: consultas por día (60) y escritos nuevos por mes (20) del plan Aspirante |
+| `ABOGADO_PREGUNTAS_DIA`, `ABOGADO_ESCRITOS_MES` | Opcional: consultas por día (200) y escritos nuevos por mes (100) del plan Abogado y de cada abogado del Buffet |
+| `PRUEBA_ESCRITOS_MES` | Opcional: escritos nuevos de la prueba gratis (100) |
 
 Nunca suba al repositorio claves, contraseñas ni cadenas de conexión: van en las variables del servidor.
 
