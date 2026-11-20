@@ -109,7 +109,7 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 ]
 
 // Tres planes: el Aspirante para consultar, el Abogado que compra casi todos y el Buffet para oficinas. Los precios
-// se cambian aquí (en dólares, al mes y al año; lo que se ahorra al año sale de los dos) y en Lemon Squeezy, que es
+// se cambian aquí (en dólares, al mes y al año; lo que se ahorra al año sale de los dos) y en Polar, que es
 // quien cobra. El uso se describe con palabras, sin números ni «sin
 // límite» (lo decidió el dueño): los topes están en cuentas.py y la app avisa al llegar. El Buffet es para hasta
 // 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
@@ -154,7 +154,7 @@ const preguntas = (p: Prueba): [string, string][] => [
   ['¿Qué pasa cuando termina la prueba gratis?',
     `La prueba dura ${p.dias} días, con todo incluido, y no pide tarjeta. Al terminar, elige Aspirante, Abogado o Buffet para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
   ['¿Cómo se paga y cómo cancelo?',
-    'Con tarjeta, a través de Lemon Squeezy, cada mes o una vez al año (el año sale a precio de diez meses). Puede cancelar cuando quiera desde su cuenta y conserva el acceso hasta el final del período pagado.'],
+    'Con tarjeta, a través de Polar, cada mes o una vez al año (el año sale a precio de diez meses). Puede cancelar cuando quiera desde su cuenta y conserva el acceso hasta el final del período pagado.'],
   ['¿Hay un límite de consultas?',
     'Cada plan tiene un máximo de consultas por día y de escritos por mes, pensado para el trabajo normal de un abogado: el Aspirante es para consultar de vez en cuando y el Abogado alcanza para el trabajo de todos los días. Si llega al máximo, Papiniano le avisa y al día o al mes siguiente puede seguir.'],
   ['¿Cómo funciona el plan Buffet?',
@@ -480,7 +480,7 @@ export default function Inicio() {
                 </div>
               ))}
             </div>
-            <p className="text-[0.95rem] text-[#E2C9A8]">Pago seguro con tarjeta a través de Lemon Squeezy. Cancele cuando quiera desde su cuenta.</p>
+            <p className="text-[0.95rem] text-[#E2C9A8]">Pago seguro con tarjeta a través de Polar. Cancele cuando quiera desde su cuenta.</p>
           </div>
         </section>
 

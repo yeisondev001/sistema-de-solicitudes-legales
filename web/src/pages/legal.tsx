@@ -4,9 +4,9 @@ import { CabeceraPublica, PiePublico } from '@/components/publico'
 import { NOMBRE_APP } from '@/lib/tema'
 
 /*
-  Las páginas legales del pie (Lemon Squeezy las pide para aprobar la tienda). Lemon Squeezy es el vendedor:
-  cobra, factura y reembolsa; por eso aquí no va empresa, solo el nombre del servicio. Las debe revisar un abogado
-  antes de cobrar.
+  Las páginas legales del pie (Polar las pide para aprobar la tienda). Polar es el vendedor de registro
+  (merchant of record): cobra, factura, aplica los impuestos de venta y reembolsa; por eso aquí no va empresa,
+  solo el nombre del servicio. Las debe revisar un abogado antes de cobrar.
 */
 
 const CORREO = 'soportepapiniano@gmail.com'
@@ -39,7 +39,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         <p>
           La prueba gratis dura los días indicados en la página de planes. Cada plan, y también la prueba, tiene un
           máximo de consultas por día y de escritos por mes; la app le avisa cuando llega. Los planes pagos se cobran
-          por adelantado, cada mes o cada año según elija, a través de Lemon Squeezy, que es el vendedor: procesa el
+          por adelantado, cada mes o cada año según elija, a través de Polar, que es el vendedor: procesa el
           pago, le envía el recibo y aplica los impuestos que correspondan. El plan Buffet es para hasta diez
           abogados. Puede cancelar cuando quiera: el acceso sigue hasta el final del período pagado.
         </p>
@@ -90,7 +90,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
             fechas y las notas que usted escribe. Estos datos no se le envían a la inteligencia artificial.
           </li>
           <li>Cuántas consultas hace por día (para el límite de la prueba).</li>
-          <li>Los datos del pago los guarda Lemon Squeezy; nosotros no vemos su tarjeta.</li>
+          <li>Los datos del pago los guarda Polar; nosotros no vemos su tarjeta.</li>
         </ul>
         <h2>Para qué los usamos</h2>
         <p>
@@ -101,7 +101,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
         <p>
           Para funcionar, el servicio usa proveedores que procesan datos por cuenta nuestra: el servidor y la base de datos
           (en Estados Unidos), los servicios de inteligencia artificial que leen la consulta y las fuentes encontradas para
-          redactar la respuesta, Google para la entrada con su cuenta y Lemon Squeezy para los pagos. Por eso le pedimos
+          redactar la respuesta, Google para la entrada con su cuenta y Polar para los pagos. Por eso le pedimos
           no escribir en las consultas datos personales de sus clientes.
         </p>
         <h2>Si trabaja en una oficina (plan Buffet)</h2>
@@ -140,7 +140,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
           siguientes, escribiendo a {CORREO}. Los pagos de meses siguientes no se reembolsan, salvo que el servicio haya
           estado sin funcionar por causa nuestra.
         </p>
-        <p>Los reembolsos los procesa Lemon Squeezy al mismo medio de pago, en el plazo que indique su banco.</p>
+        <p>Los reembolsos los procesa Polar al mismo medio de pago, en el plazo que indique su banco.</p>
       </>
     ),
   },
