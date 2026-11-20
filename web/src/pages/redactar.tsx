@@ -44,6 +44,17 @@ const ICONOS: Record<string, LucideIcon> = {
 
 const MAX_MB = 20
 
+/** «Demanda» → «la demanda»; «Recurso de apelación» → «el recurso de apelación» */
+const elEscrito = (nombre: string) => `${/^demanda/i.test(nombre) ? 'la' : 'el'} ${nombre.toLowerCase()}`
+
+/** De qué se trata cada pregunta, en una palabra, para decir qué va a preguntar */
+const QUE_PREGUNTA: Record<string, string> = {
+  tribunal: 'tribunal', objeto: 'qué se demanda', hechos: 'hechos', motivos: 'motivos', pide: 'qué pide',
+  pruebas: 'pruebas', contraria: 'qué pide la otra parte', sentencia: 'la sentencia', notificacion: 'notificación',
+  decidio: 'qué decidió', trascendencia: 'trascendencia',
+}
+const resumenPregunta = (clave: string) => QUE_PREGUNTA[clave] ?? clave
+
 /** «PERSONA 3» → «nombres»: para decir cuántos datos se quitaron */
 const NOMBRES: Record<string, [string, string]> = {
   PERSONA: ['nombre', 'nombres'],
@@ -199,8 +210,8 @@ export default function Redactar() {
                   <FileUp className="size-7 text-marca-texto" aria-hidden />
                   <span className="text-lg font-bold text-ink">A partir de un documento</span>
                   <span className="text-[0.95rem] text-ink-soft">
-                    Suba {tipo.documento.charAt(0).toLowerCase() + tipo.documento.slice(1)} Papiniano lo analiza y
-                    redacta la respuesta.
+                    Suba {tipo.documento.charAt(0).toLowerCase() + tipo.documento.slice(1)} Papiniano analiza el
+                    documento y redacta {elEscrito(tipo.nombre)}.
                   </span>
                 </button>
                 <button
@@ -211,8 +222,8 @@ export default function Redactar() {
                   <PencilLine className="size-7 text-marca-texto" aria-hidden />
                   <span className="text-lg font-bold text-ink">Hacerlo yo mismo</span>
                   <span className="text-[0.95rem] text-ink-soft">
-                    Papiniano le pregunta lo de su caso (tribunal, hechos, motivos, qué pide) y lo redacta con el
-                    modelo y los artículos de la biblioteca.
+                    Papiniano le pregunta lo de su caso ({tipo.preguntas.slice(0, 4).map((p) => resumenPregunta(p.clave)).join(', ')}
+                    …) y redacta {elEscrito(tipo.nombre)} con el modelo y los artículos de la biblioteca.
                   </span>
                 </button>
               </div>
