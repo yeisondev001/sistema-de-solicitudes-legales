@@ -13,7 +13,7 @@ La sesión es la misma de siempre (tabla sesiones de cuentas.py), guardada en un
 que el navegador no deja leer a JavaScript.
 """
 
-import json, os, pathlib, queue, re, secrets, threading, time, uuid
+import json, logging, os, pathlib, queue, re, secrets, threading, time, uuid
 from html import escape
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, unquote, urlencode
@@ -50,6 +50,21 @@ FUENTES_PERMITIDAS = (
 )
 
 app = FastAPI(title="Papiniano", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@app.exception_handler(Exception)
+async def _error_inesperado(request: Request, ex: Exception):
+    """Un fallo que no previmos: queda en el registro y en el panel «Errores» del administrador, y el abogado ve un
+    mensaje claro. Solo se guarda el tipo de error y dónde ocurrió, nunca el contenido de lo que subió."""
+    import traceback
+    logging.getLogger("papiniano").exception("Error en %s %s", request.method, request.url.path)
+    try:
+        cuentas.registrar_error(request.method, request.url.path, type(ex).__name__, str(ex),
+                                "".join(traceback.format_exception(type(ex), ex, ex.__traceback__)))
+    except Exception:
+        pass   # si ni el panel se puede escribir, el registro de Render igual lo tiene
+    return JSONResponse({"detail": "Algo falló de nuestro lado y ya quedó registrado. Intente de nuevo; "
+                                   "si sigue, escríbanos a soportepapiniano@gmail.com."}, status_code=500)
 
 
 # ── SESIÓN ───────────────────────────────────────
@@ -1055,6 +1070,17 @@ def solo_admin(u=Depends(usuario_actual)) -> dict:
     if not u["es_admin"]:
         raise HTTPException(403, "Solo los administradores pueden ver esto.")
     return u
+
+
+@app.get("/api/errores")
+def errores(u=Depends(solo_admin)):
+    return cuentas.listar_errores()
+
+
+@app.delete("/api/errores")
+def borrar_errores(u=Depends(solo_admin)):
+    cuentas.borrar_errores()
+    return {"ok": True}
 
 
 @app.get("/api/usuarios")

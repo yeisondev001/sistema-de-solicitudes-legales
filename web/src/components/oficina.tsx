@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   FilePen,
   FileStack,
-  Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, Users,
+  Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, TriangleAlert, Users,
 } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
 import { Logo } from '@/components/logo'
@@ -125,6 +125,11 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
         {perfil.es_admin && (
           <DropdownMenuItem onSelect={() => navegar('/usuarios')} className="h-10 text-[0.95rem]">
             <Users /> Administrar usuarios
+          </DropdownMenuItem>
+        )}
+        {perfil.es_admin && (
+          <DropdownMenuItem onSelect={() => navegar('/errores')} className="h-10 text-[0.95rem]">
+            <TriangleAlert /> Errores del sistema
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={salir} className="h-10 text-[0.95rem]">

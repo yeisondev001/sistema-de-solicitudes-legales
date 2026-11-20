@@ -19,6 +19,7 @@ import Modelos from '@/pages/modelos'
 import Redactar from '@/pages/redactar'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
+import Errores from '@/pages/errores'
 
 export default function App() {
   // undefined: todavía se está preguntando al servidor si hay sesión
@@ -112,6 +113,7 @@ export default function App() {
             <Route path="redaccion/*" element={<Navigate to="/" replace />} />
           )}
           {sesion.perfil.es_admin && <Route path="usuarios" element={<Usuarios />} />}
+          {sesion.perfil.es_admin && <Route path="errores" element={<Errores />} />}
           {/* siempre: al aceptar una invitación se llega aquí antes de que se vuelva a leer la cuenta */}
           <Route path="oficina" element={<MiOficina />} />
           <Route path="expedientes" element={<Expedientes />} />

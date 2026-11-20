@@ -184,6 +184,11 @@ _MIGRACIONES = {
             doc_id BIGINT NOT NULL,
             nombre TEXT NOT NULL,
             PRIMARY KEY (expediente_id, usuario_id, doc_id))""",
+        # los errores del servidor, para el panel del administrador (solo los últimos 200; sin documentos ni datos de personas)
+        """CREATE TABLE IF NOT EXISTS errores (
+            id BIGSERIAL PRIMARY KEY,
+            fecha BIGINT NOT NULL,
+            metodo TEXT, ruta TEXT, tipo TEXT, mensaje TEXT, detalle TEXT)""",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -276,6 +281,11 @@ _MIGRACIONES = {
             doc_id INTEGER NOT NULL,
             nombre TEXT NOT NULL,
             PRIMARY KEY (expediente_id, usuario_id, doc_id))""",
+        # los errores del servidor, para el panel del administrador (solo los últimos 200; sin documentos ni datos de personas)
+        """CREATE TABLE IF NOT EXISTS errores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha INTEGER NOT NULL,
+            metodo TEXT, ruta TEXT, tipo TEXT, mensaje TEXT, detalle TEXT)""",
     ],
 }
 _tablas_listas = False
@@ -379,6 +389,24 @@ def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = F
     email = _validar_email(email) if email.strip() else None
     _ejecutar("INSERT INTO usuarios (usuario, nombre, clave, es_admin, email, plantillas) VALUES (%s, %s, %s, %s, %s, %s)",
               (usuario, nombre.strip(), _hash(clave), es_admin, email, plantillas))
+
+
+MAX_ERRORES = 200
+
+
+def registrar_error(metodo: str, ruta: str, tipo: str, mensaje: str, detalle: str):
+    """Guarda un error del servidor para el panel. Solo guarda cuál fue y dónde: nada de lo que el abogado subió."""
+    _ejecutar("INSERT INTO errores (fecha, metodo, ruta, tipo, mensaje, detalle) VALUES (%s, %s, %s, %s, %s, %s)",
+              (int(time.time()), metodo[:10], ruta[:200], tipo[:100], mensaje[:300], detalle[-4000:]))
+    _ejecutar("DELETE FROM errores WHERE id NOT IN (SELECT id FROM errores ORDER BY id DESC LIMIT %s)", (MAX_ERRORES,))
+
+
+def listar_errores() -> list:
+    return _ejecutar("SELECT id, fecha, metodo, ruta, tipo, mensaje, detalle FROM errores ORDER BY id DESC", leer=True)
+
+
+def borrar_errores():
+    _ejecutar("DELETE FROM errores")
 
 
 def listar_usuarios() -> list:
