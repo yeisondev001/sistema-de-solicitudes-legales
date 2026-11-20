@@ -50,6 +50,10 @@ export function PiePublico() {
           <p className="max-w-xs text-[0.92rem] text-ink-soft">
             La oficina digital del abogado dominicano. Herramienta de apoyo: no sustituye el criterio del abogado.
           </p>
+          <p className="text-[0.92rem] text-ink-soft">
+            Soporte:{' '}
+            <a href="mailto:soportepapiniano@gmail.com" className="font-bold text-marca-texto hover:underline">soportepapiniano@gmail.com</a>
+          </p>
         </div>
         {COLUMNAS.map(([titulo, enlaces]) => (
           <nav key={titulo} aria-label={titulo} className="space-y-3">

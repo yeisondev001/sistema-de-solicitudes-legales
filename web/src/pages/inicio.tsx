@@ -115,7 +115,7 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 // 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
 const planes = (p: Prueba) => [
   {
-    nombre: 'Aspirante', quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 25, anual: 250,
+    nombre: 'Aspirante', tiene: false, quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 25, anual: 250,
     puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
     // lo que el Aspirante no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
@@ -123,13 +123,13 @@ const planes = (p: Prueba) => [
     boton: 'Elegir Aspirante', a: '/entrar',
   },
   {
-    nombre: 'Abogado', quien: 'PARA EL DÍA A DÍA', para: 'Para el abogado que litiga y redacta cada semana, con sus casos y su agenda.', mensual: 50, anual: 500, destacado: true,
+    nombre: 'Abogado', tiene: true, quien: 'PARA EL DÍA A DÍA', para: 'Para el abogado que litiga y redacta cada semana, con sus casos y su agenda.', mensual: 50, anual: 500, destacado: true,
     puntos: ['Todo lo del Aspirante, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
       'Sus documentos en el buscador', 'Expedientes y agenda de audiencias y plazos'],
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
-    nombre: 'Buffet', quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 200,
+    nombre: 'Buffet', tiene: true, quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 200,
     nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
@@ -137,6 +137,10 @@ const planes = (p: Prueba) => [
     boton: 'Hablar con nosotros', a: '/contacto',
   },
 ]
+
+/** Casos de éxito. Agregue aquí solo lo que de verdad dijo un abogado, con su permiso para publicarlo, por ejemplo:
+ *  { nombre: 'Lic. Nombre Apellido', cargo: 'Abogado litigante, Santo Domingo', texto: 'Lo que dijo, tal cual.' } */
+const TESTIMONIOS: { nombre: string; cargo: string; texto: string }[] = []
 
 const preguntas = (p: Prueba): [string, string][] => [
   ['¿Papiniano reemplaza al abogado?',
@@ -167,6 +171,7 @@ const preguntas = (p: Prueba): [string, string][] => [
 export default function Inicio() {
   useTitulo('Papiniano · Asistente jurídico con IA para abogados dominicanos')
   const [prueba, setPrueba] = useState(PRUEBA_INICIAL)
+  const [anual, setAnual] = useState(false)
   useEffect(() => {
     api
       .get<Entrada>('/api/entrada')
@@ -342,6 +347,24 @@ export default function Inicio() {
           </p>
         </section>
 
+        {/* casos de éxito: solo con testimonios reales y con permiso de quien los dio; vacío, la sección no se muestra */}
+        {TESTIMONIOS.length > 0 && (
+          <section id="casos" className="mx-auto max-w-[1240px] scroll-mt-20 space-y-10 px-5 py-16 md:px-6 md:py-20">
+            <Encabezado antetitulo="CASOS DE ÉXITO" titulo="Lo que dicen los abogados que ya lo usan." />
+            <div className="grid gap-5 md:grid-cols-3">
+              {TESTIMONIOS.map((t) => (
+                <figure key={t.nombre} className="flex flex-col gap-4 rounded-2xl border border-papel-borde bg-card p-7">
+                  <blockquote className="text-[1.05rem] leading-relaxed text-ink">“{t.texto}”</blockquote>
+                  <figcaption className="mt-auto">
+                    <p className="font-bold text-ink">{t.nombre}</p>
+                    <p className="text-[0.92rem] text-ink-soft">{t.cargo}</p>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* planes */}
         <section id="planes" className="scroll-mt-20 bg-panel text-sobre-panel">
           <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
@@ -350,6 +373,25 @@ export default function Inicio() {
               <p className="text-[1.05rem] text-[#E2C9A8]">
                 Todos empiezan con {prueba.dias} días gratis, con todo incluido y sin tarjeta. Después elige su plan.
               </p>
+            </div>
+            <div role="group" aria-label="Cómo quiere pagar" className="inline-flex items-center gap-3 rounded-full bg-[#4A3527] p-1.5 pr-4">
+              <div className="flex rounded-full">
+                {([['Mensual', false], ['Anual', true]] as const).map(([texto, valor]) => (
+                  <button
+                    key={texto}
+                    type="button"
+                    aria-pressed={anual === valor}
+                    onClick={() => setAnual(valor)}
+                    className={cn(
+                      'rounded-full px-5 py-2 font-bold transition-colors',
+                      anual === valor ? 'bg-[#F1E8DA] text-[#7A1F2B]' : 'text-[#E2C9A8] hover:text-white',
+                    )}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[0.9rem] font-bold text-[#E2C29B]">2 meses gratis al año</span>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {planes(prueba).map((p) => (
@@ -372,13 +414,20 @@ export default function Inicio() {
                   </div>
                   <div>
                     <p className="text-[2.1rem] font-bold">
-                      US${p.mensual} <span className="text-base font-normal text-[#E2C9A8]">al mes</span>
+                      {anual && p.anual ? `US$${p.anual}` : `US$${p.mensual}`}{' '}
+                      <span className="text-base font-normal text-[#E2C9A8]">{anual && p.anual ? 'al año' : 'al mes'}</span>
                     </p>
                     {p.anual ? (
-                      <p className="text-[0.92rem] text-[#E2C9A8]">
-                        O US${p.anual} al año:{' '}
-                        <strong className="text-[#F1E8DA]">ahorra US${p.mensual * 12 - p.anual}</strong>.
-                      </p>
+                      anual ? (
+                        <p className="text-[0.92rem] text-[#E2C9A8]">
+                          <strong className="rounded bg-[#F1E8DA] px-2 py-0.5 text-[#7A1F2B]">Ahorra US${p.mensual * 12 - p.anual}</strong>{' '}
+                          frente a pagar mes a mes.
+                        </p>
+                      ) : (
+                        <p className="text-[0.92rem] text-[#E2C9A8]">
+                          Con el plan anual ahorra <strong className="text-[#F1E8DA]">US${p.mensual * 12 - p.anual}</strong>.
+                        </p>
+                      )
                     ) : (
                       <p className="text-[0.92rem] text-[#E2C9A8]">{p.nota}</p>
                     )}
@@ -387,6 +436,11 @@ export default function Inicio() {
                     <p className="text-[0.85rem] font-bold tracking-[0.12em] text-[#E2C29B]">{p.quien}</p>
                     <p className="mt-1 text-[1.05rem] text-[#F1E8DA]">{p.para}</p>
                   </div>
+                  {/* la diferencia que más pesa entre el Aspirante y los otros dos, a la vista sin abrir nada */}
+                  <p className={cn('flex items-center gap-2 font-bold', p.tiene ? 'text-[#F1E8DA]' : 'text-[#E2C9A8] line-through decoration-1')}>
+                    {p.tiene ? <Check className="size-5 shrink-0 text-[#E2C29B]" /> : <X className="size-5 shrink-0 no-underline" />}
+                    Expedientes y agenda
+                  </p>
                   <details className="group border-t border-[#6B5442] pt-3.5">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-bold text-[#F1E8DA] [&::-webkit-details-marker]:hidden">
                       Ver qué incluye
@@ -435,7 +489,8 @@ export default function Inicio() {
           <div className="space-y-3">
             <Encabezado antetitulo="PREGUNTAS FRECUENTES" titulo="Lo que preguntan los abogados antes de empezar." />
             <p className="text-ink-soft">
-              ¿Otra duda? <Link to="/contacto" className="font-bold text-marca-texto hover:underline">Escríbanos</Link>.
+              ¿Otra duda? <Link to="/contacto" className="font-bold text-marca-texto hover:underline">Escríbanos</Link> a{' '}
+              <a href="mailto:soportepapiniano@gmail.com" className="font-bold text-marca-texto hover:underline">soportepapiniano@gmail.com</a>.
             </p>
           </div>
           <Accordion type="single" collapsible className="rounded-2xl border border-papel-borde bg-card px-5 md:px-6">
