@@ -157,7 +157,11 @@ export default function Calculadora() {
                       más ({pesos(calculo.vacacionesUltimoAnio * calculo.diario)}) (arts. 177 y 182).
                     </li>
                   )}
-                  <li>La regalía pascual (salario de Navidad) no puede pasar de cinco salarios mínimos (art. 219).</li>
+                  <li>
+                    La regalía pascual (salario de Navidad) no puede pasar de cinco salarios mínimos (art. 219). ¿Solo la
+                    regalía? Use la{' '}
+                    <a href="/calculadora-regalia-pascual" className="font-semibold text-marca-texto underline">calculadora de regalía pascual</a>.
+                  </li>
                   <li>
                     No incluye la indemnización del art. 95 (hasta 6 meses de salario, solo si un tribunal declara
                     injustificado el despido) ni la participación en los beneficios de la empresa.

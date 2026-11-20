@@ -1626,6 +1626,19 @@ PAGINAS_PUBLICAS = {
         "cinco años o más.</p>"
         '<p>Hecha por <a href="https://papinianord.com/">Papiniano</a>, el asistente jurídico con IA para abogados '
         "dominicanos.</p>"),
+    "calculadora-regalia-pascual": (
+        "Calculadora de regalía pascual RD · Papiniano",
+        "Calcule gratis su regalía pascual (salario de Navidad): la doceava parte de lo ganado en el año, según el Código "
+        "de Trabajo. Se paga a más tardar el 20 de diciembre.",
+        "<h1>Calculadora de regalía pascual de República Dominicana</h1>"
+        "<p>Calcula gratis, sin registrarse, la regalía pascual o salario de Navidad: la duodécima parte del salario "
+        "ordinario ganado en el año calendario (art. 219 del Código de Trabajo), en proporción al tiempo trabajado si no "
+        "trabajó todo el año (art. 220). Se paga a más tardar el 20 de diciembre, aunque el contrato haya terminado antes. "
+        "No paga impuesto sobre la renta (art. 222) y no puede pasar de cinco salarios mínimos (art. 219). No cuentan las "
+        "horas extra ni la participación en los beneficios.</p>"
+        '<p>Hecha por <a href="https://papinianord.com/">Papiniano</a>, el asistente jurídico con IA para abogados '
+        "dominicanos. También: <a href=\"https://papinianord.com/calculadora-prestaciones-laborales\">calculadora de "
+        "prestaciones laborales</a>.</p>"),
     "terminos": ("Términos de servicio · Papiniano", "Las condiciones de uso de Papiniano.", None),
     "privacidad": ("Política de privacidad · Papiniano",
                    "Qué datos guarda Papiniano, para qué, y cómo pedir verlos o borrarlos (Ley 172-13).", None),
@@ -1644,6 +1657,36 @@ PAGINA_404 = ("Página no encontrada · Papiniano", "Esta dirección no existe e
               '<a href="https://papinianord.com/calculadora-prestaciones-laborales">Calculadora de prestaciones</a> · '
               '<a href="https://papinianord.com/contacto">Contacto</a></p>')
 NO_404 = object()   # la clave de la 404 en _INDICE
+
+
+def _ruta_migas(*pasos) -> dict:
+    """La ficha BreadcrumbList (Inicio › … › página) que Google muestra en el resultado en lugar de la dirección."""
+    base = (os.environ.get("APP_URL") or "https://papinianord.com").rstrip("/")
+    return {"@type": "BreadcrumbList", "itemListElement": [
+        {"@type": "ListItem", "position": i + 1, "name": nombre, "item": base + ruta}
+        for i, (nombre, ruta) in enumerate((("Inicio", "/"),) + pasos)]}
+
+
+def _ficha_calculadora(nombre: str, ruta: str, descripcion: str) -> dict:
+    base = (os.environ.get("APP_URL") or "https://papinianord.com").rstrip("/")
+    return {"@context": "https://schema.org", "@graph": [
+        {"@type": "WebApplication", "name": nombre, "url": base + ruta, "description": descripcion,
+         "applicationCategory": "FinanceApplication", "operatingSystem": "Web", "inLanguage": "es-DO",
+         "isAccessibleForFree": True, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+         "areaServed": {"@type": "Country", "name": "República Dominicana"},
+         "publisher": {"@type": "Organization", "name": "Papiniano", "url": base + "/"}},
+        _ruta_migas((nombre, ruta))]}
+
+
+# las fichas se arman al pedir la página (usan APP_URL)
+DATOS_PAGINA = {
+    "calculadora-prestaciones-laborales": lambda: _ficha_calculadora(
+        "Calculadora de prestaciones laborales", "/calculadora-prestaciones-laborales",
+        "Preaviso, cesantía, vacaciones y regalía pascual según el Código de Trabajo dominicano."),
+    "calculadora-regalia-pascual": lambda: _ficha_calculadora(
+        "Calculadora de regalía pascual", "/calculadora-regalia-pascual",
+        "La regalía pascual o salario de Navidad según los arts. 219 a 222 del Código de Trabajo dominicano."),
+}
 _INDICE = {}
 
 
@@ -1683,8 +1726,9 @@ def _indice(ruta) -> str:
     if ruta not in _INDICE:
         es_404 = ruta is NO_404
         titulo, descripcion, resumen = PAGINA_404 if es_404 else PAGINAS_PUBLICAS[ruta]
+        datos = None if es_404 or ruta not in DATOS_PAGINA else DATOS_PAGINA[ruta]()
         _INDICE[ruta] = _pagina(titulo, descripcion, resumen, None if es_404 else f"{_origen()}/{ruta}",
-                                es_404 or ruta in NO_INDEXAR)
+                                es_404 or ruta in NO_INDEXAR, datos)
     return _INDICE[ruta]
 
 
@@ -1709,9 +1753,11 @@ def _blog_articulo_html(a: dict) -> str:
     if a["publicado"]:
         papiniano = {"@type": "Organization", "name": "Papiniano", "url": f"{_origen()}/",
                      "logo": {"@type": "ImageObject", "url": f"{_origen()}/apple-touch-icon.png"}}
-        ficha = {"@context": "https://schema.org", "@type": "Article", "headline": a["titulo"][:110],
-                 "description": a["descripcion"], "datePublished": a["fecha"], "dateModified": a["actualizado"],
-                 "inLanguage": "es-DO", "mainEntityOfPage": direccion, "author": papiniano, "publisher": papiniano}
+        ficha = {"@context": "https://schema.org", "@graph": [
+            {"@type": "Article", "headline": a["titulo"][:110], "description": a["descripcion"],
+             "datePublished": a["fecha"], "dateModified": a["actualizado"], "inLanguage": "es-DO",
+             "mainEntityOfPage": direccion, "author": papiniano, "publisher": papiniano},
+            _ruta_migas(("Blog", "/blog"), (a["titulo"], f"/blog/{a['slug']}"))]}
     cuerpo = f'<article><h1>{escape(a["titulo"])}</h1>{a["html"]}</article>'
     return _pagina(f'{a["titulo_seo"]} · Papiniano', a["descripcion"], cuerpo, direccion, not a["publicado"], ficha)
 
@@ -1735,7 +1781,8 @@ def blog_articulo(slug: str):
 def sitemap():
     """La lista de páginas para Google: las públicas fijas y los artículos publicados del blog (se arma sola)."""
     base = _origen()
-    paginas = [("/", "weekly", "1.0", None), ("/calculadora-prestaciones-laborales", "monthly", "0.9", None)]
+    paginas = [("/", "weekly", "1.0", None), ("/calculadora-prestaciones-laborales", "monthly", "0.9", None),
+               ("/calculadora-regalia-pascual", "monthly", "0.9", None)]
     publicados = blog.articulos()
     if publicados:
         paginas.append(("/blog", "weekly", "0.8", publicados[0]["actualizado"]))

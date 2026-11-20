@@ -6,6 +6,7 @@ import { aplicarColores, aplicarLetra } from '@/lib/tema'
 import type { Perfil } from '@/lib/tipos'
 import { ArticuloBlog, Blog } from '@/pages/blog'
 import Calculadora from '@/pages/calculadora'
+import CalculadoraRegalia from '@/pages/calculadora-regalia'
 import Entrada from '@/pages/entrada'
 import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
@@ -110,6 +111,7 @@ export default function App() {
       <Route key={p} path={p} element={<Legal pagina={p} />} />
     )),
     <Route key="calculadora" path="calculadora-prestaciones-laborales" element={<Calculadora />} />,
+    <Route key="regalia" path="calculadora-regalia-pascual" element={<CalculadoraRegalia />} />,
     <Route key="blog" path="blog" element={<Blog />} />,
     <Route key="articulo" path="blog/:slug" element={<ArticuloBlog />} />,
   ]

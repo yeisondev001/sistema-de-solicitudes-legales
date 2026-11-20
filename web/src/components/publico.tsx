@@ -37,7 +37,7 @@ const ANIO = new Date().getFullYear()
 
 const COLUMNAS: [string, [string, string][]][] = [
   ['Producto', [['Qué lee', '/#fuentes'], ['Qué hay adentro', '/#salas'], ['Cómo funciona', '/#como'], ['Planes', '/#planes']]],
-  ['Ayuda', [['Preguntas frecuentes', '/#preguntas'], ['Calculadora de prestaciones', '/calculadora-prestaciones-laborales'], ['Contacto', '/contacto']]],
+  ['Ayuda', [['Preguntas frecuentes', '/#preguntas'], ['Calculadora de prestaciones', '/calculadora-prestaciones-laborales'], ['Calculadora de regalía pascual', '/calculadora-regalia-pascual'], ['Contacto', '/contacto']]],
   ['Legal', [['Términos de servicio', '/terminos'], ['Privacidad', '/privacidad'], ['Política de reembolso', '/reembolso']]],
 ]
 
