@@ -52,6 +52,21 @@ FUENTES_PERMITIDAS = (
 app = FastAPI(title="Papiniano", docs_url=None, redoc_url=None, openapi_url=None)
 
 
+@app.middleware("http")
+async def _cabeceras_de_seguridad(request: Request, call_next):
+    """Cabeceras que cierran puertas comunes: que otra página no meta esta en un marco (clickjacking), que el
+    navegador no adivine tipos de archivo, que no regale la dirección completa al salir y que solo se pueda usar
+    el micrófono desde aquí (el dictado). En https, que el navegador no vuelva a pedir http."""
+    r = await call_next(request)
+    r.headers.setdefault("X-Content-Type-Options", "nosniff")
+    r.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    r.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    r.headers.setdefault("Permissions-Policy", "microphone=(self), camera=(), geolocation=(), payment=()")
+    if SEGURO:
+        r.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return r
+
+
 @app.exception_handler(Exception)
 async def _error_inesperado(request: Request, ex: Exception):
     """Un fallo que no previmos: queda en el registro y en el panel «Errores» del administrador, y el abogado ve un
