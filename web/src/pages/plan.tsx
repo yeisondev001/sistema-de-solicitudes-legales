@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Check, ExternalLink, Loader2, LogOut } from 'lucide-react'
+import { ExternalLink, Loader2, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { Logo } from '@/components/logo'
 import { TituloSala } from '@/components/oficina'
 import { Button } from '@/components/ui/button'
 import { api, ErrorApi } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
-import { cn } from '@/lib/utils'
+import { claseBotonPlan, InterruptorCiclo, TarjetaPlan } from '@/components/tarjeta-plan'
 import { planes, PRUEBA_INICIAL } from '@/pages/inicio'
 
 const NOMBRE_PLAN: Record<string, string> = {
@@ -32,9 +32,9 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
 
   // viene de «Elegir plan» de la página pública: se abre directo el pago de ese plan
   useEffect(() => {
-    if (!activo || yaIntentado.current || (elegido !== 'aspirante' && elegido !== 'buffet')) return
+    if (!activo || yaIntentado.current || (elegido !== 'aspirante' && elegido !== 'abogado' && elegido !== 'buffet')) return
     yaIntentado.current = true
-    void ir('/api/pagos/pagar', { plan: elegido, ciclo: params.get('ciclo') === 'anual' ? 'año' : 'mes' }, elegido === 'buffet' ? 'Buffet' : 'Aspirante')
+    void ir('/api/pagos/pagar', { plan: elegido, ciclo: params.get('ciclo') === 'anual' ? 'año' : 'mes' }, elegido === 'buffet' ? 'Buffet' : elegido === 'abogado' ? 'Abogado' : 'Aspirante')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, elegido])
 
@@ -88,65 +88,34 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
         </p>
       )}
 
-      <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-papel-borde bg-card p-1.5 pr-4" role="group" aria-label="Cómo quiere pagar">
-        {([['Mensual', false], ['Anual', true]] as const).map(([texto, valor]) => (
-          <button
-            key={texto}
-            type="button"
-            aria-pressed={anual === valor}
-            onClick={() => setAnual(valor)}
-            className={cn('rounded-full px-5 py-2 font-bold', anual === valor ? 'bg-boton text-sobre-boton' : 'text-ink-soft hover:text-ink')}
-          >
-            {texto}
-          </button>
-        ))}
-        <span className="text-[0.9rem] font-bold text-marca-texto">2 meses gratis al año</span>
-      </div>
-
-      <div className="grid gap-5 md:grid-cols-3">
-        {planes(PRUEBA_INICIAL).filter((p) => !duenoDeOficina || p.nombre === 'Buffet').map((p) => {
-          const plan = PLAN_DE[p.nombre]
-          const esMio = plan === 'buffet' ? duenoDeOficina && perfil.plan === 'activo' : plan === perfil.plan && !perfil.oficina
-          const precio = anual && p.anual ? p.anual : p.mensual
-          return (
-            <div key={p.nombre} className={cn('flex flex-col gap-3 rounded-2xl border bg-card p-6', p.destacado ? 'border-2 border-marca' : 'border-papel-borde')}>
-              <div>
-                <h3 className="font-heading text-[1.6rem] font-medium text-ink">{p.nombre}</h3>
-                <p className="text-ink-soft">{p.para}</p>
-              </div>
-              <p className="text-[2rem] font-bold text-ink">
-                US${precio} <span className="text-base font-normal text-ink-soft">{anual && p.anual ? 'al año' : 'al mes'}</span>
-              </p>
-              {anual && p.anual && (
-                <p className="text-[0.92rem] font-bold text-marca-texto">Ahorra US${p.mensual * 12 - p.anual} al año</p>
-              )}
-              <ul className="space-y-2 text-ink">
-                {p.puntos.map((x) => (
-                  <li key={x} className="flex gap-2.5">
-                    <Check className="mt-1 size-4 shrink-0 text-marca-texto" />
-                    {x}
-                  </li>
-                ))}
-              </ul>
-              {plan ? (
-                <Button
-                  className="mt-auto h-12 text-base"
-                  variant={p.destacado ? 'default' : 'outline'}
-                  disabled={!activo || esMio || !!enCurso}
-                  onClick={() => ir('/api/pagos/pagar', { plan: p.nombre.toLowerCase(), ciclo: anual ? 'año' : 'mes' }, p.nombre)}
-                >
-                  {enCurso === p.nombre ? <Loader2 className="animate-spin" /> : null}
-                  {esMio ? 'Su plan actual' : `Elegir ${p.nombre}`}
-                </Button>
-              ) : (
-                <Button asChild variant="outline" className="mt-auto h-12 text-base">
-                  <Link to="/contacto">Hablar con nosotros</Link>
-                </Button>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <section className="rounded-3xl bg-panel px-5 py-8 text-sobre-panel md:px-8 md:py-10">
+        <div className="mb-8">
+          <InterruptorCiclo anual={anual} setAnual={setAnual} />
+        </div>
+        <div className="grid gap-5 md:grid-cols-3">
+          {planes(PRUEBA_INICIAL).filter((p) => !duenoDeOficina || p.nombre === 'Buffet').map((p) => {
+            const plan = PLAN_DE[p.nombre]
+            const esMio = plan === 'buffet' ? duenoDeOficina && perfil.plan === 'activo' : plan === perfil.plan && !perfil.oficina
+            return (
+              <TarjetaPlan
+                key={p.nombre}
+                p={p}
+                anual={anual}
+                accion={
+                  <button
+                    type="button"
+                    className={claseBotonPlan(p.destacado)}
+                    disabled={!activo || esMio || !!enCurso}
+                    onClick={() => ir('/api/pagos/pagar', { plan: p.nombre.toLowerCase(), ciclo: anual ? 'año' : 'mes' }, p.nombre)}
+                  >
+                    {enCurso === p.nombre ? <Loader2 className="mx-auto size-5 animate-spin" /> : esMio ? 'Su plan actual' : `Elegir ${p.nombre}`}
+                  </button>
+                }
+              />
+            )
+          })}
+        </div>
+      </section>
 
       {paga && !soloPagar && (
         <div className="mt-8 rounded-2xl border border-papel-borde bg-card p-6">

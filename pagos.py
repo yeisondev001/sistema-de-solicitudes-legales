@@ -13,6 +13,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 
@@ -57,7 +58,13 @@ def _pedir(metodo: str, ruta: str, **datos) -> dict:
     except httpx.HTTPError:
         raise ErrorPago("No se pudo conectar con Polar. Intente en un momento.")
     if r.status_code >= 400:
-        raise ErrorPago("Polar no pudo completar la operación. Intente en un momento.")
+        # solo el código y lo que Polar contesta (nunca el token): para saber si es el token (401), un permiso (403) o los datos (422)
+        logging.getLogger("papiniano").warning("Polar %s %s → %s %s", metodo, ruta, r.status_code, r.text[:300])
+        try:
+            cuentas.registrar_error(metodo, "polar" + ruta, f"Polar {r.status_code}", r.text[:300], "")
+        except Exception:
+            pass
+        raise ErrorPago(f"Polar no pudo completar la operación (código {r.status_code}). Escríbanos a soportepapiniano@gmail.com si sigue.")
     return r.json()
 
 

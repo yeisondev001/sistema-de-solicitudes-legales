@@ -30,7 +30,7 @@ export default function Entrada({ alEntrar }: { alEntrar: (p: Perfil) => void })
     // (por Google la página se recarga, por eso va a sessionStorage y no en la dirección)
     const q = new URLSearchParams(window.location.search)
     const plan = q.get('plan')
-    if (plan === 'aspirante' || plan === 'buffet') {
+    if (plan === 'aspirante' || plan === 'abogado' || plan === 'buffet') {
       try {
         sessionStorage.setItem('plan_elegido', JSON.stringify({ plan, ciclo: q.get('ciclo') === 'anual' ? 'anual' : 'mensual' }))
       } catch {
