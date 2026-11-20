@@ -35,7 +35,7 @@ function ultimoUso(dia?: string | null) {
 }
 
 /**
- * «Mi oficina» (plan Despacho): quiénes están y los modelos que comparten. El dueño agrega abogados por su
+ * «Mi oficina» (plan Buffet): quiénes están y los modelos que comparten. El dueño agrega abogados por su
  * correo, ve cuánto usa cada uno (nunca lo que pregunta) y los puede quitar; los demás pueden salir.
  */
 export default function MiOficinaPagina() {
@@ -82,7 +82,7 @@ export default function MiOficinaPagina() {
   const ocupados = o ? o.abogados.length + o.pendientes.length : 0
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 md:px-8 md:py-8">
-      <TituloSala titulo="Mi oficina" sub={o ? `${o.nombre} · plan Despacho` : 'Plan Despacho: varios abogados, una sola factura.'} />
+      <TituloSala titulo="Mi oficina" sub={o ? `${o.nombre} · plan Buffet` : 'Plan Buffet: varios abogados, una sola factura.'} />
       {error ? (
         <p className="text-destructive" role="alert">{error}</p>
       ) : !datos ? (
@@ -93,7 +93,7 @@ export default function MiOficinaPagina() {
           {!datos.invitaciones.length && (
             <Seccion titulo="No está en ninguna oficina">
               <p className="text-ink">
-                Con el plan Despacho, varios abogados trabajan en una misma oficina y pagan una sola factura. Si su
+                Con el plan Buffet, varios abogados trabajan en una misma oficina y pagan una sola factura. Si su
                 oficina lo quiere, escríbanos desde Contacto.
               </p>
             </Seccion>

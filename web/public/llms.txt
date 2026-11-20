@@ -18,14 +18,14 @@ de la computadora, la tableta y el celular, sin instalar nada · Contacto: sopor
 - **Biblioteca:** el Boletín Judicial, los códigos y las leyes, y los documentos propios del abogado (solo él los ve).
 - **Expedientes:** una carpeta por caso con cliente, tribunal, contraparte, fechas, escritos y documentos.
 - **Agenda:** audiencias, plazos y reuniones, con aviso de lo que viene en la semana.
-- **Oficinas:** en el plan Despacho, varios abogados comparten expedientes y agenda.
+- **Oficinas:** en el plan Buffet, varios abogados comparten expedientes y agenda.
 
 ## Planes (en dólares)
 
-- **Básico:** US$25 al mes o US$250 al año. Para consultar sentencias y leyes, con pocos escritos al mes.
+- **Aspirante:** US$25 al mes o US$250 al año. Para consultar sentencias y leyes, con pocos escritos al mes.
 - **Abogado:** US$50 al mes o US$500 al año. Para el trabajo de todos los días: más consultas y escritos, modelos y
   documentos propios, expedientes y agenda.
-- **Despacho:** US$200 al mes, para hasta 10 abogados, el dueño incluido.
+- **Buffet:** US$200 al mes, para hasta 10 abogados, el dueño incluido.
 
 ## Privacidad
 

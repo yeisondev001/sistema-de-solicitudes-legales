@@ -4,7 +4,7 @@ Expedientes y agenda
 Un expediente es la carpeta de un caso: el cliente, el asunto, el número, el tribunal, la contraparte, quién lo
 lleva y unas notas. La agenda son las fechas (audiencias, plazos, reuniones), de un expediente o sueltas.
 
-En una oficina (plan Despacho) los dos son de la oficina: todos sus abogados ven y cambian los mismos, y cada cosa
+En una oficina (plan Buffet) los dos son de la oficina: todos sus abogados ven y cambian los mismos, y cada cosa
 dice quién la lleva. Fuera de una oficina, cada abogado ve solo lo suyo. Si un abogado sale de la oficina, lo de la
 oficina se queda en ella; si se cierra la oficina, cada cosa vuelve a quien la creó (cuentas.borrar_oficina).
 

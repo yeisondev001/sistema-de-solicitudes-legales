@@ -181,9 +181,9 @@ export default function Calculadora() {
               caso y le redacta el escrito en Word.
             </p>
           </div>
-          <Link to="/entrar" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
+          <a href="/#planes" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
             Pruébelo 5 días gratis
-          </Link>
+          </a>
         </section>
 
         {/* la explicación: para quien quiere entender el cálculo, y para que Google sepa de qué trata la página */}

@@ -81,7 +81,7 @@ def _perfil(u: dict) -> dict:
     perfil["letra"] = u.get("letra") or "normal"
     perfil["propios"] = cuentas.con_propios(u["plan"])
     perfil["prueba"] = perfil["basico"] = None
-    # la cajita de lo que le queda: solo en la prueba y en el Básico (el Abogado no ve su tope)
+    # la cajita de lo que le queda: solo en la prueba y en el Aspirante (el Abogado no ve su tope)
     tope = cuentas.tope_diario(u["plan"]) if u["plan"] in ("prueba", "basico") else None
     if tope:
         try:
@@ -288,9 +288,9 @@ def audiencias(u=Depends(usuario_actual)):
 
 
 # ── ASISTENTE ────────────────────────────────────
-# el plan Básico redacta pocos escritos al mes y solo con los modelos de todos: sus propios modelos y
+# el plan Aspirante redacta pocos escritos al mes y solo con los modelos de todos: sus propios modelos y
 # documentos son del plan Abogado
-SIN_PROPIOS = ("Sus propios modelos y documentos vienen con el plan Abogado. Con el plan Básico puede usar "
+SIN_PROPIOS = ("Sus propios modelos y documentos vienen con el plan Abogado. Con el plan Aspirante puede usar "
                "nuestros modelos. Para pasar al plan Abogado, escríbanos.")
 
 
@@ -782,7 +782,7 @@ class TextoEscrito(BaseModel):
 
 
 def con_propios(u=Depends(usuario_actual)) -> dict:
-    """Sus propios modelos y documentos: todos los planes menos el Básico."""
+    """Sus propios modelos y documentos: todos los planes menos el Aspirante."""
     if not cuentas.con_propios(u["plan"]):
         raise HTTPException(403, SIN_PROPIOS)
     return u
@@ -1154,7 +1154,7 @@ def oficina_borrar(oid: int, u=Depends(solo_admin)):
     return {"ok": True}
 
 
-# ── MI OFICINA (plan Despacho) ───────────────────
+# ── MI OFICINA (plan Buffet) ───────────────────
 def _mi_oficina(u: dict) -> dict:
     """Su oficina (None si no tiene) y las oficinas que lo agregaron y esperan que acepte."""
     return {"oficina": cuentas.mi_oficina(u["id"]), "invitaciones": cuentas.invitaciones_de(u)}
@@ -1216,7 +1216,7 @@ def oficina_salir(u=Depends(usuario_actual)):
 
 
 # ── EXPEDIENTES Y AGENDA ─────────────────────────
-# Del plan Abogado y del Despacho (en una oficina, compartidos por todos sus abogados): el Básico no los trae.
+# Del plan Abogado y del Buffet (en una oficina, compartidos por todos sus abogados): el Aspirante no los trae.
 SIN_EXPEDIENTES = "Expedientes y Agenda vienen con el plan Abogado. Para pasar al plan Abogado, escríbanos."
 
 
@@ -1381,7 +1381,7 @@ PAGINAS_PUBLICAS = {
     "privacidad": ("Política de privacidad · Papiniano",
                    "Qué datos guarda Papiniano, para qué, y cómo pedir verlos o borrarlos (Ley 172-13).", None),
     "reembolso": ("Política de reembolso · Papiniano", "Cuándo y cómo se devuelve un pago de Papiniano.", None),
-    "contacto": ("Contacto · Papiniano", "Escríbale a Papiniano: preguntas, el plan Despacho o algo que no funciona.", None),
+    "contacto": ("Contacto · Papiniano", "Escríbale a Papiniano: preguntas, el plan Buffet o algo que no funciona.", None),
     "entrar": ("Entrar · Papiniano", "Entre a Papiniano con su cuenta de Gmail o con su usuario y contraseña.", None),
 }
 _INDICE = {}

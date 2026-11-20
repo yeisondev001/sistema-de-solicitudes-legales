@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Briefcase, CalendarDays, Check, FileStack, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, RotateCcw, Scale,
+  Briefcase, CalendarDays, Check, ChevronDown, FileStack, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, RotateCcw, Scale,
   ShieldCheck, Trash2, UserRound, X, type LucideIcon,
 } from 'lucide-react'
 import { Papiniano } from '@/components/papiniano'
@@ -108,28 +108,28 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
   { icono: Lock, titulo: 'Conexión cifrada', texto: 'Todo viaja cifrado entre su equipo y Papiniano.' },
 ]
 
-// Tres planes: el Básico para consultar, el Abogado que compra casi todos y el Despacho para oficinas. Los precios
+// Tres planes: el Aspirante para consultar, el Abogado que compra casi todos y el Buffet para oficinas. Los precios
 // se cambian aquí (en dólares, al mes y al año; lo que se ahorra al año sale de los dos) y en Lemon Squeezy, que es
 // quien cobra. El uso se describe con palabras, sin números ni «sin
-// límite» (lo decidió el dueño): los topes están en cuentas.py y la app avisa al llegar. El Despacho es para hasta
+// límite» (lo decidió el dueño): los topes están en cuentas.py y la app avisa al llegar. El Buffet es para hasta
 // 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
 const planes = (p: Prueba) => [
   {
-    nombre: 'Básico', para: 'Para consultar sentencias y leyes.', mensual: 25, anual: 250,
+    nombre: 'Aspirante', quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 25, anual: 250,
     puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
-    // lo que el Básico no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
+    // lo que el Aspirante no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
     faltan: ['Sus propios modelos de escritos', 'Subir sus propios documentos', 'Expedientes y agenda'],
-    boton: 'Elegir Básico', a: '/entrar',
+    boton: 'Elegir Aspirante', a: '/entrar',
   },
   {
-    nombre: 'Abogado', para: 'Para el trabajo de todos los días.', mensual: 50, anual: 500, destacado: true,
-    puntos: ['Todo lo del Básico, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
+    nombre: 'Abogado', quien: 'PARA EL DÍA A DÍA', para: 'Para el abogado que litiga y redacta cada semana, con sus casos y su agenda.', mensual: 50, anual: 500, destacado: true,
+    puntos: ['Todo lo del Aspirante, con muchas más consultas y escritos', 'Escritos en Word o PDF, con nuestros modelos y los suyos',
       'Sus documentos en el buscador', 'Expedientes y agenda de audiencias y plazos'],
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
-    nombre: 'Despacho', para: 'Para oficinas con varios abogados.', mensual: 200,
+    nombre: 'Buffet', quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 200,
     nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
@@ -148,12 +148,12 @@ const preguntas = (p: Prueba): [string, string][] => [
   ['¿Quién ve los documentos que subo?',
     'Solo usted. Se usan para buscar cuando usted pregunta, y los puede quitar cuando quiera. Le pedimos no escribir en las consultas datos personales de sus clientes.'],
   ['¿Qué pasa cuando termina la prueba gratis?',
-    `La prueba dura ${p.dias} días, con todo incluido, y no pide tarjeta. Al terminar, elige Básico, Abogado o Despacho para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
+    `La prueba dura ${p.dias} días, con todo incluido, y no pide tarjeta. Al terminar, elige Aspirante, Abogado o Buffet para seguir; si no, la cuenta queda en pausa y no se le cobra nada.`],
   ['¿Cómo se paga y cómo cancelo?',
     'Con tarjeta, a través de Lemon Squeezy, cada mes o una vez al año (el año sale a precio de diez meses). Puede cancelar cuando quiera desde su cuenta y conserva el acceso hasta el final del período pagado.'],
   ['¿Hay un límite de consultas?',
-    'Cada plan tiene un máximo de consultas por día y de escritos por mes, pensado para el trabajo normal de un abogado: el Básico es para consultar de vez en cuando y el Abogado alcanza para el trabajo de todos los días. Si llega al máximo, Papiniano le avisa y al día o al mes siguiente puede seguir.'],
-  ['¿Cómo funciona el plan Despacho?',
+    'Cada plan tiene un máximo de consultas por día y de escritos por mes, pensado para el trabajo normal de un abogado: el Aspirante es para consultar de vez en cuando y el Abogado alcanza para el trabajo de todos los días. Si llega al máximo, Papiniano le avisa y al día o al mes siguiente puede seguir.'],
+  ['¿Cómo funciona el plan Buffet?',
     'La oficina paga US$200 al mes y lo usan hasta 10 abogados, el dueño entre ellos. El dueño agrega a sus abogados con su correo y ve cuánto usa Papiniano cada uno, nunca lo que pregunta. Si su oficina tiene más de 10 abogados, escríbanos.'],
   ['¿Por qué se llama Papiniano?',
     'Por Emilio Papiniano (siglo III), el jurista más respetado de Roma: cuando los grandes juristas no se ponían de acuerdo, la ley mandaba seguir su opinión.'],
@@ -191,9 +191,9 @@ export default function Inicio() {
               las leyes, le muestra la página exacta de cada cita y le redacta el escrito.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <Link to="/entrar" className="rounded-lg bg-boton px-6 py-4 text-[1.05rem] font-bold text-sobre-boton hover:bg-boton/90">
+              <a href="/#planes" className="rounded-lg bg-boton px-6 py-4 text-[1.05rem] font-bold text-sobre-boton hover:bg-boton/90">
                 Empiece gratis
-              </Link>
+              </a>
               <a href="#como" className="rounded-lg border border-regla bg-card px-6 py-4 text-[1.05rem] font-bold text-ink hover:border-marca">
                 Ver cómo funciona
               </a>
@@ -355,16 +355,20 @@ export default function Inicio() {
               {planes(prueba).map((p) => (
                 <div
                   key={p.nombre}
-                  className={cn('flex flex-col gap-3.5 rounded-2xl p-7', p.destacado ? 'border-2 border-[#F1E8DA] bg-[#4A3527]' : 'border border-[#6B5442]')}
+                  className={cn(
+                    'relative flex flex-col gap-3.5 rounded-2xl p-7',
+                    p.destacado
+                      ? 'z-10 border-2 border-[#F1E8DA] bg-[#4A3527] pt-12 shadow-[0_18px_50px_rgba(0,0,0,0.55)] md:-my-5 md:scale-[1.04] md:py-12'
+                      : 'border border-[#6B5442]',
+                  )}
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-heading text-[1.75rem] font-medium">{p.nombre}</h3>
-                      {p.destacado && (
-                        <span className="shrink-0 rounded-full bg-[#F1E8DA] px-3 py-1 text-[0.8rem] font-bold whitespace-nowrap text-[#7A1F2B]">Recomendado</span>
-                      )}
+                  {p.destacado && (
+                    <div className="absolute inset-x-0 top-0 rounded-t-[0.9rem] bg-[#F1E8DA] py-2 text-center text-[0.85rem] font-bold tracking-[0.12em] text-[#7A1F2B]">
+                      EL MÁS ELEGIDO
                     </div>
-                    <p className="text-[#E2C9A8]">{p.para}</p>
+                  )}
+                  <div>
+                    <h3 className="font-heading text-[1.75rem] font-medium">{p.nombre}</h3>
                   </div>
                   <div>
                     <p className="text-[2.1rem] font-bold">
@@ -379,27 +383,37 @@ export default function Inicio() {
                       <p className="text-[0.92rem] text-[#E2C9A8]">{p.nota}</p>
                     )}
                   </div>
-                  <ul className="space-y-2 text-[#F1E8DA]">
-                    {p.puntos.map((x) => (
-                      <li key={x} className="flex gap-2.5">
-                        <Check className="mt-1 size-4 shrink-0 text-[#E2C29B]" />
-                        {x}
-                      </li>
-                    ))}
-                  </ul>
-                  {p.faltan && (
-                    <div className="border-t border-[#6B5442] pt-3.5">
-                      <p className="text-[0.8rem] font-bold tracking-[0.12em] text-[#E2C9A8]">NO INCLUYE</p>
-                      <ul className="mt-2 space-y-2 text-[#E2C9A8]">
-                        {p.faltan.map((x) => (
-                          <li key={x} className="flex gap-2.5">
-                            <X className="mt-1 size-4 shrink-0" />
-                            {x}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-[0.85rem] font-bold tracking-[0.12em] text-[#E2C29B]">{p.quien}</p>
+                    <p className="mt-1 text-[1.05rem] text-[#F1E8DA]">{p.para}</p>
+                  </div>
+                  <details className="group border-t border-[#6B5442] pt-3.5">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-bold text-[#F1E8DA] [&::-webkit-details-marker]:hidden">
+                      Ver qué incluye
+                      <ChevronDown className="size-5 shrink-0 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <ul className="mt-3 space-y-2 text-[#F1E8DA]">
+                      {p.puntos.map((x) => (
+                        <li key={x} className="flex gap-2.5">
+                          <Check className="mt-1 size-4 shrink-0 text-[#E2C29B]" />
+                          {x}
+                        </li>
+                      ))}
+                    </ul>
+                    {p.faltan && (
+                      <div className="mt-3.5">
+                        <p className="text-[0.8rem] font-bold tracking-[0.12em] text-[#E2C9A8]">NO INCLUYE</p>
+                        <ul className="mt-2 space-y-2 text-[#E2C9A8]">
+                          {p.faltan.map((x) => (
+                            <li key={x} className="flex gap-2.5">
+                              <X className="mt-1 size-4 shrink-0" />
+                              {x}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </details>
                   <Link
                     to={p.a}
                     className={cn(
@@ -445,9 +459,9 @@ export default function Inicio() {
                 <h2 className="font-heading text-[2rem] leading-tight font-medium md:text-[2.4rem]">Pruébelo con su próximo caso.</h2>
                 <p className="text-[1.05rem] text-nav">{prueba.dias} días gratis. Sin tarjeta. Entra con su cuenta de Gmail.</p>
               </div>
-              <Link to="/entrar" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
+              <a href="/#planes" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
                 Empiece gratis
-              </Link>
+              </a>
             </div>
           </div>
         </section>

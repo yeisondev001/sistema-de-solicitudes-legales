@@ -40,7 +40,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
           La prueba gratis dura los días indicados en la página de planes. Cada plan, y también la prueba, tiene un
           máximo de consultas por día y de escritos por mes; la app le avisa cuando llega. Los planes pagos se cobran
           por adelantado, cada mes o cada año según elija, a través de Lemon Squeezy, que es el vendedor: procesa el
-          pago, le envía el recibo y aplica los impuestos que correspondan. El plan Despacho es para hasta diez
+          pago, le envía el recibo y aplica los impuestos que correspondan. El plan Buffet es para hasta diez
           abogados. Puede cancelar cuando quiera: el acceso sigue hasta el final del período pagado.
         </p>
         <h2>4. Uso aceptable</h2>
@@ -104,7 +104,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
           redactar la respuesta, Google para la entrada con su cuenta y Lemon Squeezy para los pagos. Por eso le pedimos
           no escribir en las consultas datos personales de sus clientes.
         </p>
-        <h2>Si trabaja en una oficina (plan Despacho)</h2>
+        <h2>Si trabaja en una oficina (plan Buffet)</h2>
         <p>
           El dueño de la oficina ve su nombre, su correo, cuándo usó {NOMBRE_APP} por última vez y cuántas consultas hizo
           en el mes. Nunca ve lo que usted pregunta, sus conversaciones, sus documentos ni sus escritos. Los modelos que
@@ -148,7 +148,7 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
     titulo: 'Contacto',
     cuerpo: (
       <>
-        <p>¿Preguntas, el plan Despacho para varios abogados, o algo que no funciona? Escríbanos:</p>
+        <p>¿Preguntas, el plan Buffet para varios abogados, o algo que no funciona? Escríbanos:</p>
         <p>
           Correo: <a href={`mailto:${CORREO}`}>{CORREO}</a>
         </p>

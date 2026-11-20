@@ -16,7 +16,7 @@ import { useSesion } from '@/lib/sesion'
 import type { OficinaAdmin, Usuario } from '@/lib/tipos'
 
 const PLANES = ['beta', 'prueba', 'basico', 'activo', 'vencido'] as const
-// los asientos de una oficina: uno por abogado, el dueño incluido. El Despacho es para 10; más, por acuerdo
+// los asientos de una oficina: uno por abogado, el dueño incluido. El Buffet es para 10; más, por acuerdo
 // aparte (de 10 a 30, como en cuentas.py)
 const ASIENTOS = Array.from({ length: 21 }, (_, i) => i + 10)
 const casilla = 'size-[1.15rem] accent-[var(--t-accent)]'
@@ -214,7 +214,7 @@ function NuevoUsuario({ alCrear }: { alCrear: () => void }) {
   )
 }
 
-/** Las oficinas del plan Despacho: su dueño, cuántos abogados tiene y su plan, que vale para todos ellos */
+/** Las oficinas del plan Buffet: su dueño, cuántos abogados tiene y su plan, que vale para todos ellos */
 function Oficinas({ oficinas, usuarios, alCambiar }: { oficinas: OficinaAdmin[]; usuarios: Usuario[]; alCambiar: () => void }) {
   const [nombre, setNombre] = useState('')
   const [dueno, setDueno] = useState('')
@@ -244,7 +244,7 @@ function Oficinas({ oficinas, usuarios, alCambiar }: { oficinas: OficinaAdmin[];
   }
 
   return (
-    <Seccion titulo="Oficinas (plan Despacho)">
+    <Seccion titulo="Oficinas (plan Buffet)">
       {oficinas.length ? (
         <ul className="mb-5">
           {oficinas.map((o) => (
@@ -331,7 +331,7 @@ function Oficinas({ oficinas, usuarios, alCambiar }: { oficinas: OficinaAdmin[];
       </form>
       <p className="mt-3 text-[0.9rem] text-ink-soft">
         El dueño agrega a sus abogados desde «Mi oficina» con el correo de cada uno, hasta llenar los asientos (él
-        ocupa uno; el Despacho es para 10, y más solo por acuerdo aparte). Mientras la oficina esté activa, cada uno
+        ocupa uno; el Buffet es para 10, y más solo por acuerdo aparte). Mientras la oficina esté activa, cada uno
         usa Papiniano con los topes del plan Abogado; si la pone vencida, ninguno puede entrar.
       </p>
 

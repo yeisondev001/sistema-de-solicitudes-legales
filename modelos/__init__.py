@@ -7,7 +7,7 @@ Los datos por llenar van entre corchetes y en mayúsculas ([NOMBRE DE SU CLIENTE
 ([NOMBRE DEL ABOGADO]…) y [FECHA DE HOY] los llena la app sola.
 
 Cada abogado también sube los suyos («Mis modelos»): se guardan en su cuenta (cuentas.py) y solo los ve él,
-o también su oficina si los comparte (plan Despacho).
+o también su oficina si los comparte (plan Buffet).
 Su clave es «propio-<id>». Al subirlo, el Word se convierte aquí, sin la IA, y se le quitan solos los datos
 que se reconocen (cédulas, RNC, correos, teléfonos, montos y fechas); los nombres los marca el abogado.
 """

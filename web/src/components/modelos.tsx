@@ -18,7 +18,7 @@ interface Catalogo {
   modelos: Modelo[]
   /** los que subió el abogado */
   propios: Modelo[]
-  /** los que comparten sus colegas de oficina (plan Despacho) */
+  /** los que comparten sus colegas de oficina (plan Buffet) */
   oficina: Modelo[]
   /** clave → nombre, en el orden en que se muestran */
   grupos: Record<string, string>

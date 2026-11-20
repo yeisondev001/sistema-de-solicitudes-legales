@@ -305,7 +305,7 @@ export default function Asistente() {
               turno={{
                 rol: 'asistente',
                 texto:
-                  // el plan Básico no sube documentos propios: el saludo no los ofrece
+                  // el plan Aspirante no sube documentos propios: el saludo no los ofrece
                   `Hola. Soy ${NOMBRE_ASISTENTE}, su asistente de jurisprudencia: busco en las sentencias de la Suprema Corte (Boletín Judicial), ` +
                   (perfil.propios ? 'en las leyes y reglamentos y en sus documentos, ' : 'y en las leyes y reglamentos, ') +
                   'y le doy mi análisis con las citas para que las verifique. ' +

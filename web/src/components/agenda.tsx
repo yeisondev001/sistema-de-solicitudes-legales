@@ -292,7 +292,7 @@ export function DialogoFecha({ inicial, expedientes = [], fijo = false, alCerrar
   )
 }
 
-/** Para el plan Básico: Expedientes y Agenda vienen con el plan Abogado */
+/** Para el plan Aspirante: Expedientes y Agenda vienen con el plan Abogado */
 export function SinExpedientes({ sala }: { sala: string }) {
   return (
     <Seccion titulo={`${sala} viene con el plan Abogado`}>

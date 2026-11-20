@@ -24,9 +24,9 @@ export function CabeceraPublica({ conMenu = true }: { conMenu?: boolean }) {
             Entrar
           </Link>
           {/* en el celular no cabe: el botón grande está justo debajo */}
-          <Link to="/entrar" className="hidden rounded-lg bg-boton px-5 py-2.5 font-bold text-sobre-boton hover:bg-boton/90 sm:inline-block">
+          <a href="/#planes" className="hidden rounded-lg bg-boton px-5 py-2.5 font-bold text-sobre-boton hover:bg-boton/90 sm:inline-block">
             Empiece gratis
-          </Link>
+          </a>
         </div>
       </div>
     </header>

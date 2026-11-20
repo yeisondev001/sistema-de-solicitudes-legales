@@ -14,12 +14,12 @@ export interface Perfil {
   tema: string
   letra: 'normal' | 'grande' | 'muy_grande'
   colores: Colores
-  /** sus propios modelos y documentos: todos los planes menos el Básico */
+  /** sus propios modelos y documentos: todos los planes menos el Aspirante */
   propios: boolean
   prueba: { dias: number; preguntas_hoy: number; tope: number } | null
-  /** en el plan Básico: las consultas de hoy y el máximo por día */
+  /** en el plan Aspirante: las consultas de hoy y el máximo por día */
   basico: { preguntas_hoy: number; tope: number } | null
-  /** su oficina del plan Despacho (el plan de la cuenta es el de la oficina) */
+  /** su oficina del plan Buffet (el plan de la cuenta es el de la oficina) */
   oficina: { id: number; nombre: string; es_dueno: boolean } | null
 }
 
@@ -225,7 +225,7 @@ export interface ExpedienteResumen {
   contraparte: string
   estado: 'activo' | 'cerrado'
   responsable: Responsable | null
-  /** es de la oficina (plan Despacho): lo ven todos sus abogados */
+  /** es de la oficina (plan Buffet): lo ven todos sus abogados */
   de_oficina: boolean
   creado: number
   actualizado: number

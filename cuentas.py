@@ -9,7 +9,7 @@ Quien entra con Google por primera vez queda en plan "prueba": unos días y un m
 de preguntas por día. El administrador cambia el plan desde el panel de usuarios:
   beta     sin límites y sin cobro (primeros usuarios que prueban la app)
   prueba   PRUEBA_DIAS días, PRUEBA_PREGUNTAS_DIA preguntas por día y los escritos del plan Abogado
-  basico   cliente del plan Básico: BASICO_PREGUNTAS_DIA preguntas por día, BASICO_ESCRITOS_MES escritos
+  basico   cliente del plan Aspirante: BASICO_PREGUNTAS_DIA preguntas por día, BASICO_ESCRITOS_MES escritos
            por mes y sin modelos ni documentos propios
   activo   cliente del plan Abogado o de una oficina: ABOGADO_PREGUNTAS_DIA preguntas por día y
            ABOGADO_ESCRITOS_MES escritos por mes
@@ -46,7 +46,7 @@ def tope_escritos(plan: str):
 
 
 def con_propios(plan: str) -> bool:
-    """Sus propios modelos y documentos: todos los planes menos el Básico."""
+    """Sus propios modelos y documentos: todos los planes menos el Aspirante."""
     return plan != "basico"
 
 _DDL = {
@@ -118,7 +118,7 @@ _MIGRACIONES = {
             texto TEXT NOT NULL,
             actualizado BIGINT NOT NULL)""",
         "CREATE INDEX IF NOT EXISTS modelos_propios_usuario ON modelos_propios (usuario_id)",
-        # las oficinas del plan Despacho: varios abogados, un dueño y un solo plan para todos
+        # las oficinas del plan Buffet: varios abogados, un dueño y un solo plan para todos
         """CREATE TABLE IF NOT EXISTS oficinas (
             id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             nombre TEXT NOT NULL,
@@ -137,7 +137,7 @@ _MIGRACIONES = {
         "ALTER TABLE modelos_propios ADD COLUMN IF NOT EXISTS compartido BOOLEAN NOT NULL DEFAULT FALSE",
         # los asientos que paga la oficina: uno por abogado, el dueño incluido
         "ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS asientos INTEGER NOT NULL DEFAULT 10",
-        # el Despacho pasó a ser para hasta 10 abogados (16 nov): las oficinas de antes suben a 10
+        # el Buffet pasó a ser para hasta 10 abogados (16 nov): las oficinas de antes suben a 10
         "UPDATE oficinas SET asientos = 10 WHERE asientos < 10",
         # los escritos nuevos del día, para el tope por mes
         "ALTER TABLE uso ADD COLUMN IF NOT EXISTS escritos INT NOT NULL DEFAULT 0",
@@ -479,7 +479,7 @@ def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
 _MAXIMO_PREGUNTAS = {
     "prueba": "Llegó al máximo de {tope} preguntas por día de la prueba gratis. Mañana puede seguir, o elija su "
               "plan para seguir trabajando.",
-    "basico": "Llegó al máximo de preguntas por día del plan Básico. Mañana puede seguir, o pase al plan Abogado, "
+    "basico": "Llegó al máximo de preguntas por día del plan Aspirante. Mañana puede seguir, o pase al plan Abogado, "
               "que trae muchas más.",
     "activo": "Llegó al máximo de preguntas de hoy. Mañana puede seguir; si su trabajo necesita más, escríbanos.",
 }
@@ -506,7 +506,7 @@ def revisar_escritos(usuario_id: int, plan: str):
                       (usuario_id, time.strftime("%Y-%m") + "-%"), leer=True)
     if filas and filas[0]["n"] >= tope:
         raise ValueError(
-            "Este mes ya usó los escritos del plan Básico. El mes que viene puede redactar más, o pase al plan "
+            "Este mes ya usó los escritos del plan Aspirante. El mes que viene puede redactar más, o pase al plan "
             "Abogado, que trae muchos más. Mientras tanto le busco sentencias y leyes sobre el tema." if plan == "basico"
             else "Este mes ya llegó al máximo de escritos de su plan. El mes que viene puede seguir; si su trabajo "
                  "necesita más, escríbanos. Mientras tanto le busco sentencias y leyes sobre el tema.")
@@ -692,11 +692,11 @@ def deshacer_escrito(usuario_id: int, conv_id: int):
     return _publico(actual)
 
 
-# ── Las oficinas (plan Despacho) ─────────────────
+# ── Las oficinas (plan Buffet) ─────────────────
 # Varios abogados con un dueño y un solo plan. El administrador crea la oficina; el dueño agrega abogados
 # por su correo y cada uno acepta desde su escritorio. El dueño ve quién usa Papiniano y cuánto, nunca lo
 # que pregunta: conversaciones, documentos y escritos siguen siendo de cada abogado.
-# El plan Despacho es para hasta 10 abogados (un asiento por abogado, el dueño incluido); los correos agregados
+# El plan Buffet es para hasta 10 abogados (un asiento por abogado, el dueño incluido); los correos agregados
 # que todavía no aceptan ya ocupan el suyo. Una oficina más grande se arregla aparte: el administrador le sube
 # los asientos.
 PLANES_OFICINA = ("activo", "vencido")

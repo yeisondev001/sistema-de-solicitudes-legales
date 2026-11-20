@@ -68,7 +68,7 @@ function MenuSalas({ alElegir }: { alElegir?: () => void }) {
   )
 }
 
-/** En la prueba gratis: los días que quedan y las consultas de hoy. En el plan Básico, solo las consultas. */
+/** En la prueba gratis: los días que quedan y las consultas de hoy. En el plan Aspirante, solo las consultas. */
 function CajaPrueba() {
   const { perfil } = useSesion()
   const limite = perfil.prueba ?? perfil.basico

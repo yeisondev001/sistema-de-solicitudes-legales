@@ -16,11 +16,11 @@ export default function Escritorio() {
   const navegar = useNavigate()
   const [convs, setConvs] = useState<Conversacion[] | null>(null)
   const [audiencias, setAudiencias] = useState<Audiencia[]>([])
-  // lo de la agenda en los próximos 7 días (plan Abogado y Despacho)
+  // lo de la agenda en los próximos 7 días (plan Abogado y Buffet)
   const [semana, setSemana] = useState<Fecha[] | null>(null)
   const [docs, setDocs] = useState<{ configurada: boolean; documentos: Documento[] } | null>(null)
   const [apariencia, setApariencia] = useState(false)
-  // las oficinas que le piden unirse (plan Despacho)
+  // las oficinas que le piden unirse (plan Buffet)
   const [invitaciones, setInvitaciones] = useState<Invitacion[]>([])
 
   const contarDocumentos = () => api.get<typeof docs>('/api/documentos').then(setDocs).catch(() => {})
