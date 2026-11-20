@@ -55,12 +55,20 @@ app = FastAPI(title="Papiniano", docs_url=None, redoc_url=None, openapi_url=None
 @app.exception_handler(Exception)
 async def _error_inesperado(request: Request, ex: Exception):
     """Un fallo que no previmos: queda en el registro y en el panel «Errores» del administrador, y el abogado ve un
-    mensaje claro. Solo se guarda el tipo de error y dónde ocurrió, nunca el contenido de lo que subió."""
+    mensaje claro. Se guarda el tipo de error, dónde ocurrió y a qué cuenta le pasó (solo eso; nunca el contenido
+    de lo que subió)."""
     import traceback
     logging.getLogger("papiniano").exception("Error en %s %s", request.method, request.url.path)
+    uid = None
+    try:
+        uid = (cuentas.usuario_de_sesion(request.cookies.get(COOKIE, "")) or {}).get("id")
+    except Exception:
+        pass   # sin sesión no se sabe quién fue; el error se registra igual
     try:
         cuentas.registrar_error(request.method, request.url.path, type(ex).__name__, str(ex),
-                                "".join(traceback.format_exception(type(ex), ex, ex.__traceback__)))
+                                "".join(traceback.format_exception(type(ex), ex, ex.__traceback__)), uid)
+        if uid is not None:
+            _abiertos().add((uid, request.url.path))
     except Exception:
         pass   # si ni el panel se puede escribir, el registro de Render igual lo tiene
     return JSONResponse({"detail": "Algo falló de nuestro lado y ya quedó registrado. Intente de nuevo; "
@@ -73,6 +81,27 @@ def _poner_sesion(respuesta: Response, token: str):
                          secure=SEGURO, path="/")
 
 
+# los errores que esperan que la cuenta vuelva a intentarlo: si entra bien a la misma ruta, quedan marcados como resueltos
+_ABIERTOS: set | None = None
+
+
+def _abiertos() -> set:
+    global _ABIERTOS
+    if _ABIERTOS is None:
+        _ABIERTOS = {(x["usuario_id"], x["ruta"]) for x in cuentas.errores_abiertos()}
+    return _ABIERTOS
+
+
+def _si_resuelve(usuario_id: int, ruta: str):
+    """Si esta cuenta tenía un error abierto en esta ruta y el pedido entró bien, ese error queda resuelto."""
+    try:
+        if (usuario_id, ruta) in _abiertos():
+            cuentas.marcar_resuelto(usuario_id, ruta)
+            _abiertos().discard((usuario_id, ruta))
+    except Exception:
+        pass   # marcar el resuelto no puede estorbar el pedido del abogado
+
+
 def usuario_actual(request: Request) -> dict:
     try:
         u = cuentas.usuario_de_sesion(request.cookies.get(COOKIE, ""))
@@ -80,6 +109,7 @@ def usuario_actual(request: Request) -> dict:
         raise HTTPException(503, "No se pudo conectar con la base de datos. Intente en un momento.")
     if not u:
         raise HTTPException(401, "Su sesión terminó. Entre otra vez.")
+    _si_resuelve(u["id"], request.url.path)
     return u
 
 
@@ -1080,6 +1110,7 @@ def errores(u=Depends(solo_admin)):
 @app.delete("/api/errores")
 def borrar_errores(u=Depends(solo_admin)):
     cuentas.borrar_errores()
+    _abiertos().clear()
     return {"ok": True}
 
 
@@ -1103,7 +1134,8 @@ def aviso_cliente(datos: AvisoCliente, u=Depends(usuario_actual)):
         "Aviso del navegador: el pedido no recibió una respuesta válida.",
         f"El navegador de {u['nombre'] or u['usuario']} no recibió respuesta válida de {metodo} {ruta} "
         f"(estado {datos.estado or 'sin conexión'}). Suele pasar mientras el servidor de Render despierta o "
-        "su proxy corta el pedido; si se repite seguido, revisar Render.")
+        "su proxy corta el pedido; si se repite seguido, revisar Render.", u["id"])
+    _abiertos().add((u["id"], ruta))
     return {"ok": True}
 
 

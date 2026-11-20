@@ -16,6 +16,8 @@ interface ErrorServidor {
   tipo: string
   mensaje: string
   detalle: string
+  usuario?: string
+  resuelto?: number | null
 }
 
 const DIA = 24 * 3600
@@ -56,7 +58,7 @@ export default function Errores() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <TituloSala titulo="Errores" sub="Lo que falló en el servidor, para que lo sepa antes de que se lo diga un cliente.">
+      <TituloSala titulo="Errores" sub="Lo que falló, a qué cuenta le pasó y si ya pudo volver a entrar. Nunca lo que el abogado subió.">
         <div className="flex gap-2">
           <Button variant="outline" onClick={cargar}><RefreshCw /> Actualizar</Button>
           {lista.length > 0 && <Button variant="outline" onClick={limpiar}><Trash2 /> Limpiar</Button>}
@@ -85,8 +87,16 @@ export default function Errores() {
                     <p className="font-bold text-ink">
                       {e.tipo} <span className="font-normal text-ink-soft">en {e.metodo} {e.ruta}</span>
                     </p>
-                    <p className="text-[0.9rem] text-ink-soft">{cuando(e.fecha)}{e.mensaje ? ` · ${e.mensaje}` : ''}</p>
+                    <p className="text-[0.9rem] text-ink-soft">
+                      {cuando(e.fecha)}{e.mensaje ? ` · ${e.mensaje}` : ''}{e.usuario ? ` · a la cuenta de ${e.usuario}` : ''}
+                    </p>
                   </summary>
+                  {e.resuelto && (
+                    <p className="mt-2 flex items-center gap-2 text-[0.88rem] font-bold text-emerald-800">
+                      <CircleCheck className="size-4" />
+                      Ya volvió a entrar y funcionó ({new Date(e.resuelto * 1000).toLocaleString('es-DO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })})
+                    </p>
+                  )}
                   <pre className="mt-2 max-h-80 overflow-auto rounded-lg bg-card p-3 text-[0.78rem] whitespace-pre-wrap text-ink">{e.detalle}</pre>
                 </details>
               </li>

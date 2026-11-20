@@ -188,7 +188,11 @@ _MIGRACIONES = {
         """CREATE TABLE IF NOT EXISTS errores (
             id BIGSERIAL PRIMARY KEY,
             fecha BIGINT NOT NULL,
-            metodo TEXT, ruta TEXT, tipo TEXT, mensaje TEXT, detalle TEXT)""",
+            metodo TEXT, ruta TEXT, tipo TEXT, mensaje TEXT, detalle TEXT,
+            usuario_id BIGINT, resuelto BIGINT)""",
+        # las bases que ya tenían la tabla: qué cuenta tuvo el error y cuándo se le arregló
+        "ALTER TABLE errores ADD COLUMN IF NOT EXISTS usuario_id BIGINT",
+        "ALTER TABLE errores ADD COLUMN IF NOT EXISTS resuelto BIGINT",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -285,7 +289,10 @@ _MIGRACIONES = {
         """CREATE TABLE IF NOT EXISTS errores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha INTEGER NOT NULL,
-            metodo TEXT, ruta TEXT, tipo TEXT, mensaje TEXT, detalle TEXT)""",
+            metodo TEXT, ruta TEXT, tipo TEXT, mensaje TEXT, detalle TEXT,
+            usuario_id INTEGER, resuelto INTEGER)""",
+        "ALTER TABLE errores ADD COLUMN usuario_id INTEGER",
+        "ALTER TABLE errores ADD COLUMN resuelto INTEGER",
     ],
 }
 _tablas_listas = False
@@ -394,15 +401,31 @@ def crear_usuario(usuario: str, clave: str, nombre: str = "", es_admin: bool = F
 MAX_ERRORES = 200
 
 
-def registrar_error(metodo: str, ruta: str, tipo: str, mensaje: str, detalle: str):
-    """Guarda un error del servidor para el panel. Solo guarda cuál fue y dónde: nada de lo que el abogado subió."""
-    _ejecutar("INSERT INTO errores (fecha, metodo, ruta, tipo, mensaje, detalle) VALUES (%s, %s, %s, %s, %s, %s)",
-              (int(time.time()), metodo[:10], ruta[:200], tipo[:100], mensaje[:300], detalle[-4000:]))
+def registrar_error(metodo: str, ruta: str, tipo: str, mensaje: str, detalle: str, usuario_id: int | None = None):
+    """Guarda un error del servidor para el panel: cuál fue, dónde y a qué cuenta le pasó. Nunca lo que el abogado subió."""
+    _ejecutar("INSERT INTO errores (fecha, metodo, ruta, tipo, mensaje, detalle, usuario_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+              (int(time.time()), metodo[:10], ruta[:200], tipo[:100], mensaje[:300], detalle[-4000:], usuario_id))
     _ejecutar("DELETE FROM errores WHERE id NOT IN (SELECT id FROM errores ORDER BY id DESC LIMIT %s)", (MAX_ERRORES,))
 
 
 def listar_errores() -> list:
-    return _ejecutar("SELECT id, fecha, metodo, ruta, tipo, mensaje, detalle FROM errores ORDER BY id DESC", leer=True)
+    """Los errores con la cuenta a la que le pasaron (solo su nombre; nunca lo que subió) y si ya se le arregló."""
+    return _ejecutar("""SELECT e.id, e.fecha, e.metodo, e.ruta, e.tipo, e.mensaje, e.detalle, e.resuelto,
+                               COALESCE(u.nombre, u.usuario, '') AS usuario
+                        FROM errores e LEFT JOIN usuarios u ON u.id = e.usuario_id
+                        ORDER BY e.id DESC""", leer=True)
+
+
+def marcar_resuelto(usuario_id: int, ruta: str):
+    """La misma cuenta volvió a usar esa ruta y entró bien: sus errores abiertos de esa ruta (de la última semana) quedan resueltos."""
+    _ejecutar("UPDATE errores SET resuelto = %s WHERE usuario_id = %s AND ruta = %s AND resuelto IS NULL AND fecha > %s",
+              (int(time.time()), usuario_id, ruta[:200], int(time.time()) - 7 * 86400))
+
+
+def errores_abiertos() -> list:
+    """Los pares (cuenta, ruta) con un error sin resolver de la última semana: el servidor los lleva en memoria."""
+    return _ejecutar("SELECT usuario_id, ruta FROM errores WHERE resuelto IS NULL AND usuario_id IS NOT NULL AND fecha > %s",
+                     (int(time.time()) - 7 * 86400,), leer=True)
 
 
 def borrar_errores():
