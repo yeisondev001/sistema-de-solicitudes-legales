@@ -108,9 +108,9 @@ abre, pero el asistente no puede buscar sentencias.
 | `APP_URL` | Opcional: dirección pública de la app (en Render se toma de `RENDER_EXTERNAL_URL`) |
 | `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (5) y consultas por día (200) |
 | `POLAR_TOKEN`, `POLAR_WEBHOOK_SECRET` | Cobro con Polar (opcional; sin ellos «Mi plan» dice que el pago llega pronto). El aviso de Polar apunta a `<dirección>/api/pagos/aviso`. `POLAR_SANDBOX=1` usa el sandbox |
-| `BASICO_PREGUNTAS_DIA`, `BASICO_ESCRITOS_MES` | Opcional: consultas por día (60) y escritos nuevos por mes (20) del plan Aspirante |
+| `BASICO_PREGUNTAS_DIA`, `BASICO_ESCRITOS_MES` | Opcional: consultas por día (60) y escritos nuevos por mes (50) del plan Aspirante |
 | `ABOGADO_PREGUNTAS_DIA`, `ABOGADO_ESCRITOS_MES` | Opcional: consultas por día (200) y escritos nuevos por mes (100) del plan Abogado y de cada abogado del Buffet |
-| `PRUEBA_ESCRITOS_MES` | Opcional: escritos nuevos de la prueba gratis (100) |
+| `PRUEBA_ESCRITOS_MES` | Opcional: escritos nuevos de la prueba gratis (40) |
 
 Nunca suba al repositorio claves, contraseñas ni cadenas de conexión: van en las variables del servidor.
 

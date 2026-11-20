@@ -34,10 +34,10 @@ PREGUNTAS_BASICO = int(os.environ.get("BASICO_PREGUNTAS_DIA", "60"))
 # el Abogado y cada abogado del Buffet: alto a propósito (20 nov), para que en el uso normal no se sienta un límite
 PREGUNTAS_ABOGADO = int(os.environ.get("ABOGADO_PREGUNTAS_DIA", "200"))
 # escritos nuevos por mes (cambiar uno que ya está no cuenta)
-ESCRITOS_BASICO = int(os.environ.get("BASICO_ESCRITOS_MES", "20"))
+ESCRITOS_BASICO = int(os.environ.get("BASICO_ESCRITOS_MES", "50"))
 ESCRITOS_ABOGADO = int(os.environ.get("ABOGADO_ESCRITOS_MES", "100"))
-# la prueba gratis: igual que el Abogado (se puede bajar sola con PRUEBA_ESCRITOS_MES)
-ESCRITOS_PRUEBA = int(os.environ.get("PRUEBA_ESCRITOS_MES", "100"))
+# la prueba gratis (20 nov, lo decidió el dueño): 40 escritos en sus 5 días
+ESCRITOS_PRUEBA = int(os.environ.get("PRUEBA_ESCRITOS_MES", "40"))
 
 
 def tope_diario(plan: str):
