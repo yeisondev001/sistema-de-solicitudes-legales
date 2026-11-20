@@ -12,6 +12,18 @@ export class ErrorApi extends Error {
 /** Avisa a la app que la sesión terminó (para volver a la entrada) */
 export const SESION_TERMINADA = 'sesion-terminada'
 
+/** Aviso del navegador: un pedido no llegó o volvió sin respuesta válida (servidor despertando, 502 del proxy…).
+ *  Queda en el panel «Errores del sistema». Se manda sin esperar nada: si el servidor sigue sin responder, se pierde. */
+function avisarFallo(ruta: string, estado: number, metodo = 'GET') {
+  fetch('/api/errores/cliente', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ruta, metodo, estado }),
+    keepalive: true,
+  }).catch(() => {})
+}
+
 async function respuesta(r: Response, ruta: string) {
   if (r.ok) return r
   let detalle = 'No se pudo conectar con el servidor. Intente en un momento.'
@@ -19,7 +31,8 @@ async function respuesta(r: Response, ruta: string) {
     const d = await r.json()
     if (typeof d.detail === 'string') detalle = d.detail
   } catch {
-    // sin cuerpo JSON: queda el mensaje general
+    // sin cuerpo JSON: la respuesta no salió del código de Papiniano (502 del proxy, servidor despertando…)
+    avisarFallo(ruta, r.status)
   }
   if (r.status === 401 && ruta !== '/api/entrar') window.dispatchEvent(new Event(SESION_TERMINADA))
   throw new ErrorApi(detalle, r.status)
@@ -34,6 +47,7 @@ async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
       headers: opciones.body ? { 'Content-Type': 'application/json' } : undefined,
     })
   } catch {
+    avisarFallo(ruta, 0, (opciones.method as string) ?? 'GET')
     throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
   }
   return (await respuesta(r, ruta)).json()
@@ -71,6 +85,7 @@ export async function preguntarAlAsistente(
       body: JSON.stringify({ texto, conv_id: convId, modelo, expediente_id: expedienteId }),
     })
   } catch {
+    avisarFallo('/api/asistente', 0, 'POST')
     throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
   }
   await respuesta(r, '/api/asistente')
@@ -107,6 +122,7 @@ export async function descargar(ruta: string, cuerpo?: unknown): Promise<Headers
       body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
     })
   } catch {
+    avisarFallo(ruta, 0, cuerpo === undefined ? 'GET' : 'POST')
     throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
   }
   await respuesta(r, ruta)
@@ -132,6 +148,7 @@ export async function leerModelo(archivo: File): Promise<{ nombre: string; texto
       body: archivo,
     })
   } catch {
+    avisarFallo('/api/modelos/leer', 0, 'POST')
     throw new ErrorApi(`«${archivo.name}» no se pudo subir: revise su internet.`, 0)
   }
   return (await respuesta(r, '/api/modelos/leer')).json()
@@ -147,6 +164,7 @@ export async function subirDocumento(archivo: File): Promise<{ titulo: string; n
       body: archivo,
     })
   } catch {
+    avisarFallo('/api/documentos', 0, 'POST')
     throw new ErrorApi(`«${archivo.name}» no se pudo subir: revise su internet.`, 0)
   }
   return (await respuesta(r, '/api/documentos')).json()
@@ -173,6 +191,7 @@ export async function leerParaRedactar(archivo: File): Promise<DocumentoLeido> {
       body: archivo,
     })
   } catch {
+    avisarFallo('/api/redactar/leer', 0, 'POST')
     throw new ErrorApi(`«${archivo.name}» no se pudo subir: revise su internet.`, 0)
   }
   return (await respuesta(r, '/api/redactar/leer')).json()
@@ -194,6 +213,7 @@ export async function redactarEscrito(
       body: JSON.stringify(datos),
     })
   } catch {
+    avisarFallo('/api/redactar', 0, 'POST')
     throw new ErrorApi('No hay conexión con el servidor. Revise su internet.', 0)
   }
   await respuesta(r, '/api/redactar')

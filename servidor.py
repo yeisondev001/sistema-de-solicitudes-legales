@@ -1083,6 +1083,30 @@ def borrar_errores(u=Depends(solo_admin)):
     return {"ok": True}
 
 
+class AvisoCliente(BaseModel):
+    ruta: str
+    metodo: str = "GET"
+    estado: int = 0
+
+
+@app.post("/api/errores/cliente")
+def aviso_cliente(datos: AvisoCliente, u=Depends(usuario_actual)):
+    """El navegador avisa que uno de sus pedidos no recibió respuesta válida (el servidor estaba despertando,
+    el proxy de Render lo cortó, se cayó el internet del abogado): queda en el mismo panel de errores, marcado
+    como aviso del navegador. Si el servidor está caído del todo este aviso también se pierde; de eso ve Render."""
+    ruta = datos.ruta.strip().split("?")[0]
+    if not ruta.startswith("/api/") or len(ruta) > 200:
+        raise HTTPException(400, "Aviso inválido.")
+    metodo = datos.metodo.strip().upper()[:10] or "GET"
+    cuentas.registrar_error(
+        metodo, ruta, "Sin respuesta" if datos.estado == 0 else f"HTTP {datos.estado}",
+        "Aviso del navegador: el pedido no recibió una respuesta válida.",
+        f"El navegador de {u['nombre'] or u['usuario']} no recibió respuesta válida de {metodo} {ruta} "
+        f"(estado {datos.estado or 'sin conexión'}). Suele pasar mientras el servidor de Render despierta o "
+        "su proxy corta el pedido; si se repite seguido, revisar Render.")
+    return {"ok": True}
+
+
 @app.get("/api/usuarios")
 def usuarios(u=Depends(solo_admin)):
     return [{**x, "es_admin": bool(x["es_admin"]), "activo": bool(x["activo"]), "plantillas": bool(x["plantillas"]),
