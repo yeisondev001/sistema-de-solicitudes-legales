@@ -1362,7 +1362,7 @@ def fecha_borrar(fecha_id: int, u=Depends(con_expedientes)):
 PAGINAS_PUBLICAS = {
     "": ("Papiniano · Asistente jurídico con IA para abogados dominicanos",
          "Papiniano responde con las sentencias de la Suprema Corte de Justicia y las leyes dominicanas, muestra la "
-         "página exacta de cada cita y redacta sus escritos. Expedientes y agenda. Pruébelo 7 días gratis.", None),
+         "página exacta de cada cita y redacta sus escritos. Expedientes y agenda. Pruébelo 5 días gratis.", None),
     "calculadora-prestaciones-laborales": (
         "Calculadora de prestaciones laborales (República Dominicana) · Papiniano",
         "Calcule gratis el preaviso, la cesantía, las vacaciones y el salario de Navidad con las fórmulas del Código "

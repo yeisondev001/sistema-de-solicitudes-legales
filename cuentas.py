@@ -26,7 +26,7 @@ DURACION_SESION = 30 * 24 * 3600   # 30 días
 # En el servidor (Neon) la página es pública: contraseñas largas. En local se permiten cortas para probar.
 MIN_CLAVE = 8 if DATABASE_URL else 3
 PLANES = ("beta", "prueba", "basico", "activo", "vencido")
-DIAS_PRUEBA = int(os.environ.get("PRUEBA_DIAS", "7"))
+DIAS_PRUEBA = int(os.environ.get("PRUEBA_DIAS", "5"))
 PREGUNTAS_PRUEBA = int(os.environ.get("PRUEBA_PREGUNTAS_DIA", "20"))
 PREGUNTAS_BASICO = int(os.environ.get("BASICO_PREGUNTAS_DIA", "20"))
 PREGUNTAS_ABOGADO = int(os.environ.get("ABOGADO_PREGUNTAS_DIA", "50"))

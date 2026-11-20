@@ -182,7 +182,7 @@ export default function Calculadora() {
             </p>
           </div>
           <Link to="/entrar" className="shrink-0 rounded-lg bg-card px-6 py-4 text-[1.05rem] font-bold text-marca-texto hover:bg-background">
-            Pruébelo 7 días gratis
+            Pruébelo 5 días gratis
           </Link>
         </section>
 

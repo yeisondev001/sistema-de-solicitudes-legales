@@ -106,7 +106,7 @@ abre, pero el asistente no puede buscar sentencias.
 | `CODIGO_INSTALACION` | Obligatoria en el servidor para crear el primer administrador |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Opcional: entrar con Google. La URL de redirección es `<dirección de la app>/oauth_callback` |
 | `APP_URL` | Opcional: dirección pública de la app (en Render se toma de `RENDER_EXTERNAL_URL`) |
-| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (7) y consultas por día (20) |
+| `PRUEBA_DIAS`, `PRUEBA_PREGUNTAS_DIA` | Opcional: días de la prueba gratis (5) y consultas por día (20) |
 | `BASICO_PREGUNTAS_DIA`, `BASICO_ESCRITOS_MES` | Opcional: consultas por día (20) y escritos nuevos por mes (3) del plan Básico |
 | `ABOGADO_PREGUNTAS_DIA`, `ABOGADO_ESCRITOS_MES` | Opcional: consultas por día (50) y escritos nuevos por mes (30) del plan Abogado y de cada abogado de una oficina |
 
