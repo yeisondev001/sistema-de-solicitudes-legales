@@ -129,7 +129,7 @@ const planes = (p: Prueba) => [
     boton: `Empezar ${p.dias} días gratis`, a: '/entrar',
   },
   {
-    nombre: 'Buffet', tiene: true, quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 200,
+    nombre: 'Buffet', tiene: true, quien: 'PARA OFICINAS', para: 'Para oficinas de hasta 10 abogados, con una sola factura.', mensual: 200, anual: 2000,
     nota: 'Para hasta 10 abogados, el dueño incluido.',
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
