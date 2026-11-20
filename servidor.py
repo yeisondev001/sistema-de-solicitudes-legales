@@ -1581,15 +1581,15 @@ def fecha_borrar(fecha_id: int, u=Depends(con_expedientes)):
 # mismo título al abrirse (useTitulo).
 PAGINAS_PUBLICAS = {
     "": ("Papiniano · Asistente jurídico con IA para abogados dominicanos",
-         "Papiniano responde con las sentencias de la Suprema Corte de Justicia y las leyes dominicanas, muestra la "
-         "página exacta de cada cita y redacta sus escritos. Expedientes y agenda. Pruébelo 5 días gratis.", None),
+         "Sentencias de la Suprema Corte y leyes dominicanas con la página exacta de cada cita, y sus escritos en Word. "
+         "Pruébelo 5 días gratis.", None),
     "calculadora-prestaciones-laborales": (
-        "Calculadora de prestaciones laborales (República Dominicana) · Papiniano",
-        "Calcule gratis el preaviso, la cesantía, las vacaciones y el salario de Navidad con las fórmulas del Código "
-        "de Trabajo dominicano. Sin registrarse.",
+        "Calculadora de prestaciones laborales RD · Papiniano",
+        "Calcule gratis el preaviso, la cesantía, las vacaciones y la regalía pascual con las fórmulas del Código de "
+        "Trabajo dominicano. Sin registrarse.",
         "<h1>Calculadora de prestaciones laborales de República Dominicana</h1>"
         "<p>Calcula gratis, sin registrarse, el preaviso (art. 76), el auxilio de cesantía (art. 80), las vacaciones no "
-        "disfrutadas (arts. 177, 180 y 182) y el salario de Navidad proporcional (arts. 219 y 220) de un trabajador al "
+        "disfrutadas (arts. 177, 180 y 182) y la regalía pascual o salario de Navidad (arts. 219 y 220) de un trabajador al "
         "que le hicieron desahucio o lo despidieron sin causa justificada, con las fórmulas del Código de Trabajo. "
         "El salario diario es el salario mensual dividido entre 23.83.</p>"
         "<p>Preaviso: 7 días de 3 a 6 meses; 14 días de más de 6 meses a un año; 28 días con más de un año. Cesantía: "
@@ -1604,22 +1604,45 @@ PAGINAS_PUBLICAS = {
     "contacto": ("Contacto · Papiniano", "Escríbale a Papiniano: preguntas, el plan Buffet o algo que no funciona.", None),
     "entrar": ("Entrar · Papiniano", "Entre a Papiniano con su cuenta de Gmail o con su usuario y contraseña.", None),
 }
+# páginas públicas que Google no debe mostrar: la entrada no le sirve a quien busca
+NO_INDEXAR = {"entrar"}
+# las pantallas de la app (sin sesión piden entrar): existen, pero no son para Google. Son las mismas de RUTAS_APP en
+# web/src/App.tsx; cualquier otra dirección responde 404. Si se agrega una pantalla, agregarla en los dos lados.
+RUTAS_APP = re.compile(r"(papiniano|expedientes|redaccion)(/[^/]+)?|plan|modelos|redactar|biblioteca|usuarios|errores|oficina|agenda")
+PAGINA_404 = ("Página no encontrada · Papiniano", "Esta dirección no existe en Papiniano.",
+              '<h1>Página no encontrada</h1><p>Esta dirección no existe en Papiniano. '
+              '<a href="https://papinianord.com/">Ir al inicio</a> · '
+              '<a href="https://papinianord.com/calculadora-prestaciones-laborales">Calculadora de prestaciones</a> · '
+              '<a href="https://papinianord.com/contacto">Contacto</a></p>')
+NO_404 = object()   # la clave de la 404 en _INDICE
 _INDICE = {}
 
 
-def _indice(ruta: str) -> str:
-    """index.html con el título, la descripción y la dirección de esa página (se arma una vez por página)."""
+def _origen() -> str:
+    """La dirección pública del sitio, para las direcciones canónicas (la misma que usa la redirección desde Render)."""
+    return (os.environ.get("APP_URL") or "https://papinianord.com").rstrip("/")
+
+
+def _indice(ruta) -> str:
+    """index.html con el título, la descripción y la dirección de esa página (se arma una vez por página).
+    Con NO_404, la página 404: sin dirección canónica y con «noindex»."""
     if ruta not in _INDICE:
         html = (PANTALLAS / "index.html").read_text(encoding="utf-8")
-        titulo, descripcion, resumen = PAGINAS_PUBLICAS[ruta]
+        es_404 = ruta is NO_404
+        titulo, descripcion, resumen = PAGINA_404 if es_404 else PAGINAS_PUBLICAS[ruta]
         t, d = escape(titulo, quote=True), escape(descripcion, quote=True)
-        direccion = f"https://papinianord.com/{ruta}"
         html = re.sub(r"<title>.*?</title>", f"<title>{t}</title>", html, count=1)
         html = re.sub(r'(<meta name="description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
         html = re.sub(r'(<meta property="og:title" content=")[^"]*', lambda m: m.group(1) + t, html, count=1)
         html = re.sub(r'(<meta property="og:description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
-        html = re.sub(r'(<meta property="og:url" content=")[^"]*', lambda m: m.group(1) + direccion, html, count=1)
-        html = html.replace("</head>", f'    <link rel="canonical" href="{direccion}" />\n  </head>', 1)
+        extra = ""
+        if not es_404:
+            direccion = f"{_origen()}/{ruta}"
+            html = re.sub(r'(<meta property="og:url" content=")[^"]*', lambda m: m.group(1) + direccion, html, count=1)
+            extra += f'    <link rel="canonical" href="{direccion}" />\n'
+        if es_404 or ruta in NO_INDEXAR:
+            extra += '    <meta name="robots" content="noindex" />\n'
+        html = html.replace("</head>", extra + "  </head>", 1)
         if resumen:
             html = re.sub(r"<noscript>.*?</noscript>", lambda m: f"<noscript>{resumen}</noscript>", html, count=1, flags=re.S)
         _INDICE[ruta] = html
@@ -1638,9 +1661,19 @@ def pantallas(ruta: str, request: Request):
         return RedirectResponse(f"{propia}/{ruta}" + (f"?{request.url.query}" if request.url.query else ""), 301)
     archivo = (PANTALLAS / ruta).resolve()
     if ruta and archivo.is_file() and PANTALLAS.resolve() in archivo.parents:
+        # los archivos de assets/ llevan su huella en el nombre (index-DwBA2pKM.js): no cambian nunca
+        if ruta.startswith("assets/"):
+            return FileResponse(archivo, headers={"Cache-Control": "public, max-age=31536000, immutable"})
         return FileResponse(archivo)
     if (PANTALLAS / "index.html").is_file():
-        if ruta.strip("/") in PAGINAS_PUBLICAS:
-            return HTMLResponse(_indice(ruta.strip("/")), headers={"Cache-Control": "no-cache"})
-        return FileResponse(PANTALLAS / "index.html", headers={"Cache-Control": "no-cache"})
+        limpia = ruta.strip("/")
+        if limpia in PAGINAS_PUBLICAS:
+            cabeceras = {"Cache-Control": "no-cache"}
+            if limpia in NO_INDEXAR:
+                cabeceras["X-Robots-Tag"] = "noindex"
+            return HTMLResponse(_indice(limpia), headers=cabeceras)
+        if RUTAS_APP.fullmatch(limpia):
+            return FileResponse(PANTALLAS / "index.html", headers={"Cache-Control": "no-cache", "X-Robots-Tag": "noindex"})
+        # cualquier otra dirección: la página 404 de la app, con el código 404 de verdad para que Google la descarte
+        return HTMLResponse(_indice(NO_404), status_code=404, headers={"Cache-Control": "no-cache", "X-Robots-Tag": "noindex"})
     return PlainTextResponse("Faltan las pantallas: en la carpeta web, corra npm install y npm run build.", 503)

@@ -332,6 +332,12 @@ que `prestaciones.py`: si cambia una, cambiar la otra. Se comprobó con 8 casos 
   `<noscript>` y los datos de Papiniano en JSON-LD. El servidor (`servidor.PAGINAS_PUBLICAS`) pone el título, la
   descripción, la dirección canónica y, en la calculadora, su propio resumen, antes de mandar la página. Si cambian
   los planes o los precios, cambiar también esos textos y `llms.txt`.
+- **Qué responde cada dirección** (`servidor.pantallas`, 20 nov): las páginas públicas (`PAGINAS_PUBLICAS`), 200 con su
+  título y dirección canónica (sacada de `APP_URL`); `/entrar`, 200 con `noindex`; las pantallas de la app
+  (`RUTAS_APP`), 200 con `X-Robots-Tag: noindex`; **cualquier otra, 404** con la página «No encontramos esta
+  página» (`web/src/pages/no-encontrada.tsx`) y `noindex`. `RUTAS_APP` está repetida en `web/src/App.tsx`: si se
+  agrega una pantalla, agregarla en los dos lados o responderá 404. Los archivos de `assets/` se guardan un año en
+  el navegador (llevan su huella en el nombre).
 - **Google Search Console:** verificado el 19 nov con un registro TXT en Hostinger (cuenta de Google de yeison; no
   borrar ese registro). Ahí se manda el `sitemap.xml` y se pide indexar cada página nueva.
 - **Bing (y ChatGPT, que busca con Bing):** por IndexNow, sin cuenta. La clave es el archivo

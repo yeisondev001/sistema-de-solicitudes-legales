@@ -105,7 +105,7 @@ export function calcular(d: Datos): Calculo | null {
     { concepto: 'Auxilio de cesantía', articulo: 'art. 80', dias: `${cesantia} días`, monto: cesantia * diario },
     { concepto: 'Vacaciones no disfrutadas', articulo: 'arts. 177, 180 y 182', dias: `${vacaciones} días`, monto: vacaciones * diario },
     {
-      concepto: 'Salario de Navidad proporcional',
+      concepto: 'Regalía pascual (salario de Navidad)',
       articulo: 'arts. 219 y 220',
       dias: `${Number(mesesDelAnio.toFixed(1))} de 12 meses`,
       monto: navidad,

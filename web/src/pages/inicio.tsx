@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Briefcase, CalendarDays, Check, FileStack, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, RotateCcw, Scale,
+  ArrowRight, Briefcase, CalendarDays, Check, FileStack, FileText, FolderClosed, Gavel, Landmark, LibraryBig, Lock, RotateCcw, Scale,
   ShieldCheck, Trash2, UserRound, X, type LucideIcon,
 } from 'lucide-react'
 import { Papiniano } from '@/components/papiniano'
@@ -31,7 +31,14 @@ const FUENTES: [string, string][] = [
 ]
 
 /** Lo que Papiniano lee, por materia: solo lo que de verdad está cargado (jurisprudencia/leyes.py y el Boletín) */
-const MATERIAS: { icono: LucideIcon; nombre: string; pregunta: string; fuentes: string[]; nota?: string }[] = [
+const MATERIAS: {
+  icono: LucideIcon
+  nombre: string
+  pregunta: string
+  fuentes: string[]
+  nota?: string
+  enlace?: [string, string]
+}[] = [
   {
     icono: Landmark,
     nombre: 'Tierras',
@@ -48,6 +55,7 @@ const MATERIAS: { icono: LucideIcon; nombre: string; pregunta: string; fuentes: 
     pregunta: 'Mi cliente terminó por desahucio el contrato de una empleada con 6 años. ¿Qué le corresponde?',
     fuentes: ['Código de Trabajo, artículo por artículo', 'Sentencias de la Tercera Sala'],
     nota: 'Los montos de las prestaciones salen de las fórmulas del Código de Trabajo, no de la inteligencia artificial.',
+    enlace: ['Calcule las prestaciones gratis', '/calculadora-prestaciones-laborales'],
   },
   {
     icono: Scale,
@@ -237,7 +245,7 @@ export default function Inicio() {
           <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
             <Encabezado antetitulo="QUÉ LEE POR USTED" titulo="El derecho dominicano que usted consulta todos los días, materia por materia." />
             <div className="grid gap-5 md:grid-cols-2">
-              {MATERIAS.map(({ icono: Icono, nombre, pregunta, fuentes, nota }) => (
+              {MATERIAS.map(({ icono: Icono, nombre, pregunta, fuentes, nota, enlace }) => (
                 <div key={nombre} className="flex flex-col gap-4 rounded-xl border border-papel-borde bg-background p-6">
                   <div className="flex items-center gap-3">
                     <span className="flex size-11 items-center justify-center rounded-[9px] bg-panel text-[#F1E8DA]">
@@ -261,6 +269,12 @@ export default function Inicio() {
                     </ul>
                   </div>
                   {nota && <p className="mt-auto border-t border-papel-borde pt-3 text-[0.92rem] text-ink-soft">{nota}</p>}
+                  {enlace && (
+                    <Link to={enlace[1]} className="inline-flex items-center gap-1.5 font-bold text-marca-texto hover:underline">
+                      {enlace[0]}
+                      <ArrowRight className="size-4" aria-hidden />
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>

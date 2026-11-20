@@ -16,11 +16,19 @@ import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
 import MiOficina from '@/pages/mi-oficina'
 import Modelos from '@/pages/modelos'
+import NoEncontrada from '@/pages/no-encontrada'
 import Plan from '@/pages/plan'
 import Redactar from '@/pages/redactar'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
 import Errores from '@/pages/errores'
+
+// Las pantallas de la app: sin sesión piden entrar. Son las mismas de servidor.RUTAS_APP (allí no van a Google y
+// cualquier otra dirección responde 404): si se agrega una pantalla, agregarla en los dos lados.
+const RUTAS_APP = [
+  'plan', 'papiniano', 'papiniano/:id', 'modelos', 'redactar', 'biblioteca', 'redaccion', 'redaccion/:clave',
+  'usuarios', 'errores', 'oficina', 'expedientes', 'expedientes/:id', 'agenda',
+]
 
 export default function App() {
   // undefined: todavía se está preguntando al servidor si hay sesión
@@ -87,7 +95,8 @@ export default function App() {
     <Route key="calculadora" path="calculadora-prestaciones-laborales" element={<Calculadora />} />,
   ]
 
-  // sin sesión: la página pública en /, la entrada en /entrar; cualquier otra dirección pide entrar
+  // sin sesión: la página pública en /, la entrada en /entrar, las pantallas de la app piden entrar y cualquier otra
+  // dirección es la página 404
   if (!sesion)
     return (
       <Routes>
@@ -104,7 +113,10 @@ export default function App() {
             />
           }
         />
-        <Route path="*" element={<Navigate to="/entrar" replace />} />
+        {RUTAS_APP.map((p) => (
+          <Route key={p} path={p} element={<Navigate to="/entrar" replace />} />
+        ))}
+        <Route path="*" element={<NoEncontrada />} />
       </Routes>
     )
 
@@ -139,14 +151,26 @@ export default function App() {
           ) : (
             <Route path="redaccion/*" element={<Navigate to="/" replace />} />
           )}
-          {sesion.perfil.es_admin && <Route path="usuarios" element={<Usuarios />} />}
-          {sesion.perfil.es_admin && <Route path="errores" element={<Errores />} />}
+          {/* lo del administrador; a los demás los lleva al Escritorio */}
+          {sesion.perfil.es_admin ? (
+            <>
+              <Route path="usuarios" element={<Usuarios />} />
+              <Route path="errores" element={<Errores />} />
+            </>
+          ) : (
+            <>
+              <Route path="usuarios" element={<Navigate to="/" replace />} />
+              <Route path="errores" element={<Navigate to="/" replace />} />
+            </>
+          )}
           {/* siempre: al aceptar una invitación se llega aquí antes de que se vuelva a leer la cuenta */}
           <Route path="oficina" element={<MiOficina />} />
           <Route path="expedientes" element={<Expedientes />} />
           <Route path="expedientes/:id" element={<Expedientes />} />
           <Route path="agenda" element={<Agenda />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* con sesión, /entrar lleva al Escritorio; lo que no existe es la 404, dentro de la app */}
+          <Route path="entrar" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NoEncontrada dentro />} />
         </Route>
       </Routes>
     </ContextoSesion.Provider>

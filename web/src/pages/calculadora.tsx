@@ -16,7 +16,7 @@ import { useTitulo } from '@/lib/titulo'
 const numero = (texto: string) => Number(texto.replace(/[^\d.]/g, ''))
 
 export default function Calculadora() {
-  useTitulo(`Calculadora de prestaciones laborales (República Dominicana) · ${NOMBRE_APP}`)
+  useTitulo(`Calculadora de prestaciones laborales RD · ${NOMBRE_APP}`)
   useEffect(() => window.scrollTo(0, 0), [])
 
   const [salario, setSalario] = useState('')
@@ -41,9 +41,9 @@ export default function Calculadora() {
             Calculadora de prestaciones laborales
           </h1>
           <p className="text-[1.1rem] leading-relaxed text-ink-soft">
-            Calcule el preaviso, la cesantía, las vacaciones y el salario de Navidad de un trabajador al que le hicieron
-            desahucio o lo despidieron sin causa justificada, con las fórmulas del Código de Trabajo de la República
-            Dominicana.
+            Calcule el preaviso, la cesantía, las vacaciones y la regalía pascual (salario de Navidad) de un trabajador al
+            que le hicieron desahucio o lo despidieron sin causa justificada, con las fórmulas del Código de Trabajo de la
+            República Dominicana.
           </p>
         </div>
 
@@ -157,7 +157,7 @@ export default function Calculadora() {
                       más ({pesos(calculo.vacacionesUltimoAnio * calculo.diario)}) (arts. 177 y 182).
                     </li>
                   )}
-                  <li>El salario de Navidad no puede pasar de cinco salarios mínimos (art. 219).</li>
+                  <li>La regalía pascual (salario de Navidad) no puede pasar de cinco salarios mínimos (art. 219).</li>
                   <li>
                     No incluye la indemnización del art. 95 (hasta 6 meses de salario, solo si un tribunal declara
                     injustificado el despido) ni la participación en los beneficios de la empresa.
@@ -191,7 +191,7 @@ export default function Calculadora() {
           <p>
             Cuando el empleador termina un contrato por tiempo indefinido sin una causa justificada (desahucio o despido
             injustificado), el trabajador tiene derecho al preaviso y al auxilio de cesantía, además de las vacaciones que
-            no disfrutó y la parte que le toca del salario de Navidad. Todo se calcula a partir del salario diario.
+            no disfrutó y la parte que le toca de la regalía pascual. Todo se calcula a partir del salario diario.
           </p>
           <h3>Salario diario</h3>
           <p>
@@ -213,9 +213,9 @@ export default function Calculadora() {
             Si el trabajador no las tomó, se pagan. Para el año en curso se usa la escala del art. 180: con más de 5 meses,
             6 días; con más de 6, 7 días; y así hasta 12 días con más de 11 meses.
           </p>
-          <h3>Salario de Navidad (arts. 219 y 220)</h3>
+          <h3>Regalía pascual o salario de Navidad (arts. 219 y 220)</h3>
           <p>
-            Es la duodécima parte de lo ganado en el año calendario. Si el contrato termina antes de diciembre, se paga la
+            La regalía pascual, que el Código llama salario de Navidad, es la duodécima parte de lo ganado en el año calendario. Si el contrato termina antes de diciembre, se paga la
             parte proporcional a los meses trabajados en el año.
           </p>
           <h3>Cuándo cambia el cálculo</h3>
