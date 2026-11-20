@@ -69,6 +69,12 @@ for _archivo, _corto, _nombre, _materia, _alias in [
      "Código de Procedimiento Civil de la República Dominicana", "Civil", r"(?:c[óo]digo de )?procedimiento civil"),
     ("leyes/codigo-de-trabajo.pdf", "Código de Trabajo", "Código de Trabajo de la República Dominicana (Ley núm. 16-92)",
      "Laboral", r"c[óo]digo de(?:l)? trabajo|ley\s*(?:n[úu]m\.?|no\.?)?\s*16-92"),
+    # la casación civil, comercial, laboral, inmobiliaria y contencioso (no la penal); su art. 90 cambió el art. 641
+    # del Código de Trabajo (el PDF del Código todavía trae el texto viejo: el plazo ya no es de un mes)
+    ("leyes/ley-2-23.pdf", "Ley 2-23",
+     "Ley núm. 2-23 sobre Recurso de Casación (deroga la Ley núm. 3726 de 1953 y modifica los arts. 640 y 641 del "
+     "Código de Trabajo)", "Civil",
+     r"\b2-23\b|ley (?:de (?:la )?|sobre (?:el )?)?(?:recurso de |procedimiento de )?casaci[óo]n|\b3726\b"),
     ("leyes/ley-189-11.pdf", "Ley 189-11",
      "Ley núm. 189-11 para el Desarrollo del Mercado Hipotecario y el Fideicomiso", "Inmobiliario",
      r"189-11|ley de fideicomiso|mercado hipotecario"),
