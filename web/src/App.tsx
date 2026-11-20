@@ -4,6 +4,7 @@ import { api, SESION_TERMINADA } from '@/lib/api'
 import { ContextoSesion, type Sesion } from '@/lib/sesion'
 import { aplicarColores, aplicarLetra } from '@/lib/tema'
 import type { Perfil } from '@/lib/tipos'
+import { ArticuloBlog, Blog } from '@/pages/blog'
 import Calculadora from '@/pages/calculadora'
 import Entrada from '@/pages/entrada'
 import Inicio from '@/pages/inicio'
@@ -103,12 +104,14 @@ export default function App() {
 
   if (perfil === undefined) return <div className="min-h-dvh bg-background" aria-busy="true" />
 
-  // las páginas legales y la calculadora de prestaciones se ven con o sin sesión
+  // las páginas legales, la calculadora de prestaciones y el blog se ven con o sin sesión
   const legales = [
     ...(['terminos', 'privacidad', 'reembolso', 'contacto'] as const).map((p) => (
       <Route key={p} path={p} element={<Legal pagina={p} />} />
     )),
     <Route key="calculadora" path="calculadora-prestaciones-laborales" element={<Calculadora />} />,
+    <Route key="blog" path="blog" element={<Blog />} />,
+    <Route key="articulo" path="blog/:slug" element={<ArticuloBlog />} />,
   ]
 
   // sin sesión: la página pública en /, la entrada en /entrar, las pantallas de la app piden entrar y cualquier otra

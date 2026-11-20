@@ -325,6 +325,19 @@ cada "N días / meses / años" de una respuesta salga de las fuentes (si no, pid
 Google. Calcula en el navegador (`web/src/lib/prestaciones.ts`), sin servidor ni base de datos, con **las mismas reglas**
 que `prestaciones.py`: si cambia una, cambiar la otra. Se comprobó con 8 casos que dan lo mismo, peso por peso.
 
+## Blog (`/blog`, 20 nov)
+Cada artículo es un archivo Markdown en `blog/` (los datos arriba entre `---`: título, `titulo_seo`, descripción,
+fechas, `publicado`, `revisado`; ver `blog.py`). El nombre del archivo es la dirección. El servidor manda el
+artículo completo en el HTML (Google y las IA lo leen sin JavaScript), con su ficha JSON-LD de «Article», y el
+`sitemap.xml` ahora lo arma el servidor con los artículos publicados (ya no hay sitemap fijo en `web/public/`).
+**Un artículo nuevo nace como borrador** (`publicado: false`): no sale en la lista, ni en el sitemap, ni en Google,
+pero se abre con su dirección para que **un abogado lo revise**. Para publicarlo: `publicado: true` y
+`revisado: "Lic. …"`, subir y avisar a Google (Search Console → pedir indexación) y a Bing (IndexNow). Al publicar
+el primero, agregar «Blog» al pie de la página pública (`components/publico.tsx`) y a `llms.txt`.
+- Primer artículo (borrador): `prestaciones-laborales-republica-dominicana`. Los ejemplos salen de las mismas
+  fórmulas de `prestaciones.py` y de la calculadora (comprobado que dan igual).
+- Siguientes (de la auditoría SEO): plazos para apelar y casación (Ley 2-23); nuevo Código Penal y Ley 44-26.
+
 ## Promociones por correo (20 nov)
 Solo a quien lo acepta (Ley 172-13): casilla **sin marcar** al entrar («Quiero recibir novedades y promociones»; se
 recuerda en `sessionStorage` hasta que entra y `App.tsx` la guarda con `POST /api/promociones`) y «Recibir

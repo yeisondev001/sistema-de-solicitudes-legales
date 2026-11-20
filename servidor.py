@@ -23,6 +23,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
+import blog
 import cuentas
 import expedientes
 import historial
@@ -1651,30 +1652,102 @@ def _origen() -> str:
     return (os.environ.get("APP_URL") or "https://papinianord.com").rstrip("/")
 
 
+def _pagina(titulo: str, descripcion: str, resumen: str | None, direccion: str | None, noindex: bool,
+            datos: dict | None = None) -> str:
+    """index.html con el título, la descripción, la dirección canónica (si la hay), «noindex» (si va) y, en lugar del
+    resumen de la portada, el de esta página. «datos»: una ficha JSON-LD más (la de un artículo del blog)."""
+    html = (PANTALLAS / "index.html").read_text(encoding="utf-8")
+    t, d = escape(titulo, quote=True), escape(descripcion, quote=True)
+    html = re.sub(r"<title>.*?</title>", f"<title>{t}</title>", html, count=1)
+    html = re.sub(r'(<meta name="description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
+    html = re.sub(r'(<meta property="og:title" content=")[^"]*', lambda m: m.group(1) + t, html, count=1)
+    html = re.sub(r'(<meta property="og:description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
+    extra = ""
+    if direccion:
+        html = re.sub(r'(<meta property="og:url" content=")[^"]*', lambda m: m.group(1) + direccion, html, count=1)
+        extra += f'    <link rel="canonical" href="{direccion}" />\n'
+    if noindex:
+        extra += '    <meta name="robots" content="noindex" />\n'
+    if datos:
+        # «</» escapado: así nada del texto puede cerrar el <script>
+        extra += ('    <script type="application/ld+json">'
+                  + json.dumps(datos, ensure_ascii=False).replace("</", "<\\/") + "</script>\n")
+    html = html.replace("</head>", extra + "  </head>", 1)
+    if resumen:
+        html = re.sub(r"<noscript>.*?</noscript>", lambda m: f"<noscript>{resumen}</noscript>", html, count=1, flags=re.S)
+    return html
+
+
 def _indice(ruta) -> str:
-    """index.html con el título, la descripción y la dirección de esa página (se arma una vez por página).
-    Con NO_404, la página 404: sin dirección canónica y con «noindex»."""
+    """La página pública ya armada (una vez por página). Con NO_404, la página 404: sin dirección y con «noindex»."""
     if ruta not in _INDICE:
-        html = (PANTALLAS / "index.html").read_text(encoding="utf-8")
         es_404 = ruta is NO_404
         titulo, descripcion, resumen = PAGINA_404 if es_404 else PAGINAS_PUBLICAS[ruta]
-        t, d = escape(titulo, quote=True), escape(descripcion, quote=True)
-        html = re.sub(r"<title>.*?</title>", f"<title>{t}</title>", html, count=1)
-        html = re.sub(r'(<meta name="description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
-        html = re.sub(r'(<meta property="og:title" content=")[^"]*', lambda m: m.group(1) + t, html, count=1)
-        html = re.sub(r'(<meta property="og:description" content=")[^"]*', lambda m: m.group(1) + d, html, count=1)
-        extra = ""
-        if not es_404:
-            direccion = f"{_origen()}/{ruta}"
-            html = re.sub(r'(<meta property="og:url" content=")[^"]*', lambda m: m.group(1) + direccion, html, count=1)
-            extra += f'    <link rel="canonical" href="{direccion}" />\n'
-        if es_404 or ruta in NO_INDEXAR:
-            extra += '    <meta name="robots" content="noindex" />\n'
-        html = html.replace("</head>", extra + "  </head>", 1)
-        if resumen:
-            html = re.sub(r"<noscript>.*?</noscript>", lambda m: f"<noscript>{resumen}</noscript>", html, count=1, flags=re.S)
-        _INDICE[ruta] = html
+        _INDICE[ruta] = _pagina(titulo, descripcion, resumen, None if es_404 else f"{_origen()}/{ruta}",
+                                es_404 or ruta in NO_INDEXAR)
     return _INDICE[ruta]
+
+
+# ── BLOG (blog.py) ───────────────────────────────
+_BLOG_TITULO = "Blog: guías de derecho dominicano · Papiniano"
+_BLOG_DESCRIPCION = ("Guías claras sobre derecho dominicano para abogados: prestaciones laborales, plazos, el nuevo "
+                     "Código Penal y más, con los artículos de la ley.")
+
+
+def _blog_lista_html() -> tuple[str, bool]:
+    """La lista del blog para el HTML del servidor, y si tiene artículos publicados."""
+    lista = blog.articulos()
+    resumen = "<h1>Blog de Papiniano</h1>" + "".join(
+        f'<h2><a href="{_origen()}/blog/{a["slug"]}">{escape(a["titulo"])}</a></h2><p>{escape(a["descripcion"])}</p>'
+        for a in lista)
+    return resumen, bool(lista)
+
+
+def _blog_articulo_html(a: dict) -> str:
+    direccion = f"{_origen()}/blog/{a['slug']}"
+    ficha = None
+    if a["publicado"]:
+        papiniano = {"@type": "Organization", "name": "Papiniano", "url": f"{_origen()}/",
+                     "logo": {"@type": "ImageObject", "url": f"{_origen()}/apple-touch-icon.png"}}
+        ficha = {"@context": "https://schema.org", "@type": "Article", "headline": a["titulo"][:110],
+                 "description": a["descripcion"], "datePublished": a["fecha"], "dateModified": a["actualizado"],
+                 "inLanguage": "es-DO", "mainEntityOfPage": direccion, "author": papiniano, "publisher": papiniano}
+    cuerpo = f'<article><h1>{escape(a["titulo"])}</h1>{a["html"]}</article>'
+    return _pagina(f'{a["titulo_seo"]} · Papiniano', a["descripcion"], cuerpo, direccion, not a["publicado"], ficha)
+
+
+@app.get("/api/blog")
+def blog_lista():
+    """Los artículos publicados, del más nuevo al más viejo."""
+    return [{k: a[k] for k in ("slug", "titulo", "descripcion", "fecha", "actualizado")} for a in blog.articulos()]
+
+
+@app.get("/api/blog/{slug}")
+def blog_articulo(slug: str):
+    """Un artículo (también un borrador, para que el abogado lo lea con su dirección)."""
+    a = blog.articulo(slug)
+    if not a:
+        raise HTTPException(404, "Ese artículo no existe.")
+    return {k: a[k] for k in ("slug", "titulo", "descripcion", "fecha", "actualizado", "publicado", "revisado", "html")}
+
+
+@app.get("/sitemap.xml")
+def sitemap():
+    """La lista de páginas para Google: las públicas fijas y los artículos publicados del blog (se arma sola)."""
+    base = _origen()
+    paginas = [("/", "weekly", "1.0", None), ("/calculadora-prestaciones-laborales", "monthly", "0.9", None)]
+    publicados = blog.articulos()
+    if publicados:
+        paginas.append(("/blog", "weekly", "0.8", publicados[0]["actualizado"]))
+        paginas += [(f"/blog/{a['slug']}", "monthly", "0.7", a["actualizado"]) for a in publicados]
+    paginas += [(f"/{p}", "yearly", "0.3", None) for p in ("terminos", "privacidad", "reembolso", "contacto")]
+    filas = "".join(
+        f"  <url><loc>{base}{ruta}</loc>" + (f"<lastmod>{fecha}</lastmod>" if fecha else "")
+        + f"<changefreq>{frecuencia}</changefreq><priority>{prioridad}</priority></url>\n"
+        for ruta, frecuencia, prioridad, fecha in paginas)
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           + filas + "</urlset>\n")
+    return Response(xml, media_type="application/xml", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/{ruta:path}")
@@ -1700,6 +1773,17 @@ def pantallas(ruta: str, request: Request):
             if limpia in NO_INDEXAR:
                 cabeceras["X-Robots-Tag"] = "noindex"
             return HTMLResponse(_indice(limpia), headers=cabeceras)
+        if limpia == "blog":
+            resumen, hay = _blog_lista_html()
+            # sin artículos publicados todavía, la lista no va a Google (sería una página vacía)
+            cabeceras = {"Cache-Control": "no-cache"} if hay else {"Cache-Control": "no-cache", "X-Robots-Tag": "noindex"}
+            return HTMLResponse(_pagina(_BLOG_TITULO, _BLOG_DESCRIPCION, resumen, f"{_origen()}/blog", not hay),
+                                headers=cabeceras)
+        if limpia.startswith("blog/") and (a := blog.articulo(limpia[5:])):
+            cabeceras = {"Cache-Control": "no-cache"}
+            if not a["publicado"]:
+                cabeceras["X-Robots-Tag"] = "noindex"
+            return HTMLResponse(_blog_articulo_html(a), headers=cabeceras)
         if RUTAS_APP.fullmatch(limpia):
             return FileResponse(PANTALLAS / "index.html", headers={"Cache-Control": "no-cache", "X-Robots-Tag": "noindex"})
         # cualquier otra dirección: la página 404 de la app, con el código 404 de verdad para que Google la descarte
