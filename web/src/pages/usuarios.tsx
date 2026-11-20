@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Building2, Loader2, Trash2, UserPlus } from 'lucide-react'
+import { Building2, Download, Loader2, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Cargando } from '@/components/cargando'
 import { TituloSala } from '@/components/oficina'
@@ -51,7 +51,14 @@ export default function Usuarios() {
 
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 md:px-8 md:py-8">
-      <TituloSala titulo="Usuarios" sub="Quién entra al despacho, con qué plan y qué ve." />
+      <TituloSala titulo="Usuarios" sub="Quién entra al despacho, con qué plan y qué ve.">
+        {/* los correos que aceptaron promociones, para subirlos a Brevo o Mailchimp (el enlace de baja lo pone ese servicio) */}
+        <Button variant="outline" asChild>
+          <a href="/api/usuarios/promociones.csv" download>
+            <Download /> Correos para promociones
+          </a>
+        </Button>
+      </TituloSala>
       <div className="space-y-5">
         <Seccion titulo="Cuentas">
           {error ? (

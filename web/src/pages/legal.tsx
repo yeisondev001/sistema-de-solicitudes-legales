@@ -10,7 +10,7 @@ import { NOMBRE_APP } from '@/lib/tema'
 */
 
 const CORREO = 'soportepapiniano@gmail.com'
-const ACTUALIZADO = '13 de noviembre de 2026'
+const ACTUALIZADO = '20 de noviembre de 2026'
 
 type Pagina = 'terminos' | 'privacidad' | 'reembolso' | 'contacto'
 
@@ -89,13 +89,21 @@ const PAGINAS: Record<Pagina, { titulo: string; cuerpo: React.ReactNode }> = {
             Sus expedientes y su agenda: el nombre del cliente, el asunto, el número, el tribunal, la contraparte, las
             fechas y las notas que usted escribe. Estos datos no se le envían a la inteligencia artificial.
           </li>
-          <li>Cuántas consultas hace por día (para el límite de la prueba).</li>
+          <li>Cuántas consultas hace por día (para el límite de su plan).</li>
+          <li>Si aceptó recibir novedades y promociones por correo, y la fecha en que lo aceptó o lo quitó.</li>
           <li>Los datos del pago los guarda Polar; nosotros no vemos su tarjeta.</li>
         </ul>
         <h2>Para qué los usamos</h2>
         <p>
-          Solo para darle el servicio: entrar a su cuenta, responder sus consultas, guardar su trabajo y cobrar su plan.
-          No vendemos sus datos ni los usamos para publicidad.
+          Para darle el servicio: entrar a su cuenta, responder sus consultas, guardar su trabajo y cobrar su plan. No
+          vendemos sus datos ni los compartimos con otros para publicidad.
+        </p>
+        <h2>Novedades y promociones</h2>
+        <p>
+          Solo si usted lo acepta (la casilla al entrar o «Recibir promociones» en su cuenta), le enviamos a su correo
+          novedades y promociones de {NOMBRE_APP}. Puede dejar de recibirlas cuando quiera: desde su cuenta, con el enlace
+          «darse de baja» que trae cada correo o escribiendo a {CORREO}. Para enviarlas usamos un servicio de correo que
+          solo recibe su nombre y su correo.
         </p>
         <h2>Con quién se comparten</h2>
         <p>

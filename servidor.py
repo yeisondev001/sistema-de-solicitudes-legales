@@ -153,6 +153,7 @@ def _perfil(u: dict) -> dict:
     perfil["letra"] = u.get("letra") or "normal"
     perfil["propios"] = cuentas.con_propios(u["plan"])
     perfil["por_pagar"] = bool(u.get("por_pagar"))
+    perfil["promociones"] = bool(u.get("promociones"))
     perfil["prueba"] = perfil["basico"] = None
     # la cajita de lo que le queda: solo en la prueba y en el Aspirante (el Abogado no ve su tope)
     tope = cuentas.tope_diario(u["plan"]) if u["plan"] in ("prueba", "basico") else None
@@ -421,6 +422,17 @@ def cambiar_letra(datos: Letra, u=Depends(usuario_actual)):
         raise HTTPException(400, "Ese tamaño de letra no existe.")
     cuentas.cambiar_letra(u["id"], "" if datos.letra == "normal" else datos.letra)
     return _perfil({**u, "letra": datos.letra})
+
+
+class Promociones(BaseModel):
+    acepta: bool
+
+
+@app.post("/api/promociones")
+def cambiar_promociones(datos: Promociones, u=Depends(usuario_actual)):
+    """Recibir o no novedades y promociones de Papiniano por correo (la casilla al entrar o Mi cuenta)."""
+    cuentas.poner_promociones(u["id"], datos.acepta)
+    return _perfil({**u, "promociones": datos.acepta})
 
 
 @app.post("/api/tema")
@@ -1275,6 +1287,22 @@ def aviso_cliente(datos: AvisoCliente, u=Depends(usuario_actual)):
         "su proxy corta el pedido; si se repite seguido, revisar Render.", u["id"])
     _abiertos().add((u["id"], ruta))
     return {"ok": True}
+
+
+@app.get("/api/usuarios/promociones.csv")
+def correos_promociones(u=Depends(solo_admin)):
+    """Para el administrador: los correos que aceptaron promociones, listos para subir a Brevo o Mailchimp."""
+    import csv
+    import io
+    salida = io.StringIO()
+    hoja = csv.writer(salida)
+    hoja.writerow(["nombre", "correo", "acepto_el"])
+    for x in cuentas.correos_para_promociones():
+        fecha = time.strftime("%Y-%m-%d", time.localtime(x["promociones_fecha"])) if x.get("promociones_fecha") else ""
+        hoja.writerow([x["nombre"] or x["usuario"], x["email"], fecha])
+    # con BOM para que Excel lea bien las tildes
+    return Response("\ufeff" + salida.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="papiniano-promociones.csv"'})
 
 
 @app.get("/api/usuarios")

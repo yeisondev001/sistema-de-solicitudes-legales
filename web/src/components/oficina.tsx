@@ -10,12 +10,16 @@ import { Logo } from '@/components/logo'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { toast } from 'sonner'
+import { api } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
 import { iniciales, NOMBRE_APP } from '@/lib/tema'
+import type { Perfil } from '@/lib/tipos'
 import { cn } from '@/lib/utils'
 
 interface Sala {
@@ -103,7 +107,7 @@ function CajaPrueba() {
 }
 
 function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
-  const { perfil, salir } = useSesion()
+  const { perfil, salir, cambiarPerfil } = useSesion()
   const navegar = useNavigate()
   return (
     <DropdownMenu>
@@ -135,6 +139,23 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
         <DropdownMenuItem onSelect={abrirApariencia} className="h-10 text-[0.95rem]">
           <Palette /> Apariencia
         </DropdownMenuItem>
+        {/* Ley 172-13: las promociones solo con su permiso, y las puede quitar cuando quiera */}
+        <DropdownMenuCheckboxItem
+          checked={perfil.promociones}
+          onSelect={(ev) => ev.preventDefault()}
+          onCheckedChange={(acepta) => {
+            api
+              .post<Perfil>('/api/promociones', { acepta })
+              .then((p) => {
+                cambiarPerfil(p)
+                toast.success(acepta ? 'Le enviaremos novedades y promociones.' : 'Ya no le enviaremos promociones.')
+              })
+              .catch(() => toast.error('No se pudo guardar. Intente en un momento.'))
+          }}
+          className="h-10 text-[0.95rem]"
+        >
+          Recibir promociones
+        </DropdownMenuCheckboxItem>
         {perfil.es_admin && (
           <DropdownMenuItem onSelect={() => navegar('/usuarios')} className="h-10 text-[0.95rem]">
             <Users /> Administrar usuarios

@@ -198,6 +198,9 @@ _MIGRACIONES = {
         # las bases que ya tenían la tabla: qué cuenta tuvo el error y cuándo se le arregló
         "ALTER TABLE errores ADD COLUMN IF NOT EXISTS usuario_id BIGINT",
         "ALTER TABLE errores ADD COLUMN IF NOT EXISTS resuelto BIGINT",
+        # promociones por correo: solo si la persona lo aceptó (casilla al entrar o en Mi cuenta), y cuándo
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promociones BOOLEAN",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promociones_fecha BIGINT",
     ],
     "sqlite": [
         "ALTER TABLE usuarios ADD COLUMN email TEXT",
@@ -298,6 +301,8 @@ _MIGRACIONES = {
             usuario_id INTEGER, resuelto INTEGER)""",
         "ALTER TABLE errores ADD COLUMN usuario_id INTEGER",
         "ALTER TABLE errores ADD COLUMN resuelto INTEGER",
+        "ALTER TABLE usuarios ADD COLUMN promociones INTEGER",
+        "ALTER TABLE usuarios ADD COLUMN promociones_fecha INTEGER",
     ],
 }
 _tablas_listas = False
@@ -362,7 +367,7 @@ def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
             "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": _plan(u),
             "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or "", "letra": u.get("letra") or "",
-            "prueba_hasta": u.get("prueba_hasta"), "oficina": oficina,
+            "prueba_hasta": u.get("prueba_hasta"), "oficina": oficina, "promociones": bool(u.get("promociones")),
             "por_pagar": bool(_bloqueo(u)) and por_pagar(u)}
 
 
@@ -458,6 +463,20 @@ def cambiar_activo(usuario_id: int, activo: bool):
     _ejecutar("UPDATE usuarios SET activo = %s WHERE id = %s", (activo, usuario_id))
     if not activo:
         _ejecutar("DELETE FROM sesiones WHERE usuario_id = %s", (usuario_id,))
+
+
+def poner_promociones(usuario_id: int, acepta: bool):
+    """Acepta o deja de aceptar novedades y promociones por correo (Ley 172-13: solo con su permiso). Se guarda la
+    fecha de la última vez que lo cambió, como prueba de cuándo lo aceptó o lo quitó."""
+    _ejecutar("UPDATE usuarios SET promociones = %s, promociones_fecha = %s WHERE id = %s",
+              (bool(acepta), int(time.time()), usuario_id))
+
+
+def correos_para_promociones() -> list:
+    """Las cuentas activas que aceptaron promociones, para subirlas al servicio de envío (Brevo, Mailchimp…)."""
+    return _ejecutar("SELECT nombre, usuario, email, promociones_fecha FROM usuarios "
+                     "WHERE promociones = %s AND activo = %s AND email IS NOT NULL AND email <> '' ORDER BY id",
+                     (True, True), leer=True)
 
 
 def cambiar_tema(usuario_id: int, tema: str):

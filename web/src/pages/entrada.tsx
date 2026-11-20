@@ -214,6 +214,14 @@ function Encabezado({ titulo, sub }: { titulo: string; sub: string }) {
 
 function Entrar({ datos, alEntrar, errorInicial }: { datos: DatosEntrada; alEntrar: (p: Perfil) => void; errorInicial: string }) {
   const [usuario, setUsuario] = useState('')
+  // promociones por correo: solo si la marca (Ley 172-13); empieza sin marcar
+  const [promociones, setPromociones] = useState(() => {
+    try {
+      return sessionStorage.getItem('acepta_promociones') === '1'
+    } catch {
+      return false
+    }
+  })
   const [clave, setClave] = useState('')
   const [error, setError] = useState(errorInicial)
   const [entrando, setEntrando] = useState(false)
@@ -245,6 +253,23 @@ function Entrar({ datos, alEntrar, errorInicial }: { datos: DatosEntrada; alEntr
             <img src="/google_g.svg" alt="" className="size-5" />
             Continuar con Google
           </a>
+          <label className="flex cursor-pointer items-start gap-3 text-[0.95rem] leading-snug text-ink-soft">
+            <input
+              type="checkbox"
+              checked={promociones}
+              onChange={(ev) => {
+                setPromociones(ev.target.checked)
+                try {
+                  if (ev.target.checked) sessionStorage.setItem('acepta_promociones', '1')
+                  else sessionStorage.removeItem('acepta_promociones')
+                } catch {
+                  // sin almacenamiento: lo puede marcar después en Mi cuenta
+                }
+              }}
+              className="mt-0.5 size-5 shrink-0 accent-[var(--color-marca)]"
+            />
+            <span>Quiero recibir novedades y promociones de Papiniano por correo. Me puedo dar de baja cuando quiera.</span>
+          </label>
           <div className="flex items-center gap-3 text-sm text-pista">
             <span className="h-px flex-1 bg-papel-borde" />o con usuario y contraseña
             <span className="h-px flex-1 bg-papel-borde" />

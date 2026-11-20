@@ -23,6 +23,8 @@ export interface Perfil {
   oficina: { id: number; nombre: string; es_dueno: boolean } | null
   /** la prueba terminó o el plan venció: solo puede ver la pantalla de pago */
   por_pagar: boolean
+  /** aceptó recibir novedades y promociones por correo (la casilla al entrar o Mi cuenta) */
+  promociones: boolean
 }
 
 /** La oficina vista desde adentro: el dueño ve además el uso de cada abogado y los correos que agregó */

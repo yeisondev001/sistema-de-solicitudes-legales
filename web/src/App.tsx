@@ -55,6 +55,19 @@ export default function App() {
     }
   }, [perfil, navegar])
 
+  // marcó «Quiero recibir novedades y promociones» al entrar: se guarda en su cuenta, con la fecha
+  useEffect(() => {
+    if (!perfil) return
+    try {
+      if (sessionStorage.getItem('acepta_promociones') !== '1') return
+      sessionStorage.removeItem('acepta_promociones')
+    } catch {
+      return
+    }
+    if (perfil.promociones) return
+    api.post<Perfil>('/api/promociones', { acepta: true }).then(setPerfil).catch(() => {})
+  }, [perfil])
+
   // el tema de la persona por dentro; por fuera, la marca
   useEffect(() => {
     aplicarColores(perfil?.colores)

@@ -325,6 +325,15 @@ cada "N días / meses / años" de una respuesta salga de las fuentes (si no, pid
 Google. Calcula en el navegador (`web/src/lib/prestaciones.ts`), sin servidor ni base de datos, con **las mismas reglas**
 que `prestaciones.py`: si cambia una, cambiar la otra. Se comprobó con 8 casos que dan lo mismo, peso por peso.
 
+## Promociones por correo (20 nov)
+Solo a quien lo acepta (Ley 172-13): casilla **sin marcar** al entrar («Quiero recibir novedades y promociones»; se
+recuerda en `sessionStorage` hasta que entra y `App.tsx` la guarda con `POST /api/promociones`) y «Recibir
+promociones» en Mi cuenta. La cuenta guarda `promociones` y `promociones_fecha` (prueba de cuándo aceptó o quitó).
+El administrador baja la lista en Usuarios → «Correos para promociones» (`/api/usuarios/promociones.csv`) y la sube
+a Brevo o Mailchimp, que ponen el enlace de baja en cada correo; quien se da de baja allá queda bloqueado allá. Antes
+de la primera promoción, que un abogado lea la cláusula de Privacidad. Las cuentas de antes no aceptaron: no se les
+mandan promociones.
+
 ## Google y los asistentes de IA (SEO, 19 nov)
 - `web/public/robots.txt` deja entrar a todos (también a los robots de IA); solo `/api/` queda fuera. `sitemap.xml`
   lista las páginas públicas y `llms.txt` resume Papiniano para las IA.
