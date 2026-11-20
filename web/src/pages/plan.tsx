@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ExternalLink, Loader2, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { Logo } from '@/components/logo'
@@ -22,21 +22,30 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
   const [anual, setAnual] = useState(false)
   const [activo, setActivo] = useState<boolean | null>(null)
   const [enCurso, setEnCurso] = useState('')
+  const navegar = useNavigate()
   const volvio = params.get('pago') === 'ok'
-  const elegido = params.get('elegir')
+  // viene de «Elegir plan» de la página pública (?elegir=abogado): no se le vuelven a mostrar los planes, solo
+  // «Abriendo el pago…» hasta que llega a Polar. Se guarda al abrir, porque enseguida se quita de la dirección.
+  const [abriendo, setAbriendo] = useState(() => {
+    const e = params.get('elegir')
+    return e === 'aspirante' || e === 'abogado' || e === 'buffet'
+      ? { plan: e, ciclo: params.get('ciclo') === 'anual' ? 'año' : 'mes' }
+      : null
+  })
   const yaIntentado = useRef(false)
 
   useEffect(() => {
     api.get<{ activo: boolean }>('/api/pagos').then((d) => setActivo(d.activo)).catch(() => setActivo(false))
   }, [])
 
-  // viene de «Elegir plan» de la página pública: se abre directo el pago de ese plan
   useEffect(() => {
-    if (!activo || yaIntentado.current || (elegido !== 'aspirante' && elegido !== 'abogado' && elegido !== 'buffet')) return
+    if (!activo || !abriendo || yaIntentado.current) return
     yaIntentado.current = true
-    void ir('/api/pagos/pagar', { plan: elegido, ciclo: params.get('ciclo') === 'anual' ? 'año' : 'mes' }, elegido === 'buffet' ? 'Buffet' : elegido === 'abogado' ? 'Abogado' : 'Aspirante')
+    // sin ?elegir= en la dirección: si vuelve atrás desde Polar, queda en Mi plan y no lo manda otra vez al pago
+    navegar('/plan', { replace: true })
+    void ir('/api/pagos/pagar', abriendo, abriendo.plan === 'buffet' ? 'Buffet' : abriendo.plan === 'abogado' ? 'Abogado' : 'Aspirante')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activo, elegido])
+  }, [activo, abriendo])
 
   // al volver de pagar, Polar tarda unos segundos en avisar: se vuelve a leer la cuenta hasta que cambie el plan
   useEffect(() => {
@@ -57,7 +66,21 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
     } catch (e) {
       toast.error(e instanceof ErrorApi ? e.message : 'No se pudo abrir el pago. Intente en un momento.')
       setEnCurso('')
+      setAbriendo(null)   // si el pago no abrió, se le muestran los planes para que elija otra vez
     }
+  }
+
+  // mientras se abre el pago del plan que eligió en la página pública (si los pagos no están activos, la página normal)
+  if (abriendo && activo !== false) {
+    const nombre = abriendo.plan === 'buffet' ? 'Buffet' : abriendo.plan === 'abogado' ? 'Abogado' : 'Aspirante'
+    const aviso = (
+      <div role="status" aria-live="polite" className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-5 text-center">
+        <Loader2 className="size-8 animate-spin text-marca-texto" aria-hidden />
+        <p className="font-heading text-[1.6rem] leading-tight text-ink">Abriendo el pago del plan {nombre}…</p>
+        <p className="text-ink-soft">Lo llevamos a la pantalla segura de Polar.</p>
+      </div>
+    )
+    return soloPagar ? <div className="min-h-dvh bg-background">{aviso}</div> : aviso
   }
 
   const duenoDeOficina = !!perfil.oficina?.es_dueno
