@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Check, ExternalLink, Loader2, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,7 +13,7 @@ import { planes, PRUEBA_INICIAL } from '@/pages/inicio'
 const NOMBRE_PLAN: Record<string, string> = {
   beta: 'Acceso completo', prueba: 'Prueba gratis', basico: 'Aspirante', activo: 'Abogado', vencido: 'Sin plan',
 }
-const PLAN_DE: Record<string, 'basico' | 'activo'> = { Aspirante: 'basico', Abogado: 'activo' }
+const PLAN_DE: Record<string, 'basico' | 'activo' | 'buffet'> = { Aspirante: 'basico', Abogado: 'activo', Buffet: 'buffet' }
 
 /** Mi plan: elegir y pagar con Polar, ver el plan actual y administrar la suscripción (recibos, tarjeta, cancelar). */
 export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
@@ -23,10 +23,20 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
   const [activo, setActivo] = useState<boolean | null>(null)
   const [enCurso, setEnCurso] = useState('')
   const volvio = params.get('pago') === 'ok'
+  const elegido = params.get('elegir')
+  const yaIntentado = useRef(false)
 
   useEffect(() => {
     api.get<{ activo: boolean }>('/api/pagos').then((d) => setActivo(d.activo)).catch(() => setActivo(false))
   }, [])
+
+  // viene de «Elegir plan» de la página pública: se abre directo el pago de ese plan
+  useEffect(() => {
+    if (!activo || yaIntentado.current || (elegido !== 'aspirante' && elegido !== 'buffet')) return
+    yaIntentado.current = true
+    void ir('/api/pagos/pagar', { plan: elegido, ciclo: params.get('ciclo') === 'anual' ? 'año' : 'mes' }, elegido === 'buffet' ? 'Buffet' : 'Aspirante')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo, elegido])
 
   // al volver de pagar, Polar tarda unos segundos en avisar: se vuelve a leer la cuenta hasta que cambie el plan
   useEffect(() => {
@@ -50,11 +60,12 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
     }
   }
 
+  const duenoDeOficina = !!perfil.oficina?.es_dueno
   const paga = perfil.plan === 'basico' || perfil.plan === 'activo'
   const titulo = soloPagar ? (perfil.plan === 'prueba' ? 'Su prueba gratis terminó' : 'Su plan terminó') : 'Mi plan'
   const sub = soloPagar
     ? 'Elija un plan para seguir. Sus documentos, expedientes y conversaciones están guardados.'
-    : `Su plan actual: ${NOMBRE_PLAN[perfil.plan] ?? perfil.plan}.`
+    : `Su plan actual: ${perfil.oficina ? 'Buffet' : (NOMBRE_PLAN[perfil.plan] ?? perfil.plan)}.`
 
   const contenido = (
     <div className="mx-auto max-w-5xl">
@@ -93,9 +104,9 @@ export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">
-        {planes(PRUEBA_INICIAL).map((p) => {
+        {planes(PRUEBA_INICIAL).filter((p) => !duenoDeOficina || p.nombre === 'Buffet').map((p) => {
           const plan = PLAN_DE[p.nombre]
-          const esMio = plan === perfil.plan
+          const esMio = plan === 'buffet' ? duenoDeOficina && perfil.plan === 'activo' : plan === perfil.plan && !perfil.oficina
           const precio = anual && p.anual ? p.anual : p.mensual
           return (
             <div key={p.nombre} className={cn('flex flex-col gap-3 rounded-2xl border bg-card p-6', p.destacado ? 'border-2 border-marca' : 'border-papel-borde')}>

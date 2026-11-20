@@ -26,6 +26,17 @@ export default function Entrada({ alEntrar }: { alEntrar: (p: Perfil) => void })
   const [lento, setLento] = useState(false)
 
   useEffect(() => {
+    // «Elegir Aspirante» o «Elegir Buffet» de la página pública: se recuerda el plan para llevarlo a pagar al entrar
+    // (por Google la página se recarga, por eso va a sessionStorage y no en la dirección)
+    const q = new URLSearchParams(window.location.search)
+    const plan = q.get('plan')
+    if (plan === 'aspirante' || plan === 'buffet') {
+      try {
+        sessionStorage.setItem('plan_elegido', JSON.stringify({ plan, ciclo: q.get('ciclo') === 'anual' ? 'anual' : 'mensual' }))
+      } catch {
+        // sin almacenamiento: entra igual y elige el plan en «Mi plan»
+      }
+    }
     if (window.location.search) window.history.replaceState(null, '', '/entrar')
     let vigente = true
     const aviso = setTimeout(() => setLento(true), AVISO_LENTO_MS)

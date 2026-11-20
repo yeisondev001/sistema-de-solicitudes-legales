@@ -33,6 +33,20 @@ export default function App() {
 
   useEffect(refrescar, [refrescar])
 
+  // llegó desde «Elegir plan» de la página pública: al entrar lo lleva directo a pagar ese plan
+  useEffect(() => {
+    if (!perfil) return
+    try {
+      const guardado = sessionStorage.getItem('plan_elegido')
+      if (!guardado) return
+      sessionStorage.removeItem('plan_elegido')
+      const { plan, ciclo } = JSON.parse(guardado) as { plan: string; ciclo: string }
+      navegar(`/plan?elegir=${encodeURIComponent(plan)}&ciclo=${encodeURIComponent(ciclo)}`, { replace: true })
+    } catch {
+      // sin almacenamiento: queda en el escritorio y elige en «Mi plan»
+    }
+  }, [perfil, navegar])
+
   // el tema de la persona por dentro; por fuera, la marca
   useEffect(() => {
     aplicarColores(perfil?.colores)

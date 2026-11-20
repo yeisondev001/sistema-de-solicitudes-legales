@@ -119,7 +119,7 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
             <Building2 /> Mi oficina
           </DropdownMenuItem>
         )}
-        {!perfil.oficina && !perfil.es_admin && (
+        {(!perfil.oficina || perfil.oficina.es_dueno) && !perfil.es_admin && (
           <DropdownMenuItem onSelect={() => navegar('/plan')} className="h-10 text-[0.95rem]">
             <CreditCard /> Mi plan
           </DropdownMenuItem>

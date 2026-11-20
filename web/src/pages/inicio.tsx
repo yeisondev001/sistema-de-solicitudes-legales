@@ -120,7 +120,7 @@ export const planes = (p: Prueba) => [
       'Sentencias y leyes, con sus citas', 'Cálculo de prestaciones laborales'],
     // lo que el Aspirante no trae y los otros dos sí (cuentas.con_propios): así se ve por qué conviene el Abogado
     faltan: ['Sus propios modelos de escritos', 'Subir sus propios documentos', 'Expedientes y agenda'],
-    boton: 'Elegir Aspirante', a: '/entrar',
+    boton: 'Elegir Aspirante', a: '/entrar?plan=aspirante',
   },
   {
     nombre: 'Abogado', tiene: true, quien: 'PARA EL DÍA A DÍA', para: 'Para el abogado que litiga y redacta cada semana, con sus casos y su agenda.', mensual: 59, anual: 590, destacado: true,
@@ -134,7 +134,7 @@ export const planes = (p: Prueba) => [
     puntos: ['Todo lo del plan Abogado, para cada abogado', 'Una sola factura para la oficina',
       'Modelos de la oficina, compartidos', 'Cuánto usa cada abogado, sin ver lo que pregunta',
       'Expedientes y agenda compartidos por la oficina'],
-    boton: 'Hablar con nosotros', a: '/contacto',
+    boton: 'Elegir Buffet', a: '/entrar?plan=buffet',
   },
 ]
 
@@ -469,7 +469,7 @@ export default function Inicio() {
                     )}
                   </details>
                   <Link
-                    to={p.a}
+                    to={p.a.includes('plan=') ? `${p.a}&ciclo=${anual ? 'anual' : 'mensual'}` : p.a}
                     className={cn(
                       'mt-auto rounded-lg border border-[#F1E8DA] px-4 py-3.5 text-center font-bold',
                       p.destacado ? 'bg-[#7A1F2B] text-white hover:bg-[#8C2A36]' : 'text-[#F8F4EC] hover:bg-white/10',

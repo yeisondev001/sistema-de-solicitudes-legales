@@ -364,8 +364,8 @@ def _limpio(u: dict) -> dict:
 def por_pagar(u: dict) -> bool:
     """Cuenta activa que solo se resuelve pagando (la prueba terminó o el plan venció) y no es de una oficina: puede
     entrar, pero solo a la pantalla de pago."""
-    if not u["activo"] or u.get("oficina_plan"):
-        return False
+    if not u["activo"] or (u.get("oficina_plan") and u.get("oficina_dueno") != u["id"]):
+        return False   # quien trabaja en una oficina ajena no paga: lo paga el dueño
     plan = _plan(u)
     return plan == "vencido" or (plan == "prueba" and bool(u.get("prueba_hasta")) and u["prueba_hasta"] < time.time())
 
@@ -489,9 +489,23 @@ def aplicar_suscripcion(usuario_id: int, plan: str) -> str:
     filas = _ejecutar(f"{_CUENTA} WHERE u.id = %s", (usuario_id,), leer=True)
     if not filas:
         return "cuenta no encontrada"
-    if filas[0]["es_admin"] or filas[0].get("oficina_id"):
+    u = filas[0]
+    if u["es_admin"]:
         return "cuenta no se toca"
-    if filas[0].get("plan") == plan:
+    if u.get("oficina_id"):
+        if u.get("oficina_dueno") != usuario_id:
+            return "cuenta no se toca"   # un abogado de la oficina: su plan es el de la oficina
+        if plan in ("buffet", "vencido"):
+            cambiar_oficina(u["oficina_id"], plan="activo" if plan == "buffet" else "vencido")
+            return f"oficina {'activa' if plan == 'buffet' else 'vencida'}"
+        return "cuenta no se toca"
+    if plan == "buffet":
+        # compró el Buffet: se abre su oficina de 10 abogados y queda como dueño (después le pone el nombre que quiera)
+        crear_oficina(f"Oficina de {u['nombre'] or u['usuario']}", usuario_id)
+        return "oficina creada"
+    if plan == "vencido" and u.get("plan") == "prueba":
+        return "estaba en prueba"
+    if u.get("plan") == plan:
         return f"ya estaba en {plan}"
     cambiar_plan(usuario_id, plan)
     return f"plan {plan}"

@@ -20,14 +20,17 @@ import httpx
 
 import cuentas
 
-# nombre del producto en Polar → (plan de la cuenta, ciclo). El Buffet (oficinas) se contrata hablando con nosotros.
+# nombre del producto en Polar → (plan, ciclo). Aspirante y Abogado cambian el plan de la cuenta; el Buffet abre una
+# oficina de 10 abogados con quien paga como dueño.
 PRODUCTOS = {
     "aspirante (mensual)": ("basico", "mes"),
     "aspirante (anual)": ("basico", "año"),
     "abogado (mensual)": ("activo", "mes"),
     "abogado (anual)": ("activo", "año"),
+    "buffet (mensual)": ("buffet", "mes"),
+    "buffet (anual)": ("buffet", "año"),
 }
-PLAN_PUBLICO = {"aspirante": "basico", "abogado": "activo"}
+PLAN_PUBLICO = {"aspirante": "basico", "abogado": "activo", "buffet": "buffet"}
 
 
 class ErrorPago(Exception):
@@ -93,7 +96,8 @@ def crear_pago(u: dict, plan: str, ciclo: str, volver: str) -> str:
     """La dirección de la pantalla de pago de Polar para este abogado, plan y ciclo."""
     if plan not in PLAN_PUBLICO or ciclo not in ("mes", "año"):
         raise ErrorPago("Ese plan no se paga aquí. Escríbanos a soportepapiniano@gmail.com.")
-    if u.get("oficina"):
+    oficina = u.get("oficina")
+    if oficina and not (plan == "buffet" and oficina["es_dueno"]):
         raise ErrorPago("Su cuenta es de una oficina: el plan lo maneja el dueño de la oficina.")
     pid = productos().get((PLAN_PUBLICO[plan], ciclo))
     if not pid:
