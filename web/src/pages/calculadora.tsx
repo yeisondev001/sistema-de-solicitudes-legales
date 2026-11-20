@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Campo, ENTRADA, SELECT } from '@/components/agenda'
 import { Antetitulo, CabeceraPublica, PiePublico } from '@/components/publico'
 import { Input } from '@/components/ui/input'
