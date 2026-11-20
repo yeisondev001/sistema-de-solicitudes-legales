@@ -47,7 +47,7 @@ En materia laboral se aplican las causas de interrupción del derecho común (ar
 - Calcule lo que le corresponde con la [calculadora de prestaciones laborales](/calculadora-prestaciones-laborales).
 - Guarde la carta de despido o de desahucio, sus recibos de pago y cualquier mensaje del empleador.
 - Si el empleador no le pagó el preaviso y la cesantía dentro de los 10 días, le debe además un día de salario por cada
-  día de retraso (art. 86).
+  día de retraso (art. 86). Esas dos indemnizaciones no pagan impuesto sobre la renta (art. 86).
 
 ## Preguntas frecuentes
 
@@ -59,8 +59,8 @@ Para reclamar lo que le deben (vacaciones, regalía pascual, salarios) el plazo 
 alegando una falta grave del empleador (dimisión), la acción para que se declare justificada es de dos meses (art. 702).
 
 **¿Y si me despidieron estando embarazada?**
-Hay reglas especiales de protección (arts. 232 y 233 del Código de Trabajo). Vea nuestra guía sobre el despido de una
-trabajadora embarazada.
+Hay reglas especiales de protección (arts. 232 y 233 del Código de Trabajo). Vea nuestra guía sobre el
+[despido de una trabajadora embarazada](/blog/despido-embarazada-republica-dominicana).
 
 ## Para abogados
 

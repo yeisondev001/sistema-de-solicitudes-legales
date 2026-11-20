@@ -52,7 +52,7 @@ copia firmada como recibida, o un correo o mensaje que pruebe la fecha.
 2. Calcule lo que le corresponde con la [calculadora de prestaciones laborales](/calculadora-prestaciones-laborales); si
    no pasaron por el Departamento de Trabajo, súmele los cinco meses de salario del art. 233.
 3. No deje pasar el tiempo: la acción por despido prescribe en **dos meses** (art. 702). Vea nuestra guía sobre el
-   plazo para demandar.
+   [plazo para demandar por despido](/blog/plazo-demandar-despido-republica-dominicana).
 
 ## Preguntas frecuentes
 
