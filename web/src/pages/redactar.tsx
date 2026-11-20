@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpenCheck, ChevronDown, FileSignature, FileUp, Landmark, Loader2, Mic, MicOff, PencilLine, Volume2, VolumeX, Scale, SendHorizontal,
+  ArrowLeft, BookOpenCheck, ChevronDown, FileDown, FileSignature, FileUp, Landmark, Loader2, Mic, MicOff, PencilLine, Volume2, VolumeX, Scale, SendHorizontal,
   ShieldCheck, Sparkles, type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { guardarDatosDelEscrito } from '@/components/escrito'
+import { guardarDatosDelEscrito, descargarEscrito, leerDatosDelEscrito } from '@/components/escrito'
 import { TituloSala } from '@/components/oficina'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Seccion } from '@/components/seccion'
@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { api, ErrorApi, leerParaRedactar, redactarEscrito, type DocumentoLeido } from '@/lib/api'
 import { hablar, hayVoz, useDictado, useVozAutomatica } from '@/lib/dictado'
+import { cuando } from '@/lib/fechas'
+import { titulo as tituloDe } from '@/lib/escrito'
 import { useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +34,14 @@ interface Tipo {
   preguntas: Pregunta[]
   /** los modelos de ese tipo, por si quiere elegir uno */
   modelos: { clave: string; nombre: string; materia: string }[]
+}
+
+/** Un escrito que Papiniano ya redactó (el historial de la sala) */
+interface EscritoGuardado {
+  id: number
+  titulo: string
+  actualizada: number
+  texto: string
 }
 
 const ICONOS: Record<string, LucideIcon> = {
@@ -91,11 +101,35 @@ export default function Redactar() {
   const [respuestas, setRespuestas] = useState<Record<string, string>>({})
   const [modelo, setModelo] = useState('')   // '' = que elija Papiniano
   const [avance, setAvance] = useState<string | null>(null)
+  // el historial: los escritos que ya se redactaron en esta cuenta
+  const [escritos, setEscritos] = useState<EscritoGuardado[] | null>(null)
   const campo = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.get<Tipo[]>('/api/redactar').then(setTipos).catch((e: ErrorApi) => toast.error(e.message))
+    api.get<EscritoGuardado[]>('/api/escritos').then(setEscritos).catch(() => setEscritos([]))
   }, [])
+
+  /** Del historial: lo baja en Word o PDF, con los datos por llenar guardados en este equipo */
+  async function bajar(e: EscritoGuardado, formato: 'docx' | 'pdf') {
+    try {
+      await descargarEscrito(perfil.id, e.id, e.texto, formato)
+      toast.success('Escrito descargado.')
+    } catch (err) {
+      toast.error((err as ErrorApi).message)
+    }
+  }
+
+  /** Del historial: abre una conversación nueva con el mismo escrito, para pedirle cambios a Papiniano */
+  async function hacerOtra(e: EscritoGuardado) {
+    try {
+      const r = await api.post<{ id: number }>(`/api/escritos/${e.id}/copiar`)
+      guardarDatosDelEscrito(perfil.id, r.id, leerDatosDelEscrito(perfil.id, e.id))
+      navegar(`/papiniano/${r.id}`)
+    } catch (err) {
+      toast.error((err as ErrorApi).message)
+    }
+  }
 
   async function leer(archivo: File) {
     if (archivo.size > MAX_MB * 1024 * 1024) {
@@ -163,7 +197,8 @@ export default function Redactar() {
 
       {/* 1. qué quiere redactar */}
       {!tipo ? (
-        <Seccion titulo="¿Qué quiere redactar?">
+        <>
+          <Seccion titulo="¿Qué quiere redactar?">
           {tipos ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {tipos.map((t) => {
@@ -186,7 +221,38 @@ export default function Redactar() {
               <Loader2 className="size-4 animate-spin" /> Cargando…
             </p>
           )}
-        </Seccion>
+          </Seccion>
+
+          {/* los escritos que ya se redactaron: recuperar, descargar o hacer otra igual */}
+          {escritos !== null && escritos.length > 0 && (
+            <Seccion
+              titulo="Sus escritos"
+              sub="Lo que ya redactó Papiniano. Lo vuelve a bajar en Word o PDF, o abre una copia nueva para pedirle cambios."
+            >
+              <ul className="divide-y divide-papel-borde">
+                {escritos.map((e) => (
+                  <li key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4 first:pt-0 last:border-b-0 last:pb-0">
+                    <div className="min-w-52 flex-1">
+                      <p className="font-bold text-ink">{tituloDe(e.texto) || e.titulo}</p>
+                      <p className="text-[0.88rem] text-ink-soft">Escrito por {NOMBRE_ASISTENTE} · {cuando(e.actualizada)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" className="h-10" onClick={() => bajar(e, 'docx')}>
+                        <FileDown /> Word
+                      </Button>
+                      <Button variant="outline" className="h-10" onClick={() => bajar(e, 'pdf')}>
+                        <FileDown /> PDF
+                      </Button>
+                      <Button variant="outline" className="h-10" onClick={() => hacerOtra(e)}>
+                        <PencilLine /> Hacer otra como esta
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Seccion>
+          )}
+        </>
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-3">

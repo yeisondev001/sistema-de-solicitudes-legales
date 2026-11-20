@@ -961,6 +961,22 @@ def escrito_descargar(formato: str, e: TextoEscrito, u=Depends(usuario_actual)):
     return _archivo(contenido, nombre_escrito(texto, formato))
 
 
+@app.get("/api/escritos")
+def escritos(u=Depends(usuario_actual)):
+    """El historial de escritos del abogado (sala Redacción): cada escrito que Papiniano le redactó, con su texto.
+    Los datos por llenar no están aquí: quedan en el navegador del abogado y solo se ponen al descargar."""
+    return cuentas.escritos_guardados(u["id"])
+
+
+@app.post("/api/escritos/{conv_id}/copiar")
+def escrito_copiar(conv_id: int, u=Depends(usuario_actual)):
+    """«Hacer otra como esta»: una conversación nueva con el mismo escrito, lista para pedirle cambios a Papiniano."""
+    nuevo = cuentas.copiar_con_escrito(u["id"], conv_id)
+    if not nuevo:
+        raise HTTPException(404, "Ese escrito ya no está (la conversación se borró).")
+    return {"id": nuevo}
+
+
 @app.get("/api/pagina")
 def pagina(url: str, n: int, u=Depends(usuario_actual)):
     """La página citada del PDF oficial, como imagen (ver jurisprudencia/visor.py)."""

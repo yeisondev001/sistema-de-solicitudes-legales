@@ -51,6 +51,18 @@ export function guardarDatosDelEscrito(usuario: number, conv: number, datos: Rec
   guardar(claveDatos(usuario, conv), { ...leer(claveDatos(usuario, conv)), ...datos })
 }
 
+/** Los datos por llenar guardados en este equipo para el escrito de esa conversación. */
+export function leerDatosDelEscrito(usuario: number, conv: number) {
+  return leer(claveDatos(usuario, conv))
+}
+
+/** Descarga el escrito en Word o PDF desde el historial de Redacción: pone antes los datos por llenar que estén
+ *  guardados en este equipo (los de la conversación y los del abogado; nunca pasan por la IA). */
+export async function descargarEscrito(usuario: number, conv: number, texto: string, formato: 'docx' | 'pdf') {
+  const datos = { [FECHA_DE_HOY]: fechaLarga(), ...leer(claveDatos(usuario, conv)), ...leer(claveAbogado(usuario)) }
+  await descargar(`/api/escrito/${formato}`, { texto: llenar(texto, datos) })
+}
+
 const CLASES: Record<TipoParrafo, string> = {
   titulo: 'mb-[1.6em] text-center text-[1.08em] font-bold',
   centro: 'text-center font-bold',

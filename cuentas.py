@@ -628,6 +628,35 @@ def listar_conversaciones(usuario_id: int) -> list:
                      "ORDER BY actualizada DESC", (usuario_id,), leer=True)
 
 
+def escritos_guardados(usuario_id: int) -> list:
+    """El historial de escritos del abogado (sala Redacción): cada conversación con escrito, con su texto."""
+    import json
+    filas = _ejecutar("SELECT id, titulo, actualizada, escrito FROM conversaciones WHERE usuario_id = %s "
+                      "AND escrito IS NOT NULL AND escrito != 'null' ORDER BY actualizada DESC",
+                      (usuario_id,), leer=True)
+    return [{**f, "texto": (json.loads(f.pop("escrito")) or {}).get("texto", "")} for f in filas]
+
+
+def copiar_con_escrito(usuario_id: int, conv_id: int):
+    """Crea una conversación nueva con una copia del escrito de otra (para «Hacer otra como esta»)."""
+    import json
+    actual = _leer_escrito(usuario_id, conv_id)
+    if not actual or not actual.get("texto"):
+        return None
+    renglones = actual["texto"].splitlines()
+    primera = " ".join(renglones[0].split())[:57] if renglones else ""
+    titulo = f"Copia de «{primera}»" if primera else "Copia de un escrito"
+    fila = _ejecutar(
+        "INSERT INTO conversaciones (usuario_id, titulo, actualizada, mensajes, escrito) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (usuario_id, titulo, int(time.time()), "[]",
+         json.dumps({"texto": actual["texto"], "anteriores": []}, ensure_ascii=False)), leer=True)
+    _ejecutar("""DELETE FROM conversaciones WHERE usuario_id = %s AND id NOT IN (
+                     SELECT id FROM conversaciones WHERE usuario_id = %s ORDER BY actualizada DESC LIMIT %s)""",
+              (usuario_id, usuario_id, MAX_CONVERSACIONES))
+    return fila[0]["id"]
+
+
 def abrir_conversacion(usuario_id: int, conv_id: int) -> list:
     import json
     filas = _ejecutar("SELECT mensajes FROM conversaciones WHERE id = %s AND usuario_id = %s",
