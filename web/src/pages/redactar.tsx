@@ -225,10 +225,10 @@ export default function Redactar() {
 
           {/* los escritos que ya se redactaron: recuperar, descargar o hacer otra igual */}
           {escritos !== null && escritos.length > 0 && (
-            <Seccion
-              titulo="Sus escritos"
-              sub="Lo que ya redactó Papiniano. Lo vuelve a bajar en Word o PDF, o abre una copia nueva para pedirle cambios."
-            >
+            <Seccion titulo="Sus escritos">
+              <p className="mb-4 text-[0.95rem] text-ink-soft">
+                Lo que ya redactó Papiniano. Lo vuelve a bajar en Word o PDF, o abre una copia nueva para pedirle cambios.
+              </p>
               <ul className="divide-y divide-papel-borde">
                 {escritos.map((e) => (
                   <li key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4 first:pt-0 last:border-b-0 last:pb-0">
