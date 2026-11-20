@@ -1,0 +1,167 @@
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Check, ExternalLink, Loader2, LogOut } from 'lucide-react'
+import { toast } from 'sonner'
+import { Logo } from '@/components/logo'
+import { TituloSala } from '@/components/oficina'
+import { Button } from '@/components/ui/button'
+import { api, ErrorApi } from '@/lib/api'
+import { useSesion } from '@/lib/sesion'
+import { cn } from '@/lib/utils'
+import { planes, PRUEBA_INICIAL } from '@/pages/inicio'
+
+const NOMBRE_PLAN: Record<string, string> = {
+  beta: 'Acceso completo', prueba: 'Prueba gratis', basico: 'Aspirante', activo: 'Abogado', vencido: 'Sin plan',
+}
+const PLAN_DE: Record<string, 'basico' | 'activo'> = { Aspirante: 'basico', Abogado: 'activo' }
+
+/** Mi plan: elegir y pagar con Polar, ver el plan actual y administrar la suscripción (recibos, tarjeta, cancelar). */
+export default function Plan({ soloPagar = false }: { soloPagar?: boolean }) {
+  const { perfil, refrescar, salir } = useSesion()
+  const [params] = useSearchParams()
+  const [anual, setAnual] = useState(false)
+  const [activo, setActivo] = useState<boolean | null>(null)
+  const [enCurso, setEnCurso] = useState('')
+  const volvio = params.get('pago') === 'ok'
+
+  useEffect(() => {
+    api.get<{ activo: boolean }>('/api/pagos').then((d) => setActivo(d.activo)).catch(() => setActivo(false))
+  }, [])
+
+  // al volver de pagar, Polar tarda unos segundos en avisar: se vuelve a leer la cuenta hasta que cambie el plan
+  useEffect(() => {
+    if (!volvio) return
+    let n = 0
+    const t = setInterval(() => {
+      refrescar()
+      if (++n >= 15) clearInterval(t)
+    }, 3000)
+    return () => clearInterval(t)
+  }, [volvio, refrescar])
+
+  async function ir(ruta: string, cuerpo: unknown, clave: string) {
+    setEnCurso(clave)
+    try {
+      const { url } = await api.post<{ url: string }>(ruta, cuerpo)
+      window.location.href = url
+    } catch (e) {
+      toast.error(e instanceof ErrorApi ? e.message : 'No se pudo abrir el pago. Intente en un momento.')
+      setEnCurso('')
+    }
+  }
+
+  const paga = perfil.plan === 'basico' || perfil.plan === 'activo'
+  const titulo = soloPagar ? (perfil.plan === 'prueba' ? 'Su prueba gratis terminó' : 'Su plan terminó') : 'Mi plan'
+  const sub = soloPagar
+    ? 'Elija un plan para seguir. Sus documentos, expedientes y conversaciones están guardados.'
+    : `Su plan actual: ${NOMBRE_PLAN[perfil.plan] ?? perfil.plan}.`
+
+  const contenido = (
+    <div className="mx-auto max-w-5xl">
+      <TituloSala titulo={titulo} sub={sub}>
+        {soloPagar && (
+          <Button variant="outline" onClick={salir}><LogOut /> Salir</Button>
+        )}
+      </TituloSala>
+
+      {volvio && (
+        <p className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 font-bold text-emerald-900">
+          <Loader2 className="size-5 animate-spin" /> Gracias. Estamos activando su plan; en unos segundos queda listo.
+        </p>
+      )}
+      {activo === false && (
+        <p className="mb-6 rounded-xl border border-papel-borde bg-card p-4 text-ink">
+          El pago con tarjeta se activa muy pronto. Mientras tanto escríbanos a{' '}
+          <a href="mailto:soportepapiniano@gmail.com" className="font-bold text-marca-texto underline">soportepapiniano@gmail.com</a>{' '}
+          y le activamos su plan.
+        </p>
+      )}
+
+      <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-papel-borde bg-card p-1.5 pr-4" role="group" aria-label="Cómo quiere pagar">
+        {([['Mensual', false], ['Anual', true]] as const).map(([texto, valor]) => (
+          <button
+            key={texto}
+            type="button"
+            aria-pressed={anual === valor}
+            onClick={() => setAnual(valor)}
+            className={cn('rounded-full px-5 py-2 font-bold', anual === valor ? 'bg-boton text-sobre-boton' : 'text-ink-soft hover:text-ink')}
+          >
+            {texto}
+          </button>
+        ))}
+        <span className="text-[0.9rem] font-bold text-marca-texto">2 meses gratis al año</span>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-3">
+        {planes(PRUEBA_INICIAL).map((p) => {
+          const plan = PLAN_DE[p.nombre]
+          const esMio = plan === perfil.plan
+          const precio = anual && p.anual ? p.anual : p.mensual
+          return (
+            <div key={p.nombre} className={cn('flex flex-col gap-3 rounded-2xl border bg-card p-6', p.destacado ? 'border-2 border-marca' : 'border-papel-borde')}>
+              <div>
+                <h3 className="font-heading text-[1.6rem] font-medium text-ink">{p.nombre}</h3>
+                <p className="text-ink-soft">{p.para}</p>
+              </div>
+              <p className="text-[2rem] font-bold text-ink">
+                US${precio} <span className="text-base font-normal text-ink-soft">{anual && p.anual ? 'al año' : 'al mes'}</span>
+              </p>
+              {anual && p.anual && (
+                <p className="text-[0.92rem] font-bold text-marca-texto">Ahorra US${p.mensual * 12 - p.anual} al año</p>
+              )}
+              <ul className="space-y-2 text-ink">
+                {p.puntos.map((x) => (
+                  <li key={x} className="flex gap-2.5">
+                    <Check className="mt-1 size-4 shrink-0 text-marca-texto" />
+                    {x}
+                  </li>
+                ))}
+              </ul>
+              {plan ? (
+                <Button
+                  className="mt-auto h-12 text-base"
+                  variant={p.destacado ? 'default' : 'outline'}
+                  disabled={!activo || esMio || !!enCurso}
+                  onClick={() => ir('/api/pagos/pagar', { plan: p.nombre.toLowerCase(), ciclo: anual ? 'año' : 'mes' }, p.nombre)}
+                >
+                  {enCurso === p.nombre ? <Loader2 className="animate-spin" /> : null}
+                  {esMio ? 'Su plan actual' : `Elegir ${p.nombre}`}
+                </Button>
+              ) : (
+                <Button asChild variant="outline" className="mt-auto h-12 text-base">
+                  <Link to="/contacto">Hablar con nosotros</Link>
+                </Button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {paga && !soloPagar && (
+        <div className="mt-8 rounded-2xl border border-papel-borde bg-card p-6">
+          <h2 className="font-heading text-[1.4rem] font-medium text-ink">Su suscripción</h2>
+          <p className="mt-1 text-ink-soft">Vea sus recibos, cambie su tarjeta o cancele. Si cancela, conserva el acceso hasta el final del período pagado.</p>
+          <Button className="mt-4" variant="outline" disabled={!!enCurso} onClick={() => ir('/api/pagos/portal', undefined, 'portal')}>
+            {enCurso === 'portal' ? <Loader2 className="animate-spin" /> : <ExternalLink />} Administrar mi suscripción
+          </Button>
+        </div>
+      )}
+      <p className="mt-6 text-[0.9rem] text-ink-soft">
+        Pago seguro con tarjeta a través de Polar, que cobra, factura y reembolsa. Reembolso dentro de los 7 días del primer pago; vea la{' '}
+        <Link to="/reembolso" className="text-marca-texto underline">política de reembolso</Link>.
+      </p>
+    </div>
+  )
+
+  if (!soloPagar) return contenido
+  return (
+    <div className="min-h-dvh bg-background">
+      <header className="border-b border-papel-borde bg-background/95">
+        <div className="mx-auto flex max-w-[1240px] items-center px-5 py-3.5 md:px-6">
+          <Logo />
+        </div>
+      </header>
+      <main className="px-5 py-10 md:px-6">{contenido}</main>
+    </div>
+  )
+}

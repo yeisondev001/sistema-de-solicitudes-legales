@@ -27,6 +27,7 @@ import cuentas
 import expedientes
 import historial
 import modelos
+import pagos
 import redaccion
 import redactar
 import temas
@@ -128,6 +129,17 @@ def usuario_actual(request: Request) -> dict:
     return u
 
 
+def usuario_para_pagar(request: Request) -> dict:
+    """Como usuario_actual, pero también deja pasar a quien solo le falta pagar (prueba terminada o plan vencido)."""
+    try:
+        u = cuentas.usuario_de_sesion(request.cookies.get(COOKIE, ""), para_pagar=True)
+    except Exception:
+        raise HTTPException(503, "No se pudo conectar con la base de datos. Intente en un momento.")
+    if not u:
+        raise HTTPException(401, "Su sesión terminó. Entre otra vez.")
+    return u
+
+
 def _colores(clave) -> dict:
     t = temas.tema(clave)
     return {**{n: t[n] for n in temas.NOMBRES}, "oscuro": t["oscuro"]}
@@ -140,6 +152,7 @@ def _perfil(u: dict) -> dict:
     perfil["colores"] = _colores(u["tema"])
     perfil["letra"] = u.get("letra") or "normal"
     perfil["propios"] = cuentas.con_propios(u["plan"])
+    perfil["por_pagar"] = bool(u.get("por_pagar"))
     perfil["prueba"] = perfil["basico"] = None
     # la cajita de lo que le queda: solo en la prueba y en el Aspirante (el Abogado no ve su tope)
     tope = cuentas.tope_diario(u["plan"]) if u["plan"] in ("prueba", "basico") else None
@@ -335,8 +348,54 @@ def salir(request: Request, respuesta: Response):
 
 # ── CUENTA ───────────────────────────────────────
 @app.get("/api/sesion")
-def sesion(u=Depends(usuario_actual)):
+def sesion(u=Depends(usuario_para_pagar)):
     return _perfil(u)
+
+
+# ── PAGOS (Polar) ────────────────────────────────
+def _direccion(request: Request) -> str:
+    base = os.environ.get("APP_URL") or os.environ.get("RENDER_EXTERNAL_URL") or str(request.base_url)
+    return base.rstrip("/")
+
+
+@app.get("/api/pagos")
+def pagos_estado(u=Depends(usuario_para_pagar)):
+    return {"activo": pagos.configurado(), "oficina": bool(u.get("oficina"))}
+
+
+class PedidoPago(BaseModel):
+    plan: str
+    ciclo: str
+
+
+@app.post("/api/pagos/pagar")
+def pagos_pagar(datos: PedidoPago, request: Request, u=Depends(usuario_para_pagar)):
+    try:
+        return {"url": pagos.crear_pago(u, datos.plan, datos.ciclo, _direccion(request) + "/plan?pago=ok")}
+    except pagos.ErrorPago as ex:
+        raise HTTPException(400, str(ex))
+
+
+@app.post("/api/pagos/portal")
+def pagos_portal(u=Depends(usuario_para_pagar)):
+    try:
+        return {"url": pagos.crear_portal(u)}
+    except pagos.ErrorPago as ex:
+        raise HTTPException(400, str(ex))
+
+
+@app.post("/api/pagos/aviso")
+async def pagos_aviso(request: Request):
+    """Polar avisa aquí cada pago, cambio o cancelación. Solo vale si trae la firma correcta."""
+    cuerpo = await request.body()
+    if not pagos.firma_valida(cuerpo, request.headers):
+        raise HTTPException(401, "Firma no válida.")
+    try:
+        hecho = pagos.procesar(cuerpo)
+    except ValueError:
+        raise HTTPException(400, "Aviso mal formado.")
+    logging.getLogger("papiniano").info("Aviso de Polar: %s", hecho)
+    return {"ok": True, "hecho": hecho}
 
 
 @app.get("/api/temas")

@@ -357,7 +357,17 @@ def _limpio(u: dict) -> dict:
     return {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"] or u["usuario"],
             "es_admin": bool(u["es_admin"]), "email": u.get("email") or "", "plan": _plan(u),
             "plantillas": bool(u.get("plantillas")), "tema": u.get("tema") or "", "letra": u.get("letra") or "",
-            "prueba_hasta": u.get("prueba_hasta"), "oficina": oficina}
+            "prueba_hasta": u.get("prueba_hasta"), "oficina": oficina,
+            "por_pagar": bool(_bloqueo(u)) and por_pagar(u)}
+
+
+def por_pagar(u: dict) -> bool:
+    """Cuenta activa que solo se resuelve pagando (la prueba terminó o el plan venció) y no es de una oficina: puede
+    entrar, pero solo a la pantalla de pago."""
+    if not u["activo"] or u.get("oficina_plan"):
+        return False
+    plan = _plan(u)
+    return plan == "vencido" or (plan == "prueba" and bool(u.get("prueba_hasta")) and u["prueba_hasta"] < time.time())
 
 
 def _bloqueo(u: dict):
@@ -473,6 +483,20 @@ def cambiar_plan(usuario_id: int, plan: str):
         _ejecutar("DELETE FROM sesiones WHERE usuario_id = %s", (usuario_id,))
 
 
+def aplicar_suscripcion(usuario_id: int, plan: str) -> str:
+    """Lo que Polar avisa de una suscripción (pago, cambio, cancelación). Nunca toca a administradores ni a quien
+    está en una oficina: su plan no depende de este cobro."""
+    filas = _ejecutar(f"{_CUENTA} WHERE u.id = %s", (usuario_id,), leer=True)
+    if not filas:
+        return "cuenta no encontrada"
+    if filas[0]["es_admin"] or filas[0].get("oficina_id"):
+        return "cuenta no se toca"
+    if filas[0].get("plan") == plan:
+        return f"ya estaba en {plan}"
+    cambiar_plan(usuario_id, plan)
+    return f"plan {plan}"
+
+
 def _validar_email(email: str) -> str:
     email = email.strip().lower()
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[a-z]{2,}", email):
@@ -492,7 +516,7 @@ def asignar_email(usuario_id: int, email: str):
 def iniciar_sesion(usuario: str, clave: str):
     """Devuelve (usuario, token) si la clave es correcta; si no, None."""
     filas = _ejecutar(f"{_CUENTA} WHERE u.usuario = %s", (usuario.strip().lower(),), leer=True)
-    if not filas or _bloqueo(filas[0]) or not _verificar(clave, filas[0]["clave"]):
+    if not filas or (_bloqueo(filas[0]) and not por_pagar(filas[0])) or not _verificar(clave, filas[0]["clave"]):
         return None
     return _limpio(filas[0]), _nueva_sesion(filas[0]["id"])
 
@@ -524,7 +548,7 @@ def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
                    int(time.time()) + DIAS_PRUEBA * 86400, False))
         filas = _ejecutar(f"{_CUENTA} WHERE lower(u.email) = %s", (email,), leer=True)
     motivo = _bloqueo(filas[0])
-    if motivo:
+    if motivo and not por_pagar(filas[0]):
         raise ValueError(motivo)
     return _limpio(filas[0]), _nueva_sesion(filas[0]["id"])
 
@@ -608,14 +632,17 @@ def preguntas_de_hoy(usuario_id: int) -> int:
     return filas[0]["preguntas"] if filas else 0
 
 
-def usuario_de_sesion(token: str):
+def usuario_de_sesion(token: str, para_pagar: bool = False):
+    """La cuenta de esta sesión. Con para_pagar también la deja pasar si solo le falta pagar (pantalla de pago)."""
     if not token:
         return None
     filas = _ejecutar(
         "SELECT u.*, o.nombre AS oficina_nombre, o.plan AS oficina_plan, o.dueno_id AS oficina_dueno "
         "FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id LEFT JOIN oficinas o ON o.id = u.oficina_id "
         "WHERE s.token = %s AND s.vence > %s", (token, int(time.time())), leer=True)
-    return _limpio(filas[0]) if filas and not _bloqueo(filas[0]) else None
+    if not filas or (_bloqueo(filas[0]) and not (para_pagar and por_pagar(filas[0]))):
+        return None
+    return _limpio(filas[0])
 
 
 def cerrar_sesion(token: str):

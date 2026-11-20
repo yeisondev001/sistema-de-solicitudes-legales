@@ -16,6 +16,7 @@ import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
 import MiOficina from '@/pages/mi-oficina'
 import Modelos from '@/pages/modelos'
+import Plan from '@/pages/plan'
 import Redactar from '@/pages/redactar'
 import Redaccion from '@/pages/redaccion'
 import Usuarios from '@/pages/usuarios'
@@ -93,11 +94,23 @@ export default function App() {
       </Routes>
     )
 
+  // la prueba terminó o el plan venció: solo la pantalla de pago (todo lo demás pediría un plan activo)
+  if (sesion.perfil.por_pagar)
+    return (
+      <ContextoSesion.Provider value={sesion}>
+        <Routes>
+          {legales}
+          <Route path="*" element={<Plan soloPagar />} />
+        </Routes>
+      </ContextoSesion.Provider>
+    )
+
   return (
     <ContextoSesion.Provider value={sesion}>
       <Routes>
         {legales}
         <Route element={<Oficina />}>
+          <Route path="plan" element={<Plan />} />
           <Route index element={<Escritorio />} />
           <Route path="papiniano" element={<Asistente />} />
           <Route path="papiniano/:id" element={<Asistente />} />

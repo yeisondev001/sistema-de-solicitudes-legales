@@ -14,7 +14,7 @@ import { useTitulo } from '@/lib/titulo'
 import { cn } from '@/lib/utils'
 
 // La prueba gratis la decide el servidor (PRUEBA_DIAS y PRUEBA_PREGUNTAS_DIA en cuentas.py); esto se ve mientras responde
-const PRUEBA_INICIAL = { dias: 7, preguntas: 20 }
+export const PRUEBA_INICIAL = { dias: 5, preguntas: 20 }
 type Prueba = typeof PRUEBA_INICIAL
 
 /**
@@ -113,7 +113,7 @@ const PROTECCION: { icono: LucideIcon; titulo: string; texto: string }[] = [
 // quien cobra. El uso se describe con palabras, sin números ni «sin
 // límite» (lo decidió el dueño): los topes están en cuentas.py y la app avisa al llegar. El Buffet es para hasta
 // 10 abogados (ASIENTOS_MINIMOS en cuentas.py); el administrador crea la oficina en Usuarios → Oficinas
-const planes = (p: Prueba) => [
+export const planes = (p: Prueba) => [
   {
     nombre: 'Aspirante', tiene: false, quien: 'PARA CONSULTAR', para: 'Para el abogado que busca sentencias y leyes de vez en cuando.', mensual: 29, anual: 290,
     puntos: ['Consultas a Papiniano, con un límite por día', 'Pocos escritos al mes, con nuestros modelos',

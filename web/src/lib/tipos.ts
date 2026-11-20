@@ -21,6 +21,8 @@ export interface Perfil {
   basico: { preguntas_hoy: number; tope: number } | null
   /** su oficina del plan Buffet (el plan de la cuenta es el de la oficina) */
   oficina: { id: number; nombre: string; es_dueno: boolean } | null
+  /** la prueba terminó o el plan venció: solo puede ver la pantalla de pago */
+  por_pagar: boolean
 }
 
 /** La oficina vista desde adentro: el dueño ve además el uso de cada abogado y los correos que agregó */

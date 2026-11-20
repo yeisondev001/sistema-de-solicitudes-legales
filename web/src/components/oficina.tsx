@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   FilePen,
   FileStack,
-  Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, TriangleAlert, Users,
+  Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, CreditCard, TriangleAlert, Users,
 } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
 import { Logo } from '@/components/logo'
@@ -117,6 +117,11 @@ function Cuenta({ abrirApariencia }: { abrirApariencia: () => void }) {
         {perfil.oficina && (
           <DropdownMenuItem onSelect={() => navegar('/oficina')} className="h-10 text-[0.95rem]">
             <Building2 /> Mi oficina
+          </DropdownMenuItem>
+        )}
+        {!perfil.oficina && !perfil.es_admin && (
+          <DropdownMenuItem onSelect={() => navegar('/plan')} className="h-10 text-[0.95rem]">
+            <CreditCard /> Mi plan
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={abrirApariencia} className="h-10 text-[0.95rem]">
