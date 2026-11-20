@@ -196,9 +196,14 @@ export default function Inicio() {
         {/* lo principal: el título y, al lado, Papiniano por dentro, con la misma cara de la app */}
         <section className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 pt-12 pb-16 md:px-6 md:pt-20 md:pb-24 lg:grid-cols-[0.8fr_1.2fr] lg:gap-10">
           <div className="space-y-7">
-            <Antetitulo>PARA ABOGADOS DE REPÚBLICA DOMINICANA</Antetitulo>
-            <h1 className="font-heading text-[2.7rem] leading-[1.05] font-medium tracking-tight md:text-[4rem] lg:text-[3.5rem]">
-              Todo su trabajo, en una sola oficina.
+            {/* la línea chica va dentro del título: así el título dice qué es y para quién (Google lo lee primero) */}
+            <h1 className="space-y-7">
+              <span className="block text-sm font-bold tracking-[0.14em] text-roble">
+                ASISTENTE JURÍDICO CON IA PARA ABOGADOS DE REPÚBLICA DOMINICANA
+              </span>
+              <span className="block font-heading text-[2.7rem] leading-[1.05] font-medium tracking-tight md:text-[4rem] lg:text-[3.5rem]">
+                Todo su trabajo, en una sola oficina.
+              </span>
             </h1>
             <p className="max-w-[34rem] text-lg leading-relaxed text-ink-soft md:text-[1.2rem]">
               Pregúntele a Papiniano, su asistente, como a un colega: le responde con las sentencias de la Suprema Corte y

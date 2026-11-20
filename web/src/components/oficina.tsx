@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   FilePen,
@@ -6,6 +6,7 @@ import {
   Building2, CalendarDays, ChevronsUpDown, FolderClosed, House, LibraryBig, LogOut, Menu, Palette, PenLine, CreditCard, TriangleAlert, Users,
 } from 'lucide-react'
 import { Apariencia } from '@/components/apariencia'
+import { Cargando } from '@/components/cargando'
 import { Logo } from '@/components/logo'
 import { NOMBRE_ASISTENTE, Papiniano } from '@/components/papiniano'
 import { Button } from '@/components/ui/button'
@@ -232,7 +233,9 @@ export function Oficina() {
       </header>
 
       <main ref={contenido} className={cn('min-h-0 min-w-0 flex-1', conversacion ? 'flex flex-col' : 'overflow-y-auto')}>
-        <Outlet />
+        <Suspense fallback={<div className="p-8"><Cargando /></div>}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <Apariencia abierta={apariencia} alCambiar={setApariencia} />

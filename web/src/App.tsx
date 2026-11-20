@@ -1,27 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { Oficina } from '@/components/oficina'
 import { api, SESION_TERMINADA } from '@/lib/api'
 import { ContextoSesion, type Sesion } from '@/lib/sesion'
 import { aplicarColores, aplicarLetra } from '@/lib/tema'
 import type { Perfil } from '@/lib/tipos'
-import Agenda from '@/pages/agenda'
-import Asistente from '@/pages/asistente'
-import Biblioteca from '@/pages/biblioteca'
 import Calculadora from '@/pages/calculadora'
 import Entrada from '@/pages/entrada'
-import Escritorio from '@/pages/escritorio'
-import Expedientes from '@/pages/expedientes'
 import Inicio from '@/pages/inicio'
 import Legal from '@/pages/legal'
-import MiOficina from '@/pages/mi-oficina'
-import Modelos from '@/pages/modelos'
 import NoEncontrada from '@/pages/no-encontrada'
-import Plan from '@/pages/plan'
-import Redactar from '@/pages/redactar'
-import Redaccion from '@/pages/redaccion'
-import Usuarios from '@/pages/usuarios'
-import Errores from '@/pages/errores'
+
+// Las pantallas de la app se bajan recién al abrirlas (cada una en su archivo): la página pública, la calculadora y la
+// entrada no cargan todo el programa, y así abren más rápido (Google mide esa velocidad).
+const Oficina = lazy(() => import('@/components/oficina').then((m) => ({ default: m.Oficina })))
+const Agenda = lazy(() => import('@/pages/agenda'))
+const Asistente = lazy(() => import('@/pages/asistente'))
+const Biblioteca = lazy(() => import('@/pages/biblioteca'))
+const Escritorio = lazy(() => import('@/pages/escritorio'))
+const Expedientes = lazy(() => import('@/pages/expedientes'))
+const MiOficina = lazy(() => import('@/pages/mi-oficina'))
+const Modelos = lazy(() => import('@/pages/modelos'))
+const Plan = lazy(() => import('@/pages/plan'))
+const Redaccion = lazy(() => import('@/pages/redaccion'))
+const Redactar = lazy(() => import('@/pages/redactar'))
+const Usuarios = lazy(() => import('@/pages/usuarios'))
+const Errores = lazy(() => import('@/pages/errores'))
 
 // Las pantallas de la app: sin sesión piden entrar. Son las mismas de servidor.RUTAS_APP (allí no van a Google y
 // cualquier otra dirección responde 404): si se agrega una pantalla, agregarla en los dos lados.
@@ -137,15 +140,18 @@ export default function App() {
   if (sesion.perfil.por_pagar)
     return (
       <ContextoSesion.Provider value={sesion}>
-        <Routes>
-          {legales}
-          <Route path="*" element={<Plan soloPagar />} />
-        </Routes>
+        <Suspense fallback={<div className="min-h-dvh bg-background" aria-busy="true" />}>
+          <Routes>
+            {legales}
+            <Route path="*" element={<Plan soloPagar />} />
+          </Routes>
+        </Suspense>
       </ContextoSesion.Provider>
     )
 
   return (
     <ContextoSesion.Provider value={sesion}>
+      <Suspense fallback={<div className="min-h-dvh bg-background" aria-busy="true" />}>
       <Routes>
         {legales}
         <Route element={<Oficina />}>
@@ -186,6 +192,7 @@ export default function App() {
           <Route path="*" element={<NoEncontrada dentro />} />
         </Route>
       </Routes>
+      </Suspense>
     </ContextoSesion.Provider>
   )
 }
