@@ -183,24 +183,69 @@ class NuevoAdmin(BaseModel):
     codigo: str = ""
 
 
-def _entrar(respuesta: Response, usuario: str, clave: str) -> dict:
+# ── Candados contra bots ─────────────────────────
+# Van en la memoria del servidor: apenas pesan y se reinician cuando el servicio se reinicia.
+
+def _ip(request: Request) -> str:
+    # Render pone la IP real del visitante en este encabezado
+    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
+        request.client.host if request.client else "?")
+
+_INTENTOS: dict = {}   # (ip, clave) → (momento del último intento fallido, cuántos fallidos seguidos)
+_NUEVAS: dict = {}     # ip → momentos de las cuentas nuevas creadas desde esa conexión
+
+
+def _demasiados_intentos(request: Request, clave: str) -> bool:
+    """Fuerza bruta: 6 intentos fallidos de entrada en 15 minutos bloquean esa IP y usuario 15 minutos."""
+    ip, ahora = _ip(request), time.time()
+    for k in [k for k in _INTENTOS if ahora - _INTENTOS[k][0] > 900]:
+        _INTENTOS.pop(k)   # van venciendo solos, sin crecer de más
+    ultimo, n = _INTENTOS.get((ip, clave), (0, 0))
+    return ahora - ultimo <= 900 and n >= 6
+
+
+def _fallo(request: Request, clave: str):
+    k = (_ip(request), clave)
+    ultimo, n = _INTENTOS.get(k, (0, 0))
+    _INTENTOS[k] = (time.time(), n + 1 if time.time() - ultimo <= 900 else 1)
+
+
+def _demasiados_registros(request: Request) -> bool:
+    """Fábricas de cuentas de prueba: máximo 20 cuentas nuevas de Google por hora desde la misma IP."""
+    ip, ahora = _ip(request), time.time()
+    _NUEVAS[ip] = [t for t in _NUEVAS.get(ip, []) if ahora - t < 3600]
+    return len(_NUEVAS[ip]) >= 20
+
+
+def _cuenta_nueva(request: Request):
+    _NUEVAS.setdefault(_ip(request), []).append(time.time())
+
+
+def _entrar(respuesta: Response, usuario: str, clave: str, request: Request = None) -> dict:
+    clave_entrada = "entrar:" + usuario.strip().lower()
+    if request is not None and _demasiados_intentos(request, clave_entrada):
+        raise HTTPException(429, "Demasiados intentos seguidos. Espere unos minutos y vuelva a intentar.")
     try:
         r = cuentas.iniciar_sesion(usuario, clave)
     except Exception as ex:
         raise HTTPException(503, f"No se pudo conectar: {ex}")
     if not r:
+        if request is not None:
+            _fallo(request, clave_entrada)
         raise HTTPException(401, "Usuario o contraseña incorrectos.")
+    if request is not None:
+        _INTENTOS.pop((_ip(request), clave_entrada), None)   # entró bien: se limpia su cuenta de fallos
     _poner_sesion(respuesta, r[1])
     return _perfil(r[0])
 
 
 @app.post("/api/entrar")
-def entrar(datos: Credenciales, respuesta: Response):
-    return _entrar(respuesta, datos.usuario, datos.clave)
+def entrar(datos: Credenciales, respuesta: Response, request: Request):
+    return _entrar(respuesta, datos.usuario, datos.clave, request)
 
 
 @app.post("/api/crear-admin")
-def crear_admin(datos: NuevoAdmin, respuesta: Response):
+def crear_admin(datos: NuevoAdmin, respuesta: Response, request: Request):
     """Solo la primera vez: crea la cuenta principal (en el servidor exige el código de instalación)."""
     if cuentas.hay_usuarios():
         raise HTTPException(409, "El administrador ya existe. Entre con su usuario.")
@@ -213,7 +258,7 @@ def crear_admin(datos: NuevoAdmin, respuesta: Response):
         cuentas.crear_usuario(datos.usuario, datos.clave, datos.nombre, es_admin=True, plantillas=True)
     except ValueError as ex:
         raise HTTPException(400, str(ex))
-    return _entrar(respuesta, datos.usuario, datos.clave)
+    return _entrar(respuesta, datos.usuario, datos.clave, request)
 
 
 @app.get("/api/google")
@@ -241,6 +286,8 @@ def google_vuelta(request: Request, code: str = "", state: str = "", error: str 
     g = _google()
     if not g or error or not code or not state or state != request.cookies.get("google_estado"):
         return volver("No se completó la entrada con Google. Intente otra vez.")
+    if _demasiados_registros(request):
+        return volver("Se crearon demasiadas cuentas desde esta conexión. Intente más tarde.")
     try:
         tok = httpx.post("https://oauth2.googleapis.com/token", timeout=20, data={
             "code": code, "client_id": g[0], "client_secret": g[1],
@@ -254,6 +301,7 @@ def google_vuelta(request: Request, code: str = "", state: str = "", error: str 
         return volver(str(ex))
     except Exception:
         return volver("No se pudo entrar con Google. Intente otra vez en un momento.")
+    _cuenta_nueva(request)
     r = RedirectResponse("/", 302)
     r.delete_cookie("google_estado", path="/")
     _poner_sesion(r, token)

@@ -248,6 +248,13 @@ Falta, en orden:
 5. **Publicar la pantalla de consentimiento de Google** (hoy solo entran los *test users*).
 6. Cuando pague el primer cliente: Render de pago (~US$7/mes) para que no se duerma.
 
+## Candados contra bots y correos temporales (19 nov)
+
+- **Correos temporales:** lista de servicios conocidos (`_DESECHABLES` en `cuentas.py`, con `email_desechable`, incluye subdominios). Se rechazan al entrar con Google con un mensaje claro y al invitar a una oficina. Cuando aparezca un servicio nuevo, se suma a la lista.
+- **Fuerza bruta:** 6 intentos fallidos de entrada (usuario/contraseña) en 15 minutos bloquean esa IP + usuario 15 minutos (`/api/entrar` y `/api/crear-admin`, en memoria del servidor).
+- **Fábricas de cuentas de prueba:** máximo 20 cuentas nuevas de Google por hora desde la misma IP (`/oauth_callback`).
+- El resto ya estaba: las cuentas por contraseña solo las crea el administrador, la prueba tiene tope por día, y el Google OAuth valida el `state` a la vuelta.
+
 ## Por dónde vamos (8 nov 2026)
 
 - **En GitHub:** `master` tiene el chat, las plantillas por cuenta y el cuaderno de Kaggle. **En Render puede seguir la versión anterior** hasta que se haga *Deploy latest commit*.

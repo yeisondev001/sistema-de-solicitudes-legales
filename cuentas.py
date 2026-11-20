@@ -513,6 +513,8 @@ def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
     email = (email or "").strip().lower()
     if not email or not verificado:
         raise ValueError("Google no confirmó el correo de esta cuenta.")
+    if email_desechable(email):
+        raise ValueError("Ese correo es temporal. Entre con su correo de siempre (Gmail o el de su estudio).")
     filas = _ejecutar(f"{_CUENTA} WHERE lower(u.email) = %s", (email,), leer=True)
     if not filas:
         # clave vacía: estas cuentas no pueden entrar con contraseña, solo con Google
@@ -525,6 +527,35 @@ def entrar_con_google(email: str, nombre: str = "", verificado: bool = False):
     if motivo:
         raise ValueError(motivo)
     return _limpio(filas[0]), _nueva_sesion(filas[0]["id"])
+
+
+# ── Correos temporales ───────────────────────────
+# Sirven para repetir la prueba gratis con cuentas de mentira: no se aceptan al entrar con Google ni al invitar
+# a alguien a una oficina. La lista trae los servicios más comunes; cuando aparezca uno nuevo, se suma aquí.
+_DESECHABLES = {
+    "10minutemail.com", "10minutemail.net", "10minutemail.co.uk", "20minutemail.com", "33mail.com",
+    "anonbox.net", "burnermail.io", "correo-temporal.com", "discard.email", "dispostable.com",
+    "dropmail.me", "email-fake.com", "emailondeck.com", "emailtemporal.org", "fakeinbox.com",
+    "fakemail.net", "fake-mail.net", "getairmail.com", "getnada.com", "grr.la",
+    "guerrillamail.com", "guerrillamail.net", "guerrillamail.org", "guerrillamail.biz", "guerrillamail.info",
+    "guerrillamail.de", "guerrillamailblock.com", "harakirimail.com", "inboxbear.com", "inboxkitten.com",
+    "mailcatch.com", "maildrop.cc", "mailinator.com", "mailnesia.com", "mail-temporaire.fr",
+    "mintemail.com", "moakt.com", "mohmal.com", "mytemp.email", "nowmymail.com",
+    "one-time.email", "sharklasers.com", "spam4.me", "tempail.com", "tempinbox.com",
+    "temp-mail.io", "temp-mail.org", "tempmail.plus", "tempmailaddress.com", "tempmailo.com",
+    "throwawaymail.com", "trashmail.com", "trashmail.de", "yopmail.com", "yopmail.net",
+    "yopmail.fr", "zetmail.com",
+}
+
+
+def email_desechable(email: str) -> bool:
+    """True si el correo es de un servicio de correos temporales (o de un subdominio de uno)."""
+    dominio = (email or "").rsplit("@", 1)[-1].strip().lower()
+    while dominio:
+        if dominio in _DESECHABLES:
+            return True
+        dominio = dominio.split(".", 1)[1] if "." in dominio else None
+    return False
 
 
 _MAXIMO_PREGUNTAS = {
@@ -918,6 +949,8 @@ def invitar(dueno_id: int, email: str):
     """El dueño agrega a un abogado por su correo; entra a la oficina cuando él acepte."""
     o = _del_dueno(dueno_id)
     email = _validar_email(email)
+    if email_desechable(email):
+        raise ValueError("No se puede invitar a un correo temporal: use el correo real de esa persona.")
     if _ejecutar("SELECT id FROM usuarios WHERE lower(email) = %s AND oficina_id = %s", (email, o["id"]), leer=True):
         raise ValueError(f"{email} ya está en la oficina.")
     if _ejecutar("SELECT email FROM oficina_invitaciones WHERE oficina_id = %s AND email = %s",
