@@ -164,12 +164,14 @@ def _personas(texto: str) -> list:
     """Los nombres de personas que se reconocen por lo que va antes o después, en el orden en que aparecen."""
     hallados = {}
     for m in re.finditer(_NOMBRE, texto):
-        nombre = m.group(0).strip()
+        raw = m.group(0)
         # el patrón puede comerse una palabra de más al principio («Contra JUAN PÉREZ»): se prueba recortando
-        partes = nombre.split()
+        partes = raw.split()
+        # dónde empieza cada palabra dentro del match: entre ellas puede haber varios espacios o un salto de línea
+        posiciones = [w.start() for w in re.finditer(r"\S+", raw)]
         for i in range(0, min(3, len(partes) - 1)):
             candidato = " ".join(partes[i:])
-            inicio = m.start() + nombre.index(candidato)
+            inicio = m.start() + posiciones[i]
             antes = texto[max(0, inicio - 60):inicio]
             despues = texto[m.end():m.end() + 80]
             if _es_nombre(candidato) and (_DESPUES.match(despues) or _ANTES.search(antes)):
