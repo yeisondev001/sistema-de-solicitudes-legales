@@ -389,9 +389,9 @@ export default function Inicio() {
         <section id="planes" className="scroll-mt-20 bg-panel text-sobre-panel">
           <div className="mx-auto max-w-[1240px] space-y-10 px-5 py-16 md:px-6 md:py-20">
             <div className="space-y-3">
-              <Encabezado antetitulo="PLANES" titulo="Empiece gratis. Pague cuando le sirva." claro />
+              <Encabezado antetitulo="PLANES" titulo="Elija el plan que le sirve." claro />
               <p className="text-[1.05rem] text-[#E2C9A8]">
-                Todos empiezan con {prueba.dias} días gratis, con todo incluido y sin tarjeta. Después elige su plan.
+                Pague cada mes o cada año y cancele cuando quiera, sin permanencia.
               </p>
             </div>
             <InterruptorCiclo anual={anual} setAnual={setAnual} />
@@ -406,9 +406,12 @@ export default function Inicio() {
                       <Link to={`${p.a}&ciclo=${anual ? 'anual' : 'mensual'}`} className={claseBotonPlan(p.destacado)}>
                         {p.boton}
                       </Link>
-                      <Link to="/entrar" className="-mt-1 text-center text-[0.92rem] text-[#E2C9A8] underline hover:text-white">
-                        o pruebe {prueba.dias} días gratis, sin tarjeta
-                      </Link>
+                      {/* la prueba trae todo lo del Abogado, así que el enlace va solo en ese plan */}
+                      {p.destacado && (
+                        <Link to="/entrar" className="-mt-1 text-center text-[0.92rem] text-[#E2C9A8] underline hover:text-white">
+                          o pruebe {prueba.dias} días gratis, sin tarjeta
+                        </Link>
+                      )}
                     </>
                   }
                 />

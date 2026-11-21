@@ -1614,13 +1614,17 @@ PAGINAS_PUBLICAS = {
          "Pruébelo 5 días gratis.", None),
     "calculadora-prestaciones-laborales": (
         "Calculadora de prestaciones laborales RD · Papiniano",
-        "Calcule gratis el preaviso, la cesantía, las vacaciones y la regalía pascual con las fórmulas del Código de "
-        "Trabajo dominicano. Sin registrarse.",
+        "Calcule gratis el preaviso, la cesantía, las vacaciones y la regalía pascual según cómo terminó el contrato: "
+        "desahucio, despido justificado o injustificado, dimisión o renuncia. Código de Trabajo dominicano.",
         "<h1>Calculadora de prestaciones laborales de República Dominicana</h1>"
         "<p>Calcula gratis, sin registrarse, el preaviso (art. 76), el auxilio de cesantía (art. 80), las vacaciones no "
-        "disfrutadas (arts. 177, 180 y 182) y la regalía pascual o salario de Navidad (arts. 219 y 220) de un trabajador al "
-        "que le hicieron desahucio o lo despidieron sin causa justificada, con las fórmulas del Código de Trabajo. "
-        "El salario diario es el salario mensual dividido entre 23.83.</p>"
+        "disfrutadas (arts. 177, 180 y 182) y la regalía pascual o salario de Navidad (arts. 219 y 220) de un trabajador "
+        "desahuciado, despedido (con causa justificada o sin ella), que dimitió o que renunció, con las fórmulas del "
+        "Código de Trabajo. El salario diario es el salario mensual dividido entre 23.83.</p>"
+        "<p>Según cómo terminó el contrato: el desahucio y el despido injustificado dan preaviso y cesantía (arts. 76, 80 "
+        "y 95); la dimisión justificada da las mismas indemnizaciones (arts. 97 y 101); el despido justificado y la "
+        "renuncia sin causa solo dan vacaciones y regalía pascual (art. 220), y la dimisión injustificada puede obligar "
+        "al trabajador a pagar el preaviso al empleador (art. 102).</p>"
         "<p>Preaviso: 7 días de 3 a 6 meses; 14 días de más de 6 meses a un año; 28 días con más de un año. Cesantía: "
         "6 días de 3 a 6 meses; 13 días de 6 meses a un año; 21 días por año de uno a cinco años; 23 días por año con "
         "cinco años o más.</p>"

@@ -3,7 +3,7 @@ import { Campo, ENTRADA, SELECT } from '@/components/agenda'
 import { Antetitulo, CabeceraPublica, PiePublico } from '@/components/publico'
 import { Input } from '@/components/ui/input'
 import { hoyIso } from '@/lib/fechas'
-import { calcular, pesos, tiempoBonito, type Periodo } from '@/lib/prestaciones'
+import { calcular, MOTIVOS, pesos, tiempoBonito, type Motivo, type Periodo } from '@/lib/prestaciones'
 import { NOMBRE_APP } from '@/lib/tema'
 import { useTitulo } from '@/lib/titulo'
 
@@ -24,10 +24,11 @@ export default function Calculadora() {
   const [entrada, setEntrada] = useState('')
   const [salida, setSalida] = useState(hoyIso())
   const [tomoVacaciones, setTomoVacaciones] = useState(false)
+  const [motivo, setMotivo] = useState<Motivo>('desahucio')
 
   const calculo = useMemo(
-    () => calcular({ salario: numero(salario), periodo, entrada, salida, tomoVacaciones }),
-    [salario, periodo, entrada, salida, tomoVacaciones],
+    () => calcular({ salario: numero(salario), periodo, entrada, salida, tomoVacaciones, motivo }),
+    [salario, periodo, entrada, salida, tomoVacaciones, motivo],
   )
   const fechasAlReves = Boolean(entrada && salida && salida <= entrada)
 
@@ -41,9 +42,9 @@ export default function Calculadora() {
             Calculadora de prestaciones laborales
           </h1>
           <p className="text-[1.1rem] leading-relaxed text-ink-soft">
-            Calcule el preaviso, la cesantía, las vacaciones y la regalía pascual (salario de Navidad) de un trabajador al
-            que le hicieron desahucio o lo despidieron sin causa justificada, con las fórmulas del Código de Trabajo de la
-            República Dominicana.
+            Calcule el preaviso, la cesantía, las vacaciones y la regalía pascual (salario de Navidad) de un trabajador
+            despedido, desahuciado o que renunció, con las fórmulas del Código de Trabajo de la República Dominicana. Escoja
+            cómo terminó el contrato: lo que corresponde cambia en cada caso.
           </p>
         </div>
 
@@ -54,6 +55,14 @@ export default function Calculadora() {
             onSubmit={(e) => e.preventDefault()}
             className="space-y-5 rounded-2xl border border-papel-borde bg-card p-6 md:p-7"
           >
+            <Campo id="calc-motivo" etiqueta="¿Cómo terminó el contrato?">
+              <select id="calc-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value as Motivo)} className={SELECT + ' w-full'}>
+                {MOTIVOS.map((m) => (
+                  <option key={m.valor} value={m.valor}>{m.texto}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-[0.88rem] leading-relaxed text-ink-soft">{MOTIVOS.find((m) => m.valor === motivo)?.ayuda}</p>
+            </Campo>
             <div className="grid grid-cols-[1fr_auto] items-end gap-3">
               <Campo id="calc-salario" etiqueta="Salario">
                 <Input
@@ -146,11 +155,14 @@ export default function Calculadora() {
                   </table>
                 </div>
                 <ul className="list-disc space-y-1.5 pl-5 text-[0.9rem] leading-relaxed text-ink-soft">
-                  {calculo.sinPreaviso && <li>Con menos de 3 meses de trabajo no corresponden preaviso ni cesantía (arts. 76 y 80).</li>}
-                  <li>
-                    El preaviso y la cesantía se pagan dentro de 10 días. Si no, el empleador debe además un día de salario
-                    ({pesos(calculo.diario)}) por cada día de retraso (art. 86).
-                  </li>
+                  {calculo.notasMotivo.map((n) => <li key={n}>{n}</li>)}
+                  {calculo.pagaIndemnizacion && calculo.sinPreaviso && <li>Con menos de 3 meses de trabajo no corresponden preaviso ni cesantía (arts. 76 y 80).</li>}
+                  {calculo.pagaIndemnizacion && (
+                    <li>
+                      El preaviso y la cesantía se pagan dentro de 10 días. Si no, el empleador debe además un día de salario
+                      ({pesos(calculo.diario)}) por cada día de retraso (art. 86).
+                    </li>
+                  )}
                   {calculo.vacacionesUltimoAnio > 0 && (
                     <li>
                       Si tampoco disfrutó las vacaciones del último año completo, se suman {calculo.vacacionesUltimoAnio} días
@@ -163,10 +175,25 @@ export default function Calculadora() {
                     <a href="/calculadora-regalia-pascual" className="font-semibold text-marca-texto underline">calculadora de regalía pascual</a>.
                   </li>
                   <li>
-                    No incluye la indemnización del art. 95 (hasta 6 meses de salario, solo si un tribunal declara
-                    injustificado el despido) ni la participación en los beneficios de la empresa.
+                    {calculo.motivo === 'desahucio'
+                      ? 'No incluye la indemnización del art. 95 (hasta 6 meses de salario, solo si un tribunal declara injustificado un despido) ni la participación en los beneficios de la empresa.'
+                      : 'No incluye la participación en los beneficios de la empresa.'}
                   </li>
                 </ul>
+                {calculo.posibles.length > 0 && (
+                  <div className="space-y-3 rounded-xl border border-dashed border-regla bg-card p-4">
+                    <p className="text-[0.85rem] font-bold tracking-[0.1em] text-ink-soft">POSIBLE, NO ESTÁ SUMADO AL TOTAL</p>
+                    {calculo.posibles.map((p) => (
+                      <div key={p.concepto} className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-bold">{p.concepto}</p>
+                          <p className="text-[0.88rem] leading-relaxed text-ink-soft">{p.articulo} · {p.texto}</p>
+                        </div>
+                        <p className="shrink-0 tabular-nums whitespace-nowrap">{p.monto > 0 ? (calculo.motivo === 'injustificado' || calculo.motivo === 'dimision_justificada' ? 'hasta ' : '') + pesos(p.monto) : ''}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="border-t border-papel-borde pt-4 text-[0.85rem] text-ink-soft">
                   Cálculo orientativo con las fórmulas del Código de Trabajo. No sustituye la asesoría de un abogado.
                 </p>
